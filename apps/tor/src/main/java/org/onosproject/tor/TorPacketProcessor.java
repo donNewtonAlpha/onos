@@ -201,8 +201,8 @@ public class TorPacketProcessor implements PacketProcessor {
             Ethernet ethPkt = pkt.parsed();
             IPv4 ip4Packet = (IPv4) ethPkt.getPayload();
 
-            int sockId = ethPkt.getVlanID();
-            int vlanID = ethPkt.getInnerVlanID();
+            int sockId = ethPkt.getStagVlanID();
+            int vlanID = ethPkt.getCtagVlanID();
 
             if(TorComponent.dnsEnabledCustomers.containsKey(vlanID)){
                 if(TorComponent.dnsEnabledCustomers.get(vlanID)){
@@ -335,7 +335,7 @@ public class TorPacketProcessor implements PacketProcessor {
                     responseEthernet.setDestinationMACAddress(ethPkt.getSourceMAC());
                     responseEthernet.setSourceMACAddress(ethPkt.getDestinationMAC());
                     responseEthernet.setEtherType(ethPkt.getEtherType());
-                    responseEthernet.setVlanID(ethPkt.getVlanID(), ethPkt.getInnerVlanID());
+                    responseEthernet.setVlanID(ethPkt.getStagVlanID(), ethPkt.getCtagVlanID());
                     //responseEthernet.resetChecksum();
 
 
@@ -383,8 +383,8 @@ public class TorPacketProcessor implements PacketProcessor {
         Ethernet ethPkt = pkt.parsed();
         //IPv4 ip4Packet = (IPv4) ethPkt.getPayload();
 
-        //int sockId = ethPkt.getVlanID();
-        int vlanID = ethPkt.getInnerVlanID();
+
+        int vlanID = ethPkt.getCtagVlanID();
 
         if (TorComponent.ipTvEnabledCustomers.containsKey(vlanID)&&TorComponent.ipTvEnabledCustomers.get(vlanID)){
             //Uverse allowed
@@ -395,6 +395,8 @@ public class TorPacketProcessor implements PacketProcessor {
 */
             TrafficTreatment sendToServerLan = DefaultTrafficTreatment.builder().setOutput(TorComponent.serverPort).build();
             OutboundPacket packetToSend = new DefaultOutboundPacket(TorComponent.torId, sendToServerLan, pkt.unparsed());
+
+            log.debug("IGMP packet passed to the server");
 
             packetService.emit(packetToSend);
 

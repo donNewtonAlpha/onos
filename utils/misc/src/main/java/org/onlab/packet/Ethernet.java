@@ -72,10 +72,12 @@ public class Ethernet extends BasePacket {
 
     protected MacAddress destinationMACAddress;
     protected MacAddress sourceMACAddress;
-    protected byte priorityCode;
-    protected short vlanID;
-    protected short innerVlanId; // For now no priority code for the second tag
-    protected boolean is1adPacket = false;
+    protected short cTagVlanId;
+    protected byte cTagpriorityCode;
+    protected short  cTagEthertype;
+    protected short sTagVlanId;
+    protected byte sTagpriorityCode;
+    protected short sTagEthertype;
     protected short etherType;
     protected boolean pad = false;
 
@@ -84,8 +86,10 @@ public class Ethernet extends BasePacket {
      */
     public Ethernet() {
         super();
-        this.vlanID = Ethernet.VLAN_UNTAGGED;
-        this.innerVlanId = Ethernet.VLAN_UNTAGGED;
+        this.cTagVlanId = Ethernet.VLAN_UNTAGGED;
+        this.sTagVlanId = Ethernet.VLAN_UNTAGGED;
+        this.cTagEthertype = TYPE_VLAN;
+        this.sTagEthertype = TYPE_VLAN_1AD;
     }
 
     /**
@@ -196,7 +200,7 @@ public class Ethernet extends BasePacket {
      * @return the priorityCode
      */
     public byte getPriorityCode() {
-        return this.priorityCode;
+        return this.cTagpriorityCode;
     }
 
     /**
@@ -206,7 +210,20 @@ public class Ethernet extends BasePacket {
      * @return the Ethernet frame
      */
     public Ethernet setPriorityCode(final byte priority) {
-        this.priorityCode = priority;
+        this.cTagpriorityCode = priority;
+        return this;
+    }
+
+    /**
+     * Sets the priority codes.
+     *
+     * @param cTagpriority the C Tag priorityCode to set
+     * @param sTagpriority the S Tag priorityCode to set
+     * @return the Ethernet frame
+     */
+    public Ethernet setPriorityCode(final byte cTagpriority, final byte sTagpriority) {
+        this.cTagpriorityCode = cTagpriority;
+        this.sTagpriorityCode = sTagpriority;
         return this;
     }
 
@@ -216,16 +233,25 @@ public class Ethernet extends BasePacket {
      * @return the vlanID
      */
     public short getVlanID() {
-        return this.vlanID;
+        return this.cTagVlanId;
     }
 
     /**
-     * Gets the inner VLAN ID for 2 tags packets(802.1ad or 2 802.1Q tags).
+     * Gets the C Tag VLAN ID.
      *
      * @return the inner vlanID
      */
-    public short getInnerVlanID() {
-        return this.innerVlanId;
+    public short getCtagVlanID() {
+        return this.cTagVlanId;
+    }
+
+    /**
+     * Gets the C Tag VLAN ID ( inner vlan if 2 tags).
+     *
+     * @return the C Tag vlanID
+     */
+    public short getStagVlanID() {
+        return this.sTagVlanId;
     }
 
     /**
@@ -235,20 +261,20 @@ public class Ethernet extends BasePacket {
      * @return the Ethernet frame
      */
     public Ethernet setVlanID(final short vlan) {
-        this.vlanID = vlan;
+        this.cTagVlanId = vlan;
         return this;
     }
 
     /**
      * Sets the VLAN IDs for 2 tags packets (802.1ad or 2 802.1Q tags).
      *
-     * @param outerVlan the outer vlanID to set
-     * @param innerVlan the inner vlanId to set
+     * @param sTagVid the outer vlanID to set
+     * @param cTagVid the inner vlanId to set
      * @return the Ethernet frame
      */
-    public Ethernet setVlanID(final short outerVlan, final short innerVlan) {
-        this.vlanID = outerVlan;
-        this.innerVlanId = innerVlan;
+    public Ethernet setVlanID(final short sTagVid, final short cTagVid) {
+        this.sTagVlanId = sTagVid;
+        this.cTagVlanId = cTagVid;
         return this;
     }
 
@@ -256,15 +282,18 @@ public class Ethernet extends BasePacket {
     /**
      * Sets the VLAN IDs for 2 tags packets (802.1ad or 2 802.1Q tags).
      *
-     * @param outerVlan the outer vlanID to set
-     * @param innerVlan the inner vlanId to set
-     * @param packet8021ad set the output to be 802.1ad if  true or 802.1q (twice) if not
+     * @param sTagEthertype the outer vlan ethertype
+     * @param sTagVid the outer vlanId
+     * @param cTagEhertype set the inner ethertype
+     * @param cTagVid set the output to be 802.1ad if  true or 802.1q (twice) if not
      * @return the Ethernet frame
      */
-    public Ethernet setVlanID(final short outerVlan, final short innerVlan, final boolean packet8021ad) {
-        this.vlanID = outerVlan;
-        this.innerVlanId = innerVlan;
-        this.is1adPacket = packet8021ad;
+    public Ethernet setVlanID(final short sTagEthertype, final short sTagVid,
+                              final short cTagEhertype, final short cTagVid) {
+        this.cTagEthertype = cTagEhertype;
+        this.cTagVlanId = cTagVid;
+        this.sTagEthertype = sTagEthertype;
+        this.sTagVlanId = sTagVid;
         return this;
     }
     /**
@@ -330,8 +359,8 @@ public class Ethernet extends BasePacket {
             this.payload.setParent(this);
             payloadData = this.payload.serialize();
         }
-        int length = 14 + (this.vlanID == Ethernet.VLAN_UNTAGGED ? 0 : 4)
-                + (this.innerVlanId == Ethernet.VLAN_UNTAGGED ? 0 : 4)
+        int length = 14 + (this.cTagVlanId == Ethernet.VLAN_UNTAGGED ? 0 : 4)
+                + (this.sTagVlanId == Ethernet.VLAN_UNTAGGED ? 0 : 4)
                 + (payloadData == null ? 0 : payloadData.length);
         if (this.pad && length < 60) {
             length = 60;
@@ -340,21 +369,19 @@ public class Ethernet extends BasePacket {
         final ByteBuffer bb = ByteBuffer.wrap(data);
         bb.put(this.destinationMACAddress.toBytes());
         bb.put(this.sourceMACAddress.toBytes());
-        if (this.vlanID != Ethernet.VLAN_UNTAGGED) {
-            if (this.innerVlanId != Ethernet.VLAN_UNTAGGED) {
+        if (this.cTagVlanId != Ethernet.VLAN_UNTAGGED) {
+            //At least one tag
+            if (this.sTagVlanId != Ethernet.VLAN_UNTAGGED) {
                 //2 tags
-                if (this.is1adPacket) {
-                    bb.putShort(TYPE_VLAN_1AD);
-                } else {
-                    bb.putShort(TYPE_VLAN);
-                }
-                bb.putShort((short) (this.priorityCode << 13 | this.vlanID & 0x0fff));
+                bb.putShort(this.sTagEthertype);
+                bb.putShort((short) (this.sTagpriorityCode << 13 | this.sTagVlanId & 0x0fff));
 
-                bb.putShort(TYPE_VLAN);
-                bb.putShort(this.innerVlanId);
+                bb.putShort(this.cTagEthertype);
+                bb.putShort((short) (this.cTagpriorityCode << 13 | this.cTagVlanId & 0x0fff));
             } else {
-                bb.putShort(TYPE_VLAN);
-                bb.putShort((short) (this.priorityCode << 13 | this.vlanID & 0x0fff));
+                //one tag
+                bb.putShort(this.cTagEthertype);
+                bb.putShort((short) (this.cTagpriorityCode << 13 | this.cTagVlanId & 0x0fff));
             }
         }
         bb.putShort(this.etherType);
@@ -389,35 +416,27 @@ public class Ethernet extends BasePacket {
         this.sourceMACAddress = MacAddress.valueOf(srcAddr);
 
         short ethType = bb.getShort();
-        //logger.info("First ethtype : " + ethType);
-        if (ethType == TYPE_VLAN) {
+        if (ethType == TYPE_VLAN_1AD | ethType == TYPE_VLAN) {
             final short tci = bb.getShort();
-            this.priorityCode = (byte) (tci >> 13 & 0x07);
-            this.vlanID = (short) (tci & 0x0fff);
+            this.cTagEthertype = ethType;
+            this.cTagpriorityCode = (byte) (tci >> 13 & 0x07);
+            this.cTagVlanId = (short) (tci & 0x0fff);
             ethType = bb.getShort();
-          //  logger.info("Second ethertype : " + ethType);
-
-
-       /* } else if (ethType == TYPE_VLAN_1AD) {
-            final short tci = bb.getShort();
-            this.priorityCode = (byte) (tci >> 13 & 0x07);
-            this.vlanID = (short) (tci & 0x0fff);
-            ethType = bb.getShort();
-            this.innerVlanId = bb.getShort();
-            ethType = bb.getShort();*/
         } else {
-            this.vlanID = Ethernet.VLAN_UNTAGGED;
-            this.innerVlanId = Ethernet.VLAN_UNTAGGED;
+            this.cTagVlanId = Ethernet.VLAN_UNTAGGED;
+            this.sTagVlanId = Ethernet.VLAN_UNTAGGED;
         }
 
-        if (ethType == -TYPE_VLAN) {
-            //logger.info("2 tags");
-            // QinQ, 2 802.1Q tags
-            this.innerVlanId = bb.getShort();
+        if (ethType == TYPE_VLAN_1AD | ethType == TYPE_VLAN) {
+            //2 tags
+            this.sTagEthertype = this.cTagEthertype;
+            this.sTagVlanId = this.cTagVlanId;
+            this.sTagpriorityCode = this.cTagpriorityCode;
+            final short tci = bb.getShort();
+            this.cTagEthertype = ethType;
+            this.cTagpriorityCode = (byte) (tci >> 13 & 0x07);
+            this.cTagVlanId = (short) (tci & 0x0fff);
             ethType = bb.getShort();
-        } else {
-            //logger.info("One tag");
-            this.innerVlanId = Ethernet.VLAN_UNTAGGED;
         }
 
         this.etherType = ethType;
@@ -459,9 +478,6 @@ public class Ethernet extends BasePacket {
         return true;
     }
 
-    public void set1adPacket(boolean b) {
-        this.is1adPacket = b;
-    }
 
     /**
      * Accepts a MAC address of the form 00:aa:11:bb:22:cc, case does not
@@ -507,8 +523,8 @@ public class Ethernet extends BasePacket {
         int result = super.hashCode();
         result = prime * result + this.destinationMACAddress.hashCode();
         result = prime * result + this.etherType;
-        result = prime * result + this.vlanID;
-        result = prime * result + this.priorityCode;
+        result = prime * result + this.cTagVlanId;
+        result = prime * result + this.cTagpriorityCode;
         result = prime * result + (this.pad ? 1231 : 1237);
         result = prime * result + this.sourceMACAddress.hashCode();
         return result;
@@ -534,10 +550,22 @@ public class Ethernet extends BasePacket {
         if (!this.destinationMACAddress.equals(other.destinationMACAddress)) {
             return false;
         }
-        if (this.priorityCode != other.priorityCode) {
+        if (this.cTagpriorityCode != other.cTagpriorityCode) {
             return false;
         }
-        if (this.vlanID != other.vlanID) {
+        if (this.cTagVlanId != other.cTagVlanId) {
+            return false;
+        }
+        if (this.cTagEthertype != other.cTagEthertype) {
+            return false;
+        }
+        if (this.sTagpriorityCode != other.sTagpriorityCode) {
+            return false;
+        }
+        if (this.sTagVlanId != other.sTagVlanId) {
+            return false;
+        }
+        if (this.sTagEthertype != other.sTagEthertype) {
             return false;
         }
         if (this.etherType != other.etherType) {
@@ -578,19 +606,27 @@ public class Ethernet extends BasePacket {
             sb.append(this.getEtherType());
         }
 
-        sb.append("\ndl_vlan: ");
-        if (this.getVlanID() == Ethernet.VLAN_UNTAGGED) {
-            sb.append("untagged");
-        } else {
-            sb.append(this.getVlanID());
+
+        if (this.getStagVlanID() != Ethernet.VLAN_UNTAGGED) {
+            sb.append("\nS_Tag_vlan: type ");
+            sb.append(this.sTagEthertype);
+            sb.append(", priority ");
+            sb.append(this.sTagpriorityCode);
+            sb.append(", vlanId : ");
+            sb.append(this.sTagVlanId);
         }
-        sb.append("\ndl_vlan_pcp: ");
-        sb.append(this.getPriorityCode());
-        sb.append("\nsecond_vlan : ");
-        if (this.innerVlanId == Ethernet.VLAN_UNTAGGED) {
+
+        sb.append("\nsC_Tag_vlan : ");
+        if (this.cTagVlanId == Ethernet.VLAN_UNTAGGED) {
             sb.append("untagged");
         } else {
-            sb.append(this.innerVlanId);
+            sb.append("type ");
+            sb.append(this.cTagEthertype);
+            sb.append(", priority ");
+            sb.append(this.cTagpriorityCode);
+            sb.append(", vlanId : ");
+            sb.append(this.cTagVlanId);
+
         }
         sb.append("\ndl_src: ");
         sb.append(bytesToHex(this.getSourceMACAddress()));
@@ -775,21 +811,27 @@ public class Ethernet extends BasePacket {
             eth.setSourceMACAddress(addressBuffer);
 
             short ethType = bb.getShort();
-            if (ethType == TYPE_VLAN) {
+
+            if (ethType == TYPE_VLAN | ethType == TYPE_VLAN_1AD) {
                 checkHeaderLength(length, ETHERNET_HEADER_LENGTH + VLAN_HEADER_LENGTH);
                 final short tci = bb.getShort();
-                eth.setPriorityCode((byte) (tci >> 13 & 0x07));
-                eth.setVlanID((short) (tci & 0x0fff));
+                eth.cTagEthertype = ethType;
+                eth.cTagpriorityCode = ((byte) (tci >> 13 & 0x07));
+                eth.cTagVlanId = (short) (tci & 0x0fff);
                 ethType = bb.getShort();
             } else {
-                eth.setVlanID(Ethernet.VLAN_UNTAGGED);
+                eth.setVlanID(Ethernet.VLAN_UNTAGGED, Ethernet.VLAN_UNTAGGED);
             }
-            if (ethType == TYPE_VLAN) {
+            if (ethType == TYPE_VLAN | ethType == TYPE_VLAN_1AD) {
                 checkHeaderLength(length, ETHERNET_HEADER_LENGTH + 2 * VLAN_HEADER_LENGTH);
-                eth.innerVlanId = (bb.getShort());
+                eth.sTagVlanId = eth.cTagVlanId;
+                eth.sTagpriorityCode = eth.cTagpriorityCode;
+                eth.sTagEthertype = eth.cTagEthertype;
+                final short tci = bb.getShort();
+                eth.cTagEthertype = ethType;
+                eth.cTagpriorityCode = ((byte) (tci >> 13 & 0x07));
+                eth.cTagVlanId = (short) (tci & 0x0fff);
                 ethType = bb.getShort();
-            } else {
-                eth.innerVlanId = Ethernet.VLAN_UNTAGGED;
             }
 
             eth.setEtherType(ethType);

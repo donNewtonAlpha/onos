@@ -33,6 +33,7 @@
 
     <properties>
         <onos.app.name>org.onosproject.olt</onos.app.name>
+        <checkstyle.skip>true</checkstyle.skip>
     </properties>
 
     <dependencies>
