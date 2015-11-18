@@ -40,10 +40,7 @@ import org.onosproject.net.config.basics.SubjectFactories;
 import org.onosproject.net.device.DeviceEvent;
 import org.onosproject.net.device.DeviceListener;
 import org.onosproject.net.device.DeviceService;
-import org.onosproject.net.flow.DefaultTrafficSelector;
-import org.onosproject.net.flow.DefaultTrafficTreatment;
-import org.onosproject.net.flow.TrafficSelector;
-import org.onosproject.net.flow.TrafficTreatment;
+import org.onosproject.net.flow.*;
 import org.onosproject.net.flowobjective.DefaultForwardingObjective;
 import org.onosproject.net.flowobjective.FlowObjectiveService;
 import org.onosproject.net.flowobjective.ForwardingObjective;
@@ -52,7 +49,6 @@ import org.slf4j.Logger;
 
 import java.util.Dictionary;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.slf4j.LoggerFactory.getLogger;
@@ -62,11 +58,14 @@ import static org.slf4j.LoggerFactory.getLogger;
  */
 @Service
 @Component(immediate = true)
-public class Olt implements AccessDeviceService {
+public class OLT implements AccessDeviceService {
     private final Logger log = getLogger(getClass());
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected FlowObjectiveService flowObjectiveService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected FlowRuleService flowRuleService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected DeviceService deviceService;
@@ -87,7 +86,8 @@ public class Olt implements AccessDeviceService {
     public static final int UPLINK_PORT = 129;
     public static final int GFAST_UPLINK_PORT = 100;
 
-    public static final String OLT_DEVICE = "of:90e2ba82f97791e9";
+    //public static final String OLT_DEVICE = "of:90e2ba82f97791e9";
+    public static final String OLT_DEVICE = "of:5254008cf49b91e9";
     public static final String GFAST_DEVICE = "of:0011223344551357";
 
     @Property(name = "uplinkPort", intValue = UPLINK_PORT,
@@ -129,10 +129,13 @@ public class Olt implements AccessDeviceService {
 
         networkConfig.registerConfigFactory(configFactory);
         networkConfig.addListener(configListener);
+        log.info("OLT Starting network config");
 
         networkConfig.getSubjects(DeviceId.class, AccessDeviceConfig.class).forEach(
                 subject -> {
                     AccessDeviceConfig config = networkConfig.getConfig(subject, AccessDeviceConfig.class);
+                    log.info("activate() OLT getting data for subject");
+
                     if (config != null) {
                         AccessDeviceData data = config.getOlt();
                         oltData.put(data.deviceId(), data);
@@ -244,43 +247,118 @@ public class Olt implements AccessDeviceService {
         AccessDeviceData olt = oltData.get(port.deviceId());
 
         if (olt == null) {
-            log.warn("No data found for OLT device {}", port.deviceId());
+            log.info("No data found for OLT device {}", port.deviceId());
             return;
         }
 
-        provisionVlans(olt.deviceId(), olt.uplink(), port.port(), vlan, olt.vlan(),
-                olt.defaultVlan());
+        provisionVlans(olt.deviceId(), olt.uplink(), port.port(), vlan, olt.vlan());
     }
 
     private void provisionVlans(DeviceId deviceId, PortNumber uplinkPort,
                                 PortNumber subscriberPort,
-                                VlanId subscriberVlan, VlanId deviceVlan,
-                                Optional<VlanId> defaultVlan) {
+                                VlanId subscriberVlan, VlanId deviceVlan) {
 
-        TrafficSelector upstream = DefaultTrafficSelector.builder()
-                .matchVlanId((defaultVlan.isPresent()) ? defaultVlan.get() : DEFAULT_VLAN)
+        log.info("provisionVlans uplinkPort:{}, deviceVlan:{}, subscriberPort:{}, subscriberVlan:{}",
+                uplinkPort, deviceVlan, subscriberPort, subscriberVlan);
+
+
+        // Create Upstream Flow Rules
+
+
+        TrafficSelector upstream0 = DefaultTrafficSelector.builder()
+                .matchVlanId(DEFAULT_VLAN)
                 .matchInPort(subscriberPort)
                 .build();
 
-        TrafficSelector downstream = DefaultTrafficSelector.builder()
-                .matchVlanId(deviceVlan)
-                .matchInPort(uplinkPort)
+        TrafficSelector upstream1 = DefaultTrafficSelector.builder()
+                .matchVlanId(subscriberVlan)
+                .matchInPort(subscriberPort)
                 .build();
 
-        TrafficTreatment upstreamTreatment = DefaultTrafficTreatment.builder()
+
+        TrafficTreatment upstreamTreatment0 = DefaultTrafficTreatment.builder()
                 .setVlanId(subscriberVlan)
+                .transition(1)
+                .build();
+
+        TrafficTreatment upstreamTreatment1 = DefaultTrafficTreatment.builder()
                 .pushVlan()
                 .setVlanId(deviceVlan)
                 .setOutput(uplinkPort)
                 .build();
 
-        TrafficTreatment downstreamTreatment = DefaultTrafficTreatment.builder()
+        FlowRule upFwd0 = DefaultFlowRule.builder()
+                .withSelector(upstream0)
+                .withTreatment(upstreamTreatment0)
+                .withPriority(1000)
+                .makePermanent()
+                .forDevice(deviceId)
+                .withCookie(1001)
+                .forTable(0)
+                .build();
+
+        FlowRule upFwd1 = DefaultFlowRule.builder()
+                .withSelector(upstream1)
+                .withTreatment(upstreamTreatment1)
+                .withPriority(1000)
+                .makePermanent()
+                .forDevice(deviceId)
+                .withCookie(1002)
+                .forTable(1)
+                .build();
+
+        flowRuleService.applyFlowRules(upFwd0, upFwd1);
+
+
+
+        // Create Downstream Flow Rules
+
+        TrafficSelector downstream0 = DefaultTrafficSelector.builder()
+                .matchVlanId(deviceVlan)
+                .matchVlanPcp((byte)0)
+                .matchInPort(uplinkPort)
+                .build();
+
+        TrafficSelector downstream1 = DefaultTrafficSelector.builder()
+                .matchVlanId(subscriberVlan)
+                .matchVlanPcp((byte)0)
+                .matchInPort(uplinkPort)
+                .build();
+
+        TrafficTreatment downstreamTreatment0 = DefaultTrafficTreatment.builder()
                 .popVlan()
-                .setVlanId((defaultVlan.isPresent()) ? defaultVlan.get() : DEFAULT_VLAN)
+                .transition(3)
+                .build();
+
+        TrafficTreatment downstreamTreatment1 = DefaultTrafficTreatment.builder()
+                .popVlan()
                 .setOutput(subscriberPort)
                 .build();
 
+        FlowRule downFwd0 = DefaultFlowRule.builder()
+                .withSelector(downstream0)
+                .withTreatment(downstreamTreatment0)
+                .withPriority(1000)
+                .makePermanent()
+                .forDevice(deviceId)
+                .withCookie(1003)
+                .forTable(0)
+                .build();
 
+        FlowRule downFwd1 = DefaultFlowRule.builder()
+                .withSelector(downstream1)
+                .withTreatment(downstreamTreatment1)
+                .withPriority(1000)
+                .makePermanent()
+                .forDevice(deviceId)
+                .withCookie(1004)
+                .forTable(3)
+                .build();
+
+        flowRuleService.applyFlowRules(downFwd0,downFwd1);
+
+
+/*
         ForwardingObjective upFwd = DefaultForwardingObjective.builder()
                 .withFlag(ForwardingObjective.Flag.VERSATILE)
                 .withPriority(1000)
@@ -289,6 +367,7 @@ public class Olt implements AccessDeviceService {
                 .fromApp(appId)
                 .withTreatment(upstreamTreatment)
                 .add();
+
 
         ForwardingObjective downFwd = DefaultForwardingObjective.builder()
                 .withFlag(ForwardingObjective.Flag.VERSATILE)
@@ -301,6 +380,8 @@ public class Olt implements AccessDeviceService {
 
         flowObjectiveService.forward(deviceId, upFwd);
         flowObjectiveService.forward(deviceId, downFwd);
+*/
+
     }
 
     @Override
@@ -315,6 +396,9 @@ public class Olt implements AccessDeviceService {
             switch (event.type()) {
                 case PORT_ADDED:
                 case PORT_UPDATED:
+
+                    log.info("PortUpdated: OLT calling VlanOnPort {}", event.port().number());
+
                     if (devId.equals(event.subject().id()) && event.port().isEnabled()) {
                         short vlanId = fetchVlanId(event.port().number());
                         provisionVlanOnPort(gfastDevice, uplinkPort, event.port().number(), vlanId);
@@ -344,6 +428,7 @@ public class Olt implements AccessDeviceService {
                     AccessDeviceConfig config =
                             networkConfig.getConfig((DeviceId) event.subject(), CONFIG_CLASS);
                     if (config != null) {
+                        log.info("NetworkConfigEvent() OLT getting data for subject");
                         oltData.put(config.getOlt().deviceId(), config.getOlt());
                     }
                 }
