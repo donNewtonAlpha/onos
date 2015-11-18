@@ -470,6 +470,91 @@
         <command>
             <action class="org.onosproject.cli.net.TunnelUpdateCommand"/>
         </command>
+        <!-- abstractswitch app commands-->
+        <command>
+            <action class="org.onosproject.cli.AbstractSwitchComputeExpandedGraph" />
+        </command>
+        <command>
+            <action class="org.onosproject.cli.AbstractSwitchResetCommand" />
+        </command>
+        <command>
+            <action class="org.onosproject.cli.AbstractSwitchAddChildCommand" />
+        </command>
+        <command>
+            <action class="org.onosproject.cli.AbstractSwitchKnowledgeDisplayCommand" />
+        </command>
+        <command>
+            <action class="org.onosproject.cli.AbstractSwitchNameResolutionProtocolCommand" />
+        </command>
+        <command>
+            <action class="org.onosproject.cli.AbstractSwitchTopologyDiscoveryProtocolInitiation" />
+        </command>
+        <command>
+            <action class="org.onosproject.cli.net.AbstractSwitchAddIntentCommand" />
+        </command>
+        <command>
+            <action class="org.onosproject.cli.AbstractSwitchFillDatabase" />
+        </command>
+ <!--       &lt;!&ndash; parental control command&ndash;&gt;
+        <command>
+            <action class="org.onosproject.cli.net.ParentalControlGeneralDNS" />
+        </command>
+        <command>
+            <action class="org.onosproject.cli.net.ParentalControlPersonalDNS" />
+        </command>
+
+        <command>
+            <action class="org.onosproject.cli.net.ParentalControlConnectCustomer" />
+        </command>
+
+        <command>
+            <action class="org.onosproject.cli.net.ParentalControlDisconnectCustomer" />
+        </command>-->
+        <!-- Vcpe Cli-->
+        <command>
+            <action class="org.onosproject.cli.net.VcpeEnableInternetCommand" />
+        </command>
+        <command>
+        <action class="org.onosproject.cli.net.VcpeDisableInternetCommand" />
+        </command>
+        <command>
+            <action class="org.onosproject.cli.net.VcpeEnableUverseCommand" />
+        </command>
+        <command>
+            <action class="org.onosproject.cli.net.VcpeDisableUverseCommand" />
+        </command>
+        <command>
+            <action class="org.onosproject.cli.net.VcpeGeneralDnsCommand" />
+        </command>
+        <command>
+            <action class="org.onosproject.cli.net.VcpeNoDnsCommand" />
+        </command>
+        <command>
+            <action class="org.onosproject.cli.net.VcpePersonalDnsCommand" />
+        </command>
+        <command>
+            <action class="org.onosproject.cli.net.VcpeInitiateCustomerCommand" />
+        </command>
+        <command>
+            <action class="org.onosproject.cli.VcpeDiscoverLanCommand" />
+        </command>
+
+        <!--Tor CLI-->
+        <command>
+            <action class="org.onosproject.cli.net.TorInternet" />
+        </command>
+        <command>
+            <action class="org.onosproject.cli.net.TorDns" />
+        </command>
+        <command>
+            <action class="org.onosproject.cli.net.TorUverse" />
+        </command>
+        <command>
+            <action class="org.onosproject.cli.net.TorTestNextFlow" />
+        </command>
+
+
+
     </command-bundle>
 
     <bean id="reviewAppNameCompleter" class="org.onosproject.cli.security.ReviewApplicationNameCompleter"/>

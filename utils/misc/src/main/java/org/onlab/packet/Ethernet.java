@@ -46,6 +46,7 @@ public class Ethernet extends BasePacket {
     public static final short TYPE_LLDP = EthType.EtherType.LLDP.ethType().toShort();
     public static final short TYPE_VLAN = EthType.EtherType.VLAN.ethType().toShort();
     public static final short TYPE_BSN = EthType.EtherType.BDDP.ethType().toShort();
+    public static final short TYPE_VLAN_1AD = EthType.EtherType.VLAN_1AD.ethType().toShort();
 
     public static final short MPLS_UNICAST = EthType.EtherType.MPLS_UNICAST.ethType().toShort();;
     public static final short MPLS_MULTICAST = EthType.EtherType.MPLS_MULTICAST.ethType().toShort();
@@ -73,6 +74,8 @@ public class Ethernet extends BasePacket {
     protected MacAddress sourceMACAddress;
     protected byte priorityCode;
     protected short vlanID;
+    protected short innerVlanId; // For now no priority code for the second tag
+    protected boolean is1adPacket = false;
     protected short etherType;
     protected boolean pad = false;
 
@@ -82,6 +85,7 @@ public class Ethernet extends BasePacket {
     public Ethernet() {
         super();
         this.vlanID = Ethernet.VLAN_UNTAGGED;
+        this.innerVlanId = Ethernet.VLAN_UNTAGGED;
     }
 
     /**
@@ -216,6 +220,15 @@ public class Ethernet extends BasePacket {
     }
 
     /**
+     * Gets the inner VLAN ID for 2 tags packets(802.1ad or 2 802.1Q tags).
+     *
+     * @return the inner vlanID
+     */
+    public short getInnerVlanID() {
+        return this.innerVlanId;
+    }
+
+    /**
      * Sets the VLAN ID.
      *
      * @param vlan the vlanID to set
@@ -226,6 +239,34 @@ public class Ethernet extends BasePacket {
         return this;
     }
 
+    /**
+     * Sets the VLAN IDs for 2 tags packets (802.1ad or 2 802.1Q tags).
+     *
+     * @param outerVlan the outer vlanID to set
+     * @param innerVlan the inner vlanId to set
+     * @return the Ethernet frame
+     */
+    public Ethernet setVlanID(final short outerVlan, final short innerVlan) {
+        this.vlanID = outerVlan;
+        this.innerVlanId = innerVlan;
+        return this;
+    }
+
+
+    /**
+     * Sets the VLAN IDs for 2 tags packets (802.1ad or 2 802.1Q tags).
+     *
+     * @param outerVlan the outer vlanID to set
+     * @param innerVlan the inner vlanId to set
+     * @param packet8021ad set the output to be 802.1ad if  true or 802.1q (twice) if not
+     * @return the Ethernet frame
+     */
+    public Ethernet setVlanID(final short outerVlan, final short innerVlan, final boolean packet8021ad) {
+        this.vlanID = outerVlan;
+        this.innerVlanId = innerVlan;
+        this.is1adPacket = packet8021ad;
+        return this;
+    }
     /**
      * Gets the Ethernet type.
      *
@@ -290,6 +331,7 @@ public class Ethernet extends BasePacket {
             payloadData = this.payload.serialize();
         }
         int length = 14 + (this.vlanID == Ethernet.VLAN_UNTAGGED ? 0 : 4)
+                + (this.innerVlanId == Ethernet.VLAN_UNTAGGED ? 0 : 4)
                 + (payloadData == null ? 0 : payloadData.length);
         if (this.pad && length < 60) {
             length = 60;
@@ -299,8 +341,21 @@ public class Ethernet extends BasePacket {
         bb.put(this.destinationMACAddress.toBytes());
         bb.put(this.sourceMACAddress.toBytes());
         if (this.vlanID != Ethernet.VLAN_UNTAGGED) {
-            bb.putShort(TYPE_VLAN);
-            bb.putShort((short) (this.priorityCode << 13 | this.vlanID & 0x0fff));
+            if (this.innerVlanId != Ethernet.VLAN_UNTAGGED) {
+                //2 tags
+                if (this.is1adPacket) {
+                    bb.putShort(TYPE_VLAN_1AD);
+                } else {
+                    bb.putShort(TYPE_VLAN);
+                }
+                bb.putShort((short) (this.priorityCode << 13 | this.vlanID & 0x0fff));
+
+                bb.putShort(TYPE_VLAN);
+                bb.putShort(this.innerVlanId);
+            } else {
+                bb.putShort(TYPE_VLAN);
+                bb.putShort((short) (this.priorityCode << 13 | this.vlanID & 0x0fff));
+            }
         }
         bb.putShort(this.etherType);
         if (payloadData != null) {
@@ -334,17 +389,39 @@ public class Ethernet extends BasePacket {
         this.sourceMACAddress = MacAddress.valueOf(srcAddr);
 
         short ethType = bb.getShort();
+        //logger.info("First ethtype : " + ethType);
         if (ethType == TYPE_VLAN) {
             final short tci = bb.getShort();
             this.priorityCode = (byte) (tci >> 13 & 0x07);
             this.vlanID = (short) (tci & 0x0fff);
             ethType = bb.getShort();
+          //  logger.info("Second ethertype : " + ethType);
+
+
+       /* } else if (ethType == TYPE_VLAN_1AD) {
+            final short tci = bb.getShort();
+            this.priorityCode = (byte) (tci >> 13 & 0x07);
+            this.vlanID = (short) (tci & 0x0fff);
+            ethType = bb.getShort();
+            this.innerVlanId = bb.getShort();
+            ethType = bb.getShort();*/
         } else {
             this.vlanID = Ethernet.VLAN_UNTAGGED;
+            this.innerVlanId = Ethernet.VLAN_UNTAGGED;
         }
+
+        if (ethType == -TYPE_VLAN) {
+            //logger.info("2 tags");
+            // QinQ, 2 802.1Q tags
+            this.innerVlanId = bb.getShort();
+            ethType = bb.getShort();
+        } else {
+            //logger.info("One tag");
+            this.innerVlanId = Ethernet.VLAN_UNTAGGED;
+        }
+
         this.etherType = ethType;
 
-        IPacket payload;
         Deserializer<? extends IPacket> deserializer;
         if (Ethernet.ETHERTYPE_DESERIALIZER_MAP.containsKey(ethType)) {
             deserializer = Ethernet.ETHERTYPE_DESERIALIZER_MAP.get(ethType);
@@ -380,6 +457,10 @@ public class Ethernet extends BasePacket {
             }
         }
         return true;
+    }
+
+    public void set1adPacket(boolean b) {
+        this.is1adPacket = b;
     }
 
     /**
@@ -505,6 +586,12 @@ public class Ethernet extends BasePacket {
         }
         sb.append("\ndl_vlan_pcp: ");
         sb.append(this.getPriorityCode());
+        sb.append("\nsecond_vlan : ");
+        if (this.innerVlanId == Ethernet.VLAN_UNTAGGED) {
+            sb.append("untagged");
+        } else {
+            sb.append(this.innerVlanId);
+        }
         sb.append("\ndl_src: ");
         sb.append(bytesToHex(this.getSourceMACAddress()));
         sb.append("\ndl_dst: ");
@@ -697,6 +784,14 @@ public class Ethernet extends BasePacket {
             } else {
                 eth.setVlanID(Ethernet.VLAN_UNTAGGED);
             }
+            if (ethType == TYPE_VLAN) {
+                checkHeaderLength(length, ETHERNET_HEADER_LENGTH + 2 * VLAN_HEADER_LENGTH);
+                eth.innerVlanId = (bb.getShort());
+                ethType = bb.getShort();
+            } else {
+                eth.innerVlanId = Ethernet.VLAN_UNTAGGED;
+            }
+
             eth.setEtherType(ethType);
 
             IPacket payload;
