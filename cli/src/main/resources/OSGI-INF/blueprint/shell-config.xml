@@ -471,7 +471,7 @@
             <action class="org.onosproject.cli.net.TunnelUpdateCommand"/>
         </command>
         <!-- abstractswitch app commands-->
-        <command>
+        <!--<command>
             <action class="org.onosproject.cli.AbstractSwitchComputeExpandedGraph" />
         </command>
         <command>
@@ -494,7 +494,7 @@
         </command>
         <command>
             <action class="org.onosproject.cli.AbstractSwitchFillDatabase" />
-        </command>
+        </command>-->
  <!--       &lt;!&ndash; parental control command&ndash;&gt;
         <command>
             <action class="org.onosproject.cli.net.ParentalControlGeneralDNS" />
@@ -511,7 +511,7 @@
             <action class="org.onosproject.cli.net.ParentalControlDisconnectCustomer" />
         </command>-->
         <!-- Vcpe Cli-->
-        <command>
+       <!-- <command>
             <action class="org.onosproject.cli.net.VcpeEnableInternetCommand" />
         </command>
         <command>
@@ -537,7 +537,7 @@
         </command>
         <command>
             <action class="org.onosproject.cli.VcpeDiscoverLanCommand" />
-        </command>
+        </command>-->
 
         <!--Tor CLI-->
         <command>
