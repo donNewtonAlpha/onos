@@ -195,12 +195,49 @@ public class Ethernet extends BasePacket {
     }
 
     /**
+     * Gets the C Tag Ethertype.
+     *
+     * @return the C Tag Ethertype
+     */
+    public short getCtagEthertype() {
+        return this.cTagEthertype;
+    }
+
+    /**
+     * Gets the S Tag Ethertype.
+     *
+     * @return the S Tag Ethertype
+     */
+    public short getStagEthertype() {
+        return this.sTagEthertype;
+    }
+
+
+    /**
      * Gets the priority code.
      *
      * @return the priorityCode
      */
     public byte getPriorityCode() {
         return this.cTagpriorityCode;
+    }
+
+    /**
+     * Gets the C Tag priority code.
+     *
+     * @return the C Tag priorityCode
+     */
+    public byte getCtagPriorityCode() {
+        return this.cTagpriorityCode;
+    }
+
+    /**
+     * Gets the S Tag priority code.
+     *
+     * @return the S Tag priorityCode
+     */
+    public byte getStagPriorityCode() {
+        return this.sTagpriorityCode;
     }
 
     /**

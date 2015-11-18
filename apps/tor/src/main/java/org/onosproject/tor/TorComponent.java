@@ -176,7 +176,7 @@ public class TorComponent implements TorService {
 
         //Packets capture  to controller
         dnsCapture();
-        igmpCapture();
+        //igmpCapture();
         ipLearningCapture(serverPort);
         //ipLearningCapture(oltPort); // For testing, not for the real system
 
@@ -1145,7 +1145,7 @@ public class TorComponent implements TorService {
         ethernetPacket.setDestinationMACAddress(VSG_MAC);
         ethernetPacket.setSourceMACAddress(DEFAULT_SOURCE_MAC);
         ethernetPacket.setEtherType(Ethernet.TYPE_IPV4);
-        ethernetPacket.setVlanID((short) sockId, (short) vlanId);
+        ethernetPacket.setVlanID(Ethernet.TYPE_VLAN , (short) sockId, Ethernet.TYPE_VLAN, (short) vlanId);
         ethernetPacket.resetChecksum();
 
         TrafficTreatment.Builder ipLearningTreatment = DefaultTrafficTreatment.builder();
