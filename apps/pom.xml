@@ -58,6 +58,8 @@
         <module>pim</module>
         <module>mlb</module>
         <module>openstackswitching</module>
+
+        <module>tor</module>
   </modules>
 
     <properties>
