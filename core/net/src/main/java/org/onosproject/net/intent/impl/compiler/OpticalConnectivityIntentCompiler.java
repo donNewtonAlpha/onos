@@ -107,8 +107,8 @@ public class OpticalConnectivityIntentCompiler implements IntentCompiler<Optical
         log.debug("Compiling optical connectivity intent between {} and {}", src, dst);
 
         // Reserve OCh ports
-        ResourcePath srcPortPath = new ResourcePath(src.deviceId(), src.port());
-        ResourcePath dstPortPath = new ResourcePath(dst.deviceId(), dst.port());
+        ResourcePath srcPortPath = ResourcePath.discrete(src.deviceId(), src.port());
+        ResourcePath dstPortPath = ResourcePath.discrete(dst.deviceId(), dst.port());
         List<org.onosproject.net.newresource.ResourceAllocation> allocation =
                 resourceService.allocate(intent.id(), srcPortPath, dstPortPath);
         if (allocation.isEmpty()) {
@@ -182,8 +182,8 @@ public class OpticalConnectivityIntentCompiler implements IntentCompiler<Optical
 
         IndexedLambda minLambda = findFirstLambda(lambdas);
         List<ResourcePath> lambdaResources = path.links().stream()
-                .map(x -> new ResourcePath(linkKey(x.src(), x.dst())))
-                .map(x -> ResourcePath.child(x, minLambda))
+                .map(x -> ResourcePath.discrete(linkKey(x.src(), x.dst())))
+                .map(x -> x.child(minLambda))
                 .collect(Collectors.toList());
 
         List<ResourceAllocation> allocations = resourceService.allocate(intent.id(), lambdaResources);
@@ -196,10 +196,10 @@ public class OpticalConnectivityIntentCompiler implements IntentCompiler<Optical
 
     private Set<IndexedLambda> findCommonLambdasOverLinks(List<Link> links) {
         return links.stream()
-                .map(x -> new ResourcePath(linkKey(x.src(), x.dst())))
+                .map(x -> ResourcePath.discrete(linkKey(x.src(), x.dst())))
                 .map(resourceService::getAvailableResources)
-                .map(x -> Iterables.filter(x, r -> r.lastComponent() instanceof IndexedLambda))
-                .map(x -> Iterables.transform(x, r -> (IndexedLambda) r.lastComponent()))
+                .map(x -> Iterables.filter(x, r -> r.last() instanceof IndexedLambda))
+                .map(x -> Iterables.transform(x, r -> (IndexedLambda) r.last()))
                 .map(x -> (Set<IndexedLambda>) ImmutableSet.copyOf(x))
                 .reduce(Sets::intersection)
                 .orElse(Collections.emptySet());

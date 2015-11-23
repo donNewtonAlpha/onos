@@ -15,10 +15,9 @@
  */
 package org.onosproject.rest.resources;
 
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.onosproject.net.config.NetworkConfigService;
-import org.onosproject.net.config.SubjectFactory;
-import org.onosproject.rest.AbstractWebResource;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Set;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -29,8 +28,16 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import java.io.IOException;
-import java.io.InputStream;
+
+import org.onosproject.net.config.Config;
+import org.onosproject.net.config.NetworkConfigService;
+import org.onosproject.net.config.SubjectFactory;
+import org.onosproject.rest.AbstractWebResource;
+
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import static org.onlab.util.Tools.emptyIsNotFound;
+import static org.onlab.util.Tools.nullIsNotFound;
 
 /**
  * Manage network configurations.
@@ -38,9 +45,30 @@ import java.io.InputStream;
 @Path("network/configuration")
 public class NetworkConfigWebResource extends AbstractWebResource {
 
+
+    private String subjectClassNotFoundErrorString(String subjectClassKey) {
+        return "Config for '" + subjectClassKey + "' not found";
+    }
+
+    private String subjectNotFoundErrorString(String subjectClassKey,
+                                              String subjectKey) {
+        return "Config for '"
+                + subjectClassKey + "/" + subjectKey
+                + "' not found";
+    }
+
+    private String configKeyNotFoundErrorString(String subjectClassKey,
+                                                String subjectKey,
+                                                String configKey) {
+        return "Config for '"
+                + subjectClassKey + "/" + subjectKey + "/" + configKey
+                + "' not found";
+    }
+
     /**
      * Get entire network configuration base.
      *
+     * @rsModel NetCfgGet
      * @return network configuration JSON
      */
     @GET
@@ -70,7 +98,9 @@ public class NetworkConfigWebResource extends AbstractWebResource {
     public Response download(@PathParam("subjectClassKey") String subjectClassKey) {
         NetworkConfigService service = get(NetworkConfigService.class);
         ObjectNode root = mapper().createObjectNode();
-        SubjectFactory subjectFactory = service.getSubjectFactory(subjectClassKey);
+        SubjectFactory subjectFactory =
+                nullIsNotFound(service.getSubjectFactory(subjectClassKey),
+                               subjectClassNotFoundErrorString(subjectClassKey));
         produceJson(service, root, subjectFactory, subjectFactory.subjectClass());
         return ok(root).build();
     }
@@ -90,8 +120,12 @@ public class NetworkConfigWebResource extends AbstractWebResource {
                              @PathParam("subjectKey") String subjectKey) {
         NetworkConfigService service = get(NetworkConfigService.class);
         ObjectNode root = mapper().createObjectNode();
-        SubjectFactory subjectFactory = service.getSubjectFactory(subjectClassKey);
-        produceSubjectJson(service, root, subjectFactory.createSubject(subjectKey));
+        SubjectFactory subjectFactory =
+                nullIsNotFound(service.getSubjectFactory(subjectClassKey),
+                               subjectClassNotFoundErrorString(subjectClassKey));
+        produceSubjectJson(service, root, subjectFactory.createSubject(subjectKey),
+                           true,
+                           subjectNotFoundErrorString(subjectClassKey, subjectKey));
         return ok(root).build();
     }
 
@@ -111,26 +145,47 @@ public class NetworkConfigWebResource extends AbstractWebResource {
                              @PathParam("subjectKey") String subjectKey,
                              @PathParam("configKey") String configKey) {
         NetworkConfigService service = get(NetworkConfigService.class);
-        return ok(service.getConfig(service.getSubjectFactory(subjectClassKey).createSubject(subjectKey),
-                                    service.getConfigClass(subjectClassKey, configKey)).node()).build();
+
+        Object subject =
+                nullIsNotFound(service.getSubjectFactory(subjectClassKey)
+                                       .createSubject(subjectKey),
+                                        subjectNotFoundErrorString(subjectClassKey, subjectKey));
+
+        Class configClass =
+                nullIsNotFound(service.getConfigClass(subjectClassKey, configKey),
+                               configKeyNotFoundErrorString(subjectClassKey, subjectKey, configKey));
+        Config config =
+                nullIsNotFound(service.getConfig(subject, configClass),
+                               configKeyNotFoundErrorString(subjectClassKey,
+                                                            subjectKey,
+                                                            configKey));
+        return ok(config.node()).build();
     }
 
     @SuppressWarnings("unchecked")
     private void produceJson(NetworkConfigService service, ObjectNode node,
                              SubjectFactory subjectFactory, Class subjectClass) {
         service.getSubjects(subjectClass).forEach(s ->
-            produceSubjectJson(service, newObject(node, subjectFactory.subjectKey(s)), s));
+            produceSubjectJson(service, newObject(node, subjectFactory.subjectKey(s)), s, false, ""));
     }
 
     private void produceSubjectJson(NetworkConfigService service, ObjectNode node,
-                                    Object subject) {
-        service.getConfigs(subject).forEach(c -> node.set(c.key(), c.node()));
+                                    Object subject,
+                                    boolean emptyIsError,
+                                    String emptyErrorMessage) {
+        Set<? extends Config<Object>> configs = service.getConfigs(subject);
+        if (emptyIsError) {
+            // caller wants an empty set to be a 404
+            configs = emptyIsNotFound(configs, emptyErrorMessage);
+        }
+        configs.forEach(c -> node.set(c.key(), c.node()));
     }
 
 
     /**
      * Upload bulk network configuration.
      *
+     * @rsModel NetCfgGet
      * @param request network configuration JSON rooted at the top node
      * @return empty response
      * @throws IOException if unable to parse the request
@@ -253,17 +308,15 @@ public class NetworkConfigWebResource extends AbstractWebResource {
      * Clear all network configurations for a subject class.
      *
      * @param subjectClassKey subject class key
-     * @return empty response
      */
     @DELETE
     @Path("{subjectClassKey}")
     @SuppressWarnings("unchecked")
-    public Response delete(@PathParam("subjectClassKey") String subjectClassKey) {
+    public void delete(@PathParam("subjectClassKey") String subjectClassKey) {
         NetworkConfigService service = get(NetworkConfigService.class);
-        service.getSubjects(service.getSubjectFactory(subjectClassKey).getClass())
+        service.getSubjects(service.getSubjectFactory(subjectClassKey).subjectClass())
                 .forEach(subject -> service.getConfigs(subject)
                         .forEach(config -> service.removeConfig(subject, config.getClass())));
-        return Response.ok().build();
     }
 
     /**
@@ -271,17 +324,15 @@ public class NetworkConfigWebResource extends AbstractWebResource {
      *
      * @param subjectClassKey subjectKey class key
      * @param subjectKey      subjectKey key
-     * @return empty response
      */
     @DELETE
     @Path("{subjectClassKey}/{subjectKey}")
     @SuppressWarnings("unchecked")
-    public Response delete(@PathParam("subjectClassKey") String subjectClassKey,
+    public void delete(@PathParam("subjectClassKey") String subjectClassKey,
                            @PathParam("subjectKey") String subjectKey) {
         NetworkConfigService service = get(NetworkConfigService.class);
         Object s = service.getSubjectFactory(subjectClassKey).createSubject(subjectKey);
         service.getConfigs(s).forEach(c -> service.removeConfig(s, c.getClass()));
-        return Response.ok().build();
     }
 
     /**
@@ -290,18 +341,16 @@ public class NetworkConfigWebResource extends AbstractWebResource {
      * @param subjectClassKey subjectKey class key
      * @param subjectKey      subjectKey key
      * @param configKey       configuration class key
-     * @return empty response
      */
     @DELETE
     @Path("{subjectClassKey}/{subjectKey}/{configKey}")
     @SuppressWarnings("unchecked")
-    public Response delete(@PathParam("subjectClassKey") String subjectClassKey,
+    public void delete(@PathParam("subjectClassKey") String subjectClassKey,
                            @PathParam("subjectKey") String subjectKey,
                            @PathParam("configKey") String configKey) {
         NetworkConfigService service = get(NetworkConfigService.class);
         service.removeConfig(service.getSubjectFactory(subjectClassKey).createSubject(subjectKey),
                              service.getConfigClass(subjectClassKey, configKey));
-        return Response.ok().build();
     }
 
 }

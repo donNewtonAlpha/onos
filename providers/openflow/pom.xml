@@ -37,6 +37,7 @@
         <module>flow</module>
         <module>group</module>
         <module>meter</module>
+        <module>base</module>
         <module>app</module>
     </modules>
 

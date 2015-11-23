@@ -45,10 +45,9 @@
         <module>web</module>
         <module>cli</module>
 
-        <module>openflow</module>
+        <module>protocols</module>
+        <!-- FIXME move to protocols/ -->
         <module>ovsdb</module>
-        <module>netconf</module>
-        <module>pcep</module>
         <module>bgp</module>
 
         <module>providers</module>

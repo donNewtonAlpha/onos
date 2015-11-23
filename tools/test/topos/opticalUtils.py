@@ -58,7 +58,7 @@ import os
 from time import sleep
 import urllib2
 
-from mininet.node import Switch, RemoteController
+from mininet.node import Switch, OVSSwitch, RemoteController
 from mininet.topo import Topo
 from mininet.util import quietRun
 from mininet.net import Mininet
@@ -356,8 +356,18 @@ class LINCSwitch(OpticalSwitch):
         return configDict
 
     @staticmethod
-    def bootOE(net):
-        "Start the LINC optical emulator within a mininet instance"
+    def bootOE(net, domain=None):
+        """
+        Start the LINC optical emulator within a mininet instance
+
+        This involves 1. converting the information stored in Linc* to configs
+        for both LINC and the network config system, 2. starting Linc, 3. connecting
+        cross-connects, and finally pushing the network configs to ONOS.
+
+        Inevitably, there are times when we have OVS switches that should not be
+        under the control of the controller in charge of the Linc switches. We
+        hint at these by passing domain information.
+        """
         LINCSwitch.opticalJSON = {}
         linkConfig = []
         devices = []
@@ -365,9 +375,11 @@ class LINCSwitch(OpticalSwitch):
         LINCSwitch.controllers = net.controllers
 
         for switch in net.switches:
+            if domain and switch not in domain:
+                continue
             if isinstance(switch, OpticalSwitch):
                 devices.append(switch.json())
-            else:
+            elif isinstance(switch, OVSSwitch):
                 devices.append(LINCSwitch.switchJSON(switch))
         LINCSwitch.opticalJSON[ 'devices' ] = devices
 
@@ -450,18 +462,21 @@ class LINCSwitch(OpticalSwitch):
         opener = urllib2.build_opener(handler)
         opener.open(url)
         urllib2.install_opener(opener)
+        # focus on just checking the state of devices we're interested in
+        devlist =  map( lambda x: x['uri'], devices )
         while True:
             response = json.load(urllib2.urlopen(url))
             devs = response.get('devices')
 
-            # Wait for all devices to be registered
-            if (len(devices) != len(devs)):
+            # Wait for all devices to be registered. There is a chance that this is only a subgraph.
+            if (len(devices) > len(devs)):
                 continue
 
             # Wait for all devices to available
             available = True
             for d in devs:
-                available &= d['available']
+                if d['id'] in devlist:
+                    available &= d['available']
             if available:
                 break
 
@@ -615,9 +630,11 @@ class LINCSwitch(OpticalSwitch):
             if isinstance(link, LINCLink):
                 if link.annotations[ 'optical.type' ] == 'cross-connect':
                     tapCount += 1
-
         while True:
-            if str(tapCount) == quietRun('ip addr | grep tap | wc -l', shell=True).strip('\n'):
+            # tapCount can be less than the actual number of taps if the optical network
+            # is a subgraph of a larger multidomain network.
+            tapNum = int(quietRun('ip addr | grep tap | wc -l', shell=True).strip('\n'))
+            if tapCount <= tapNum:
                 return True
             if timeout:
                 if time >= TIMEOUT:

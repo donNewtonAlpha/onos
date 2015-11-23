@@ -19,12 +19,11 @@ package org.onosproject.sdnip;
 import org.onosproject.net.intent.Intent;
 import org.onosproject.net.intent.MultiPointToSinglePointIntent;
 import org.onosproject.net.intent.PointToPointIntent;
+import org.onosproject.net.intent.SinglePointToMultiPointIntent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
-
-import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * Utilities for dealing with intents.
@@ -49,15 +48,24 @@ public final class IntentUtils {
      * @return true if the two intents represent the same value, otherwise false
      */
     public static boolean equals(Intent one, Intent two) {
-        checkArgument(one.getClass() == two.getClass(),
-                "Intents are not the same type");
+        if (one.getClass() != two.getClass()) {
+            return false;
+        }
 
         if (!(Objects.equals(one.appId(), two.appId()) &&
                 Objects.equals(one.key(), two.key()))) {
             return false;
         }
 
-        if (one instanceof MultiPointToSinglePointIntent) {
+        if (one instanceof SinglePointToMultiPointIntent) {
+            SinglePointToMultiPointIntent intent1 = (SinglePointToMultiPointIntent) one;
+            SinglePointToMultiPointIntent intent2 = (SinglePointToMultiPointIntent) two;
+
+            return Objects.equals(intent1.selector(), intent2.selector()) &&
+                    Objects.equals(intent1.treatment(), intent2.treatment()) &&
+                    Objects.equals(intent1.ingressPoint(), intent2.ingressPoint()) &&
+                    Objects.equals(intent1.egressPoints(), intent2.egressPoints());
+        } else if (one instanceof MultiPointToSinglePointIntent) {
             MultiPointToSinglePointIntent intent1 = (MultiPointToSinglePointIntent) one;
             MultiPointToSinglePointIntent intent2 = (MultiPointToSinglePointIntent) two;
 
