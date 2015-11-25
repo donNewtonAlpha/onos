@@ -13,11 +13,16 @@ public class CustomerServerBehavior extends SwitchingBehavior {
 
     public final static VlanId INTERNET_VLAN = VlanId.vlanId((short)404);
 
-    private ConnectPoint serverConnection;
+    private PortNumber serverConnectionPort;
     private int sTag;
 
-    public CustomerServerBehavior(DeviceId deviceId, int portNumber, int sTag){
+    public CustomerServerBehavior(int portNumber, int sTag){
         this.sTag = sTag;
-        serverConnection = new ConnectPoint(deviceId, PortNumber.portNumber(portNumber));
+        this.port = PortNumber.portNumber(portNumber);
     }
+
+    public int getSTag(){
+        return sTag;
+    }
+
 }

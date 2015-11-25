@@ -26,10 +26,19 @@ public abstract class Switch {
         internetPorts.add(port);
     }
 
+    public List<PortNumber> getInternetPorts() {
+        return internetPorts;
+    }
+
+    public DeviceId getDeviceId() {
+        return deviceId;
+    }
+
     public void removeInternetLink(PortNumber port){
         for(PortNumber portNumber: internetPorts){
             if(port.equals(portNumber)){
                 internetPorts.remove(portNumber);
+
             }
         }
     }

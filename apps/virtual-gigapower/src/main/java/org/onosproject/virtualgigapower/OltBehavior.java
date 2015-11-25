@@ -12,15 +12,16 @@ public class OltBehavior extends SwitchingBehavior {
 
     public final static VlanId OLT_MULTICAST_VLAN = VlanId.vlanId((short)2000);
 
-    private ConnectPoint oltConnection;
     private int sTag;
 
     public OltBehavior(DeviceId deviceId, int portNumber, int sTag){
         this.sTag = sTag;
-        oltConnection = new ConnectPoint(deviceId, PortNumber.portNumber(portNumber));
+        this.port = PortNumber.portNumber(portNumber);
     }
 
-
+    public int getSTag(){
+        return sTag;
+    }
 
 
 

@@ -38,13 +38,13 @@ public class VirtualGigaPowerComponent {
 
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected CoreService coreService;
+    protected static CoreService coreService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected PacketService packetService;
+    protected static PacketService packetService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected FlowRuleService flowRuleService;
+    protected static FlowRuleService flowRuleService;
 
     static ApplicationId appId;
 
@@ -75,34 +75,14 @@ public class VirtualGigaPowerComponent {
             log.error("Exception occured during config retrieval", e);
         }
 
+        Fabric.getFabric().connectFabric();
+
     }
 
     // TODO
     private void applyConfig(JsonObject configs){}
 
-    private synchronized Spine addSpine(DeviceId spineId, Ip4Address  managementIp, int id, String model){
 
-        Spine newSpine = new Spine(spineId, managementIp, id, model, 32);
-        spines.add(newSpine);
-        return  newSpine;
-
-    }
-
-    private synchronized void addSpine(Spine newSpine){
-        spines.add(newSpine);
-    }
-
-    private synchronized Leaf addLeaf(DeviceId spineId, Ip4Address  managementIp, int id, String model){
-        Leaf newLeaf = new Leaf(spineId, managementIp, id, model);
-        newLeaf.setMPLS(currentMPLS ++);
-        leaves.add(newLeaf);
-        return  newLeaf;
-    }
-
-    private synchronized void addLeaf(Leaf newLeaf){
-        newLeaf.setMPLS(currentMPLS ++);
-        leaves.add(newLeaf);
-    }
 
 
 

@@ -12,7 +12,7 @@ import java.util.List;
  */
 public class Leaf extends Switch{
 
-    private List<SwitchingBehavior> behaviors;
+    private List<SwitchingBehavior> personalBehaviors;
     private List<PortNumber> spineConnections;
     private int MplsTag;
 
@@ -23,12 +23,12 @@ public class Leaf extends Switch{
         managementIp = ip;
         this.id = id;
         hardwareModel = model;
-        behaviors = new LinkedList<>();
+        personalBehaviors = new LinkedList<>();
         spineConnections = new LinkedList<>();
     }
 
-    public void addBehavior(SwitchingBehavior newBehavior){
-        behaviors.add(newBehavior);
+    public void addPersonnalBehavior(SwitchingBehavior newBehavior){
+        personalBehaviors.add(newBehavior);
     }
 
     public void connectToSpine(int portNumber){
@@ -43,13 +43,13 @@ public class Leaf extends Switch{
         }
     }
 
-    public void setMPLS(int tag){
+    public void setMpls(int tag){
         this.MplsTag = tag;
     }
 
-    public boolean applyBehaviors(){
-
-
-        return true;
+    public int getMplsLabel(){
+        return MplsTag;
     }
+
+
 }
