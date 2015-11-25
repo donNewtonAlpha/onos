@@ -60,6 +60,7 @@
         <module>openstackswitching</module>
 
         <module>tor</module>
+        <module>virtual-gigapower</module>
   </modules>
 
     <properties>
