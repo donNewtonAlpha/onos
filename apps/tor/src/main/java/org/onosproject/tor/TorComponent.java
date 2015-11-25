@@ -200,7 +200,7 @@ public class TorComponent implements TorService {
         uverseRule.makePermanent();
 
         uverseBlockingFlow = uverseRule.build();
-        flowRuleService.applyFlowRules(uverseBlockingFlow);
+        //flowRuleService.applyFlowRules(uverseBlockingFlow);
 
     }
 
@@ -1067,19 +1067,19 @@ public class TorComponent implements TorService {
 
         TrafficSelector.Builder[] igmpSelector = new TrafficSelector.Builder[3];
 
-        for(int i =0; i< 3; i++){
+        for(int i =0; i< 1; i++){
             igmpSelector[i] = DefaultTrafficSelector.builder();
             igmpSelector[i].matchInPort(oltPort);
             igmpSelector[i].matchEthType(Ethernet.TYPE_IPV4);
-            //igmpSelector[i].matchIPProtocol(IPv4.PROTOCOL_IGMP);
+            igmpSelector[i].matchIPProtocol(IPv4.PROTOCOL_IGMP);
         }
 
-        igmpSelector[0].matchIPDst(Ip4Address.valueOf("224.0.0.1").toIpPrefix());
+      /*  igmpSelector[0].matchIPDst(Ip4Address.valueOf("224.0.0.1").toIpPrefix());
         igmpSelector[1].matchIPDst(Ip4Address.valueOf("224.0.0.2").toIpPrefix());
         igmpSelector[2].matchIPDst(Ip4Address.valueOf("224.0.0.22").toIpPrefix());
+*/
 
-
-        for(int i = 0; i<3; i++) {
+        for(int i = 0; i<1; i++) {
 
             FlowRule.Builder igmpRule = DefaultFlowRule.builder();
             igmpRule.withSelector(igmpSelector[i].build());
@@ -1145,6 +1145,7 @@ public class TorComponent implements TorService {
         ethernetPacket.setDestinationMACAddress(VSG_MAC);
         ethernetPacket.setSourceMACAddress(DEFAULT_SOURCE_MAC);
         ethernetPacket.setEtherType(Ethernet.TYPE_IPV4);
+
         ethernetPacket.setVlanID(Ethernet.TYPE_VLAN , (short) sockId, Ethernet.TYPE_VLAN, (short) vlanId);
         ethernetPacket.resetChecksum();
 

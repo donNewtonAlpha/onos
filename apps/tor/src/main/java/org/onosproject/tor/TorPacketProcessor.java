@@ -23,10 +23,7 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 /**
  * Created by nick on 10/5/15.
@@ -148,6 +145,12 @@ public class TorPacketProcessor implements PacketProcessor {
 
         }catch (Exception e){
             log.error("Olt packet processing exception", e);
+            log.debug(context.inPacket().parsed().toString());
+
+            TrafficTreatment sendToServerLan = DefaultTrafficTreatment.builder().setOutput(TorComponent.serverPort).build();
+            OutboundPacket packetToSend = new DefaultOutboundPacket(TorComponent.torId, sendToServerLan, context.inPacket().unparsed());
+
+            packetService.emit(packetToSend);
         }
     }
 
@@ -223,7 +226,7 @@ public class TorPacketProcessor implements PacketProcessor {
                     } catch (Exception e) {
                         log.error("exception dns resolution : ", e);
                     }
-                    log.info(" DNS request : " + url);
+                    //log.info(" DNS request : " + url);
 
                     //Call parental control API
                     //sockId, vlanId, deviceMac, url
@@ -238,12 +241,12 @@ public class TorPacketProcessor implements PacketProcessor {
                     urlBuilder.append("&searchVal=");
                     urlBuilder.append(URLEncoder.encode(url, CHARSET));
                     urlBuilder.append("&macAddr=");
-                    urlBuilder.append(URLEncoder.encode(deviceIP.toString(), CHARSET));
+                    urlBuilder.append(URLEncoder.encode(deviceMac.toString(), CHARSET));
 
 
                     String requestUrl = urlBuilder.toString();
 
-                    log.debug("URL : " + requestUrl);
+                    log.info("URL : " + requestUrl);
 
 
                     boolean allowed = true;
@@ -293,8 +296,12 @@ public class TorPacketProcessor implements PacketProcessor {
 
                     if(!allowed){
                         log.info("domain not allowed");
-                        return;
-                        // DnsProxy.switchResponse(response,redirect);
+                        try{
+                            DnsProxy.switchResponse(response,redirect);
+                        }catch (Exception e){
+                            log.error("Switch Response exception" , e);
+                            return;
+                        }
                     }
 
                     log.info("DNS response retrieved");
@@ -335,8 +342,8 @@ public class TorPacketProcessor implements PacketProcessor {
                     responseEthernet.setDestinationMACAddress(ethPkt.getSourceMAC());
                     responseEthernet.setSourceMACAddress(ethPkt.getDestinationMAC());
                     responseEthernet.setEtherType(ethPkt.getEtherType());
-                    responseEthernet.setVlanID(ethPkt.getStagVlanID(), ethPkt.getCtagVlanID());
-                    //responseEthernet.resetChecksum();
+                    responseEthernet.setVlanID(Ethernet.TYPE_VLAN, ethPkt.getStagVlanID(), Ethernet.TYPE_VLAN, ethPkt.getCtagVlanID());
+                    responseEthernet.resetChecksum();
 
 
 
@@ -347,16 +354,16 @@ public class TorPacketProcessor implements PacketProcessor {
 
                     packetService.emit(outboundPacket);
                     //debug
-                    StringBuffer buffer = new StringBuffer("DNS message sent, ");
-                    byte[] dnsResponseBytes  = responseEthernet.serialize();
-                    buffer.append(dnsResponseBytes.length);
+                    StringBuilder buffer = new StringBuilder("DNS message sent, ");
+
+
                     buffer.append((" bytes : "));
-                    for(int i =0; i< dnsResponseBytes.length; i++){
-                        buffer.append(dnsResponseBytes[i]);
+                    for(int i =0; i< response.length; i++){
+                        buffer.append(response[i]);
                         buffer.append(' ');
                     }
 
-                    log.debug(buffer.toString());
+                    log.info(buffer.toString());
                     return;
                 }
             }

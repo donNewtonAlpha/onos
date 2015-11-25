@@ -76,6 +76,7 @@ public class DnsProxy {
         try{
 
             int[] ipIndexes= findIpAnswersIndexes(dnsResponse);
+            TorComponent.log.info("ip indexes found");
 
             byte[] ipBytes = redirectIp.getAddress();
 
@@ -105,9 +106,9 @@ public class DnsProxy {
                 b = false;
             }
             else if(dnsMessage[i] > 0){
-                i = i + dnsMessage[i];
+                i = i + dnsMessage[i] + 1;
             }else{
-                i = i + 256 + dnsMessage[i];
+                i = i + 256 + dnsMessage[i] + 1;
             }
 
         }
