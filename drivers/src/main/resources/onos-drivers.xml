@@ -32,13 +32,14 @@
                    impl="org.onosproject.driver.handshaker.NiciraSwitchHandshaker"/>
         <behaviour api="org.onosproject.net.behaviour.ControllerConfig"
                    impl="org.onosproject.driver.ovsdb.OvsdbControllerConfig"/>
-        <behaviour api="org.onosproject.openflow.controller.ExtensionInterpreter"
-                   impl="org.onosproject.driver.extensions.NiciraExtensionInterpreter" />
-        <behaviour api="org.onosproject.net.behaviour.ExtensionResolver"
-                   impl="org.onosproject.driver.extensions.NiciraExtensionInterpreter" />
+        <behaviour api="org.onosproject.openflow.controller.ExtensionTreatmentInterpreter"
+                   impl="org.onosproject.driver.extensions.NiciraExtensionTreatmentInterpreter" />
+        <behaviour api="org.onosproject.net.behaviour.ExtensionTreatmentResolver"
+                   impl="org.onosproject.driver.extensions.NiciraExtensionTreatmentInterpreter" />
     </driver>
+    <!--This driver is for simulated NETCONF devices through of-config tool on top og OVSDB-->
     <driver name="ovs-netconf" extends="default"
-            manufacturer="Nicira, Inc\." hwVersion="Open vSwitch" swVersion="2\..*">
+            manufacturer="" hwVersion="" swVersion="">
         <behaviour api="org.onosproject.openflow.controller.driver.OpenFlowSwitchDriver"
                    impl="org.onosproject.driver.handshaker.NiciraSwitchHandshaker"/>
         <behaviour api="org.onosproject.net.behaviour.ControllerConfig"
@@ -137,7 +138,7 @@
                    impl="org.onosproject.driver.pipeline.OpenVSwitchPipeline"/>
     </driver>
     <driver name="eci" extends="default"
-            manufacturer="ECI Telecom" hwVersion="optical" swVersion="V_1_0">
+            manufacturer="ECI Telecom" hwVersion="Optical.*" swVersion="V_1_0">
         <behaviour api="org.onosproject.openflow.controller.driver.OpenFlowSwitchDriver"
                    impl="org.onosproject.driver.handshaker.OFOpticalSwitch13"/>
     </driver>

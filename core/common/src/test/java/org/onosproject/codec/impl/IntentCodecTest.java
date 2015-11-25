@@ -63,8 +63,6 @@ import org.onosproject.net.intent.constraint.LambdaConstraint;
 import org.onosproject.net.intent.constraint.LatencyConstraint;
 import org.onosproject.net.intent.constraint.ObstacleConstraint;
 import org.onosproject.net.intent.constraint.WaypointConstraint;
-import org.onosproject.net.resource.link.BandwidthResource;
-import org.onosproject.net.resource.link.LambdaResource;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -181,8 +179,8 @@ public class IntentCodecTest extends AbstractIntentTest {
 
         final List<Constraint> constraints =
                 ImmutableList.of(
-                        new BandwidthConstraint(new BandwidthResource(Bandwidth.bps(1.0))),
-                        new LambdaConstraint(LambdaResource.valueOf(3)),
+                        new BandwidthConstraint(Bandwidth.bps(1.0)),
+                        new LambdaConstraint(new IndexedLambda(3)),
                         new AnnotationConstraint("key", 33.0),
                         new AsymmetricPathConstraint(),
                         new LatencyConstraint(Duration.ofSeconds(2)),

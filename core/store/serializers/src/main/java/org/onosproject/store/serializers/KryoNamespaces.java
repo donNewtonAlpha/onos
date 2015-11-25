@@ -75,6 +75,7 @@ import org.onosproject.net.OduSignalType;
 import org.onosproject.net.OmsPort;
 import org.onosproject.net.Port;
 import org.onosproject.net.PortNumber;
+import org.onosproject.net.TributarySlot;
 import org.onosproject.net.device.DefaultDeviceDescription;
 import org.onosproject.net.device.DefaultPortDescription;
 import org.onosproject.net.device.DefaultPortStatistics;
@@ -128,7 +129,7 @@ import org.onosproject.net.flow.criteria.TunnelIdCriterion;
 import org.onosproject.net.flow.criteria.UdpPortCriterion;
 import org.onosproject.net.flow.criteria.VlanIdCriterion;
 import org.onosproject.net.flow.criteria.VlanPcpCriterion;
-import org.onosproject.net.flow.instructions.ExtensionType;
+import org.onosproject.net.flow.instructions.ExtensionTreatmentType;
 import org.onosproject.net.flow.instructions.Instructions;
 import org.onosproject.net.flow.instructions.L0ModificationInstruction;
 import org.onosproject.net.flow.instructions.L1ModificationInstruction;
@@ -454,7 +455,7 @@ public final class KryoNamespaces {
             .register(new DefaultOutboundPacketSerializer(), DefaultOutboundPacket.class)
             .register(new AnnotationsSerializer(), DefaultAnnotations.class)
             .register(new ExtensionInstructionSerializer(), Instructions.ExtensionInstructionWrapper.class)
-            .register(ExtensionType.class)
+            .register(ExtensionTreatmentType.class)
             .register(Versioned.class)
             .register(MapEvent.class)
             .register(MapEvent.Type.class)
@@ -476,6 +477,7 @@ public final class KryoNamespaces {
             .register(OduCltPortDescription.class)
             .register(OchPortDescription.class)
             .register(OmsPortDescription.class)
+            .register(TributarySlot.class)
             .register(
                     MplsIntent.class,
                     MplsPathIntent.class,

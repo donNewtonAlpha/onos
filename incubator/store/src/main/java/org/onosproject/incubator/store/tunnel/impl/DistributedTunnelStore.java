@@ -148,7 +148,7 @@ public class DistributedTunnelStore
     @Override
     public TunnelId createOrUpdateTunnel(Tunnel tunnel) {
         // tunnelIdAsKeyStore.
-        if (tunnel.tunnelId() != null && !"".equals(tunnel.tunnelId())) {
+        if (tunnel.tunnelId() != null && !"".equals(tunnel.tunnelId().toString())) {
             Tunnel old = tunnelIdAsKeyStore.get(tunnel.tunnelId());
             if (old == null) {
                 log.info("This tunnel[" + tunnel.tunnelId() + "] is not available.");
@@ -290,9 +290,10 @@ public class DistributedTunnelStore
         TunnelSubscription order = new TunnelSubscription(appId, null, null, tunnelId, null, null,
                                 annotations);
         Tunnel result = tunnelIdAsKeyStore.get(tunnelId);
-        if (result != null || Tunnel.State.INACTIVE.equals(result.state())) {
+        if (result == null || Tunnel.State.INACTIVE.equals(result.state())) {
             return null;
         }
+
         orderSet.add(order);
         orderRelationship.put(appId, orderSet);
         return result;

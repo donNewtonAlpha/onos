@@ -44,7 +44,7 @@ import org.onosproject.net.flow.TrafficSelector;
 import org.onosproject.net.flow.TrafficTreatment;
 import org.onosproject.net.flow.instructions.Instructions;
 import org.onosproject.openflow.controller.Dpid;
-import org.onosproject.openflow.controller.ExtensionInterpreter;
+import org.onosproject.openflow.controller.ExtensionTreatmentInterpreter;
 import org.projectfloodlight.openflow.protocol.OFFlowMod;
 import org.projectfloodlight.openflow.protocol.OFFlowRemoved;
 import org.projectfloodlight.openflow.protocol.OFFlowStatsEntry;
@@ -449,7 +449,7 @@ public class FlowEntryBuilder {
             break;
         case TUNNEL_IPV4_DST:
             DriverHandler driver = getDriver(dpid);
-            ExtensionInterpreter interpreter = driver.behaviour(ExtensionInterpreter.class);
+            ExtensionTreatmentInterpreter interpreter = driver.behaviour(ExtensionTreatmentInterpreter.class);
             if (interpreter != null) {
                 builder.extension(interpreter.mapAction(action), DeviceId.deviceId(Dpid.uri(dpid)));
             }
@@ -513,6 +513,7 @@ public class FlowEntryBuilder {
         Ip4Prefix ip4Prefix;
         Ip6Address ip6Address;
         Ip6Prefix ip6Prefix;
+        Ip4Address ip;
 
         TrafficSelector.Builder builder = DefaultTrafficSelector.builder();
         for (MatchField<?> field : match.getMatchFields()) {
@@ -711,13 +712,19 @@ public class FlowEntryBuilder {
                 mac = MacAddress.valueOf(match.get(MatchField.ARP_SHA).getLong());
                 builder.matchArpSha(mac);
                 break;
+            case ARP_SPA:
+                ip = Ip4Address.valueOf(match.get(MatchField.ARP_SPA).getInt());
+                builder.matchArpSpa(ip);
+                break;
             case ARP_THA:
                 mac = MacAddress.valueOf(match.get(MatchField.ARP_THA).getLong());
                 builder.matchArpTha(mac);
                 break;
-            case ARP_OP:
-            case ARP_SPA:
             case ARP_TPA:
+                ip = Ip4Address.valueOf(match.get(MatchField.ARP_TPA).getInt());
+                builder.matchArpTpa(ip);
+                break;
+            case ARP_OP:
             case MPLS_TC:
             default:
                 log.warn("Match type {} not yet implemented.", field.id);

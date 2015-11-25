@@ -25,6 +25,7 @@ import org.onosproject.net.driver.DriverService;
 import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.flow.TrafficSelector;
 import org.onosproject.net.flow.criteria.ArpHaCriterion;
+import org.onosproject.net.flow.criteria.ArpPaCriterion;
 import org.onosproject.net.flow.criteria.Criterion;
 import org.onosproject.net.flow.criteria.EthCriterion;
 import org.onosproject.net.flow.criteria.EthTypeCriterion;
@@ -180,6 +181,7 @@ public abstract class FlowModBuilder {
         SctpPortCriterion sctpPortCriterion;
         IPv6NDLinkLayerAddressCriterion llAddressCriterion;
         ArpHaCriterion arpHaCriterion;
+        ArpPaCriterion arpPaCriterion;
 
         for (Criterion c : selector.criteria()) {
             switch (c.type()) {
@@ -422,14 +424,22 @@ public abstract class FlowModBuilder {
                 mBuilder.setExact(MatchField.ARP_SHA,
                                   MacAddress.of(arpHaCriterion.mac().toLong()));
                 break;
+            case ARP_SPA:
+                arpPaCriterion = (ArpPaCriterion) c;
+                mBuilder.setExact(MatchField.ARP_SPA,
+                                  IPv4Address.of(arpPaCriterion.ip().toInt()));
+                break;
             case ARP_THA:
                 arpHaCriterion = (ArpHaCriterion) c;
                 mBuilder.setExact(MatchField.ARP_THA,
                                   MacAddress.of(arpHaCriterion.mac().toLong()));
                 break;
-            case ARP_OP:
-            case ARP_SPA:
             case ARP_TPA:
+                arpPaCriterion = (ArpPaCriterion) c;
+                mBuilder.setExact(MatchField.ARP_TPA,
+                                  IPv4Address.of(arpPaCriterion.ip().toInt()));
+                break;
+            case ARP_OP:
             case MPLS_TC:
             case PBB_ISID:
             default:

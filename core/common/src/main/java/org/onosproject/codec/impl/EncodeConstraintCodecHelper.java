@@ -128,7 +128,7 @@ public final class EncodeConstraintCodecHelper {
         final BandwidthConstraint bandwidthConstraint =
                 (BandwidthConstraint) constraint;
         return context.mapper().createObjectNode()
-                .put("bandwidth", bandwidthConstraint.bandwidth().toDouble());
+                .put("bandwidth", bandwidthConstraint.bandwidth().bps());
     }
 
     /**
@@ -142,7 +142,7 @@ public final class EncodeConstraintCodecHelper {
                 (LambdaConstraint) constraint;
 
         return context.mapper().createObjectNode()
-                .put("lambda", lambdaConstraint.lambda().toInt());
+                .put("lambda", lambdaConstraint.lambda().index());
     }
 
     /**

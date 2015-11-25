@@ -141,7 +141,7 @@ public final class IntentJsonMatcher extends TypeSafeDiagnosingMatcher<JsonNode>
         final JsonNode bandwidthJson = constraintJson.get("bandwidth");
         return bandwidthJson != null
                 && constraintJson.get("bandwidth").asDouble()
-                == bandwidthConstraint.bandwidth().toDouble();
+                == bandwidthConstraint.bandwidth().bps();
     }
 
     /**
@@ -157,7 +157,7 @@ public final class IntentJsonMatcher extends TypeSafeDiagnosingMatcher<JsonNode>
         final JsonNode lambdaJson = constraintJson.get("lambda");
         return lambdaJson != null
                 && constraintJson.get("lambda").asInt()
-                == lambdaConstraint.lambda().toInt();
+                == lambdaConstraint.lambda().index();
     }
 
     /**
