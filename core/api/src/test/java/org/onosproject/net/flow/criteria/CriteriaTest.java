@@ -42,6 +42,7 @@ import org.onosproject.net.OduSignalType;
 import org.onosproject.net.PortNumber;
 
 import com.google.common.testing.EqualsTester;
+
 /**
  * Unit tests for the Criteria class and its subclasses.
  */
@@ -135,6 +136,24 @@ public class CriteriaTest {
     Criterion sameAsMatchUdpPort1 = Criteria.matchUdpSrc(tpPort1);
     Criterion matchUdpPort2 = Criteria.matchUdpDst(tpPort2);
 
+
+    int tcpFlags1 =
+        Criterion.TCPFlags.NS.getValue() |
+        Criterion.TCPFlags.CWR.getValue() |
+        Criterion.TCPFlags.ECE.getValue() |
+        Criterion.TCPFlags.URG.getValue() |
+        Criterion.TCPFlags.ACK.getValue() |
+        Criterion.TCPFlags.PSH.getValue() |
+        Criterion.TCPFlags.RST.getValue() |
+        Criterion.TCPFlags.SYN.getValue();
+
+    int tcpFlags2 = tcpFlags1 |
+        Criterion.TCPFlags.FIN.getValue();
+
+    Criterion matchTcpFlags1 = Criteria.matchTcpFlags(tcpFlags1);
+    Criterion sameAsmatchTcpFlags1 = Criteria.matchTcpFlags(tcpFlags1);
+    Criterion matchTcpFlags2 = Criteria.matchTcpFlags(tcpFlags2);
+
     Criterion matchSctpPort1 = Criteria.matchSctpSrc(tpPort1);
     Criterion sameAsMatchSctpPort1 = Criteria.matchSctpSrc(tpPort1);
     Criterion matchSctpPort2 = Criteria.matchSctpDst(tpPort2);
@@ -174,34 +193,40 @@ public class CriteriaTest {
     private Ip6Address ip6TargetAddress1 = Ip6Address.valueOf(IPV6_ADDR1);
     private Ip6Address ip6TargetAddress2 = Ip6Address.valueOf(IPV6_ADDR2);
     Criterion matchIpv6TargetAddr1 =
-        Criteria.matchIPv6NDTargetAddress(ip6TargetAddress1);
+            Criteria.matchIPv6NDTargetAddress(ip6TargetAddress1);
     Criterion sameAsMatchIpv6TargetAddr1 =
-        Criteria.matchIPv6NDTargetAddress(ip6TargetAddress1);
+            Criteria.matchIPv6NDTargetAddress(ip6TargetAddress1);
     Criterion matchIpv6TargetAddr2 =
-        Criteria.matchIPv6NDTargetAddress(ip6TargetAddress2);
+            Criteria.matchIPv6NDTargetAddress(ip6TargetAddress2);
 
     private static final String LL_MAC1 = "00:00:00:00:00:01";
     private static final String LL_MAC2 = "00:00:00:00:00:02";
     private MacAddress llMac1 = MacAddress.valueOf(LL_MAC1);
     private MacAddress llMac2 = MacAddress.valueOf(LL_MAC2);
     Criterion matchSrcLlAddr1 =
-        Criteria.matchIPv6NDSourceLinkLayerAddress(llMac1);
+            Criteria.matchIPv6NDSourceLinkLayerAddress(llMac1);
     Criterion sameAsMatchSrcLlAddr1 =
-        Criteria.matchIPv6NDSourceLinkLayerAddress(llMac1);
+            Criteria.matchIPv6NDSourceLinkLayerAddress(llMac1);
     Criterion matchSrcLlAddr2 =
-        Criteria.matchIPv6NDSourceLinkLayerAddress(llMac2);
+            Criteria.matchIPv6NDSourceLinkLayerAddress(llMac2);
     Criterion matchTargetLlAddr1 =
-        Criteria.matchIPv6NDTargetLinkLayerAddress(llMac1);
+            Criteria.matchIPv6NDTargetLinkLayerAddress(llMac1);
     Criterion sameAsMatchTargetLlAddr1 =
-        Criteria.matchIPv6NDTargetLinkLayerAddress(llMac1);
+            Criteria.matchIPv6NDTargetLinkLayerAddress(llMac1);
     Criterion matchTargetLlAddr2 =
-        Criteria.matchIPv6NDTargetLinkLayerAddress(llMac2);
+            Criteria.matchIPv6NDTargetLinkLayerAddress(llMac2);
 
     MplsLabel mpls1 = MplsLabel.mplsLabel(1);
     MplsLabel mpls2 = MplsLabel.mplsLabel(2);
     Criterion matchMpls1 = Criteria.matchMplsLabel(mpls1);
     Criterion sameAsMatchMpls1 = Criteria.matchMplsLabel(mpls1);
     Criterion matchMpls2 = Criteria.matchMplsLabel(mpls2);
+
+    byte mplsTc1 = 1;
+    byte mplsTc2 = 2;
+    Criterion matchMplsTc1 = Criteria.matchMplsTc(mplsTc1);
+    Criterion sameAsMatchMplsTc1 = Criteria.matchMplsTc(mplsTc1);
+    Criterion matchMplsTc2 = Criteria.matchMplsTc(mplsTc2);
 
     long tunnelId1 = 1;
     long tunnelId2 = 2;
@@ -219,13 +244,13 @@ public class CriteriaTest {
         Criterion.IPv6ExthdrFlags.HOP.getValue() |
         Criterion.IPv6ExthdrFlags.UNREP.getValue();
     int ipv6ExthdrFlags2 = ipv6ExthdrFlags1 |
-        Criterion.IPv6ExthdrFlags.UNSEQ.getValue();
+            Criterion.IPv6ExthdrFlags.UNSEQ.getValue();
     Criterion matchIpv6ExthdrFlags1 =
-        Criteria.matchIPv6ExthdrFlags(ipv6ExthdrFlags1);
+            Criteria.matchIPv6ExthdrFlags(ipv6ExthdrFlags1);
     Criterion sameAsMatchIpv6ExthdrFlags1 =
-        Criteria.matchIPv6ExthdrFlags(ipv6ExthdrFlags1);
+            Criteria.matchIPv6ExthdrFlags(ipv6ExthdrFlags1);
     Criterion matchIpv6ExthdrFlags2 =
-        Criteria.matchIPv6ExthdrFlags(ipv6ExthdrFlags2);
+            Criteria.matchIPv6ExthdrFlags(ipv6ExthdrFlags2);
 
     Criterion matchOchSignalType1 = Criteria.matchOchSignalType(OchSignalType.FIXED_GRID);
     Criterion sameAsMatchOchSignalType1 = Criteria.matchOchSignalType(OchSignalType.FIXED_GRID);
@@ -242,8 +267,8 @@ public class CriteriaTest {
     Criterion matchOchSignal2 =
             Criteria.matchLambda(Lambda.ochSignal(GridType.DWDM, ChannelSpacing.CHL_50GHZ, 4, 8));
 
-    final OduSignalId odu1 = oduSignalId(1, 80, new byte [] {1, 1, 2, 2, 1, 2, 2, 1, 2, 2});
-    final OduSignalId odu2 = oduSignalId(3, 8, new byte [] {1, 0, 0, 0, 0, 0, 0, 0, 0, 0});
+    final OduSignalId odu1 = oduSignalId(1, 80, new byte[]{1, 1, 2, 2, 1, 2, 2, 1, 2, 2});
+    final OduSignalId odu2 = oduSignalId(3, 8, new byte[]{1, 0, 0, 0, 0, 0, 0, 0, 0, 0});
     Criterion matchOduSignalId1 = Criteria.matchOduSignalId(odu1);
     Criterion sameAsMatchOduSignalId1 = Criteria.matchOduSignalId(odu1);
     Criterion matchOduSignalId2 = Criteria.matchOduSignalId(odu2);
@@ -259,9 +284,9 @@ public class CriteriaTest {
      * it to the proper type.
      *
      * @param criterion Criterion object to convert
-     * @param type Enumerated type value for the Criterion class
-     * @param clazz Desired Criterion class
-     * @param <T> The type the caller wants returned
+     * @param type      Enumerated type value for the Criterion class
+     * @param clazz     Desired Criterion class
+     * @param <T>       The type the caller wants returned
      * @return converted object
      */
     @SuppressWarnings("unchecked")
@@ -297,6 +322,7 @@ public class CriteriaTest {
         assertThatClassIsImmutable(IPCriterion.class);
         assertThatClassIsImmutable(TcpPortCriterion.class);
         assertThatClassIsImmutable(UdpPortCriterion.class);
+        assertThatClassIsImmutable(TcpFlagsCriterion.class);
         assertThatClassIsImmutable(SctpPortCriterion.class);
         assertThatClassIsImmutable(IcmpTypeCriterion.class);
         assertThatClassIsImmutable(IcmpCodeCriterion.class);
@@ -306,6 +332,7 @@ public class CriteriaTest {
         assertThatClassIsImmutable(IPv6NDTargetAddressCriterion.class);
         assertThatClassIsImmutable(IPv6NDLinkLayerAddressCriterion.class);
         assertThatClassIsImmutable(MplsCriterion.class);
+        assertThatClassIsImmutable(MplsTcCriterion.class);
         assertThatClassIsImmutable(IPv6ExthdrFlagsCriterion.class);
         assertThatClassIsImmutable(LambdaCriterion.class);
         assertThatClassIsImmutable(OduSignalIdCriterion.class);
@@ -395,8 +422,8 @@ public class CriteriaTest {
         Criterion matchEthDst = Criteria.matchEthDst(mac1);
         EthCriterion ethCriterion =
                 checkAndConvert(matchEthDst,
-                        Criterion.Type.ETH_DST,
-                        EthCriterion.class);
+                                Criterion.Type.ETH_DST,
+                                EthCriterion.class);
         assertThat(ethCriterion.mac(), is(equalTo(mac1)));
     }
 
@@ -461,8 +488,8 @@ public class CriteriaTest {
         Criterion matchVlanId = Criteria.matchVlanId(vlanId1);
         VlanIdCriterion vlanIdCriterion =
                 checkAndConvert(matchVlanId,
-                        Criterion.Type.VLAN_VID,
-                        VlanIdCriterion.class);
+                                Criterion.Type.VLAN_VID,
+                                VlanIdCriterion.class);
         assertThat(vlanIdCriterion.vlanId(), is(equalTo(vlanId1)));
     }
 
@@ -487,8 +514,8 @@ public class CriteriaTest {
         Criterion matchVlanPcp = Criteria.matchVlanPcp(vlanPcp1);
         VlanPcpCriterion vlanPcpCriterion =
                 checkAndConvert(matchVlanPcp,
-                        Criterion.Type.VLAN_PCP,
-                        VlanPcpCriterion.class);
+                                Criterion.Type.VLAN_PCP,
+                                VlanPcpCriterion.class);
         assertThat(vlanPcpCriterion.priority(), is(equalTo(vlanPcp1)));
     }
 
@@ -513,8 +540,8 @@ public class CriteriaTest {
         Criterion matchIPDscp = Criteria.matchIPDscp(ipDscp1);
         IPDscpCriterion ipDscpCriterion =
                 checkAndConvert(matchIPDscp,
-                        Criterion.Type.IP_DSCP,
-                        IPDscpCriterion.class);
+                                Criterion.Type.IP_DSCP,
+                                IPDscpCriterion.class);
         assertThat(ipDscpCriterion.ipDscp(), is(equalTo(ipDscp1)));
     }
 
@@ -539,8 +566,8 @@ public class CriteriaTest {
         Criterion matchIPEcn = Criteria.matchIPEcn(ipEcn1);
         IPEcnCriterion ipEcnCriterion =
                 checkAndConvert(matchIPEcn,
-                        Criterion.Type.IP_ECN,
-                        IPEcnCriterion.class);
+                                Criterion.Type.IP_ECN,
+                                IPEcnCriterion.class);
         assertThat(ipEcnCriterion.ipEcn(), is(equalTo(ipEcn1)));
     }
 
@@ -565,8 +592,8 @@ public class CriteriaTest {
         Criterion matchIPProtocol = Criteria.matchIPProtocol(protocol1);
         IPProtocolCriterion ipProtocolCriterion =
                 checkAndConvert(matchIPProtocol,
-                        Criterion.Type.IP_PROTO,
-                        IPProtocolCriterion.class);
+                                Criterion.Type.IP_PROTO,
+                                IPProtocolCriterion.class);
         assertThat(ipProtocolCriterion.protocol(), is(equalTo(protocol1)));
     }
 
@@ -604,8 +631,8 @@ public class CriteriaTest {
         Criterion matchIPDst = Criteria.matchIPDst(ip1);
         IPCriterion ipCriterion =
                 checkAndConvert(matchIPDst,
-                        Criterion.Type.IPV4_DST,
-                        IPCriterion.class);
+                                Criterion.Type.IPV4_DST,
+                                IPCriterion.class);
         assertThat(ipCriterion.ip(), is(equalTo(ip1)));
     }
 
@@ -617,8 +644,8 @@ public class CriteriaTest {
         Criterion matchIpv6Src = Criteria.matchIPv6Src(ipv61);
         IPCriterion ipCriterion =
                 checkAndConvert(matchIpv6Src,
-                        Criterion.Type.IPV6_SRC,
-                        IPCriterion.class);
+                                Criterion.Type.IPV6_SRC,
+                                IPCriterion.class);
         assertThat(ipCriterion.ip(), is(ipv61));
     }
 
@@ -630,8 +657,8 @@ public class CriteriaTest {
         Criterion matchIPv6Dst = Criteria.matchIPv6Dst(ipv61);
         IPCriterion ipCriterion =
                 checkAndConvert(matchIPv6Dst,
-                        Criterion.Type.IPV6_DST,
-                        IPCriterion.class);
+                                Criterion.Type.IPV6_DST,
+                                IPCriterion.class);
         assertThat(ipCriterion.ip(), is(equalTo(ipv61)));
     }
 
@@ -674,8 +701,8 @@ public class CriteriaTest {
         Criterion matchTcpDst = Criteria.matchTcpDst(tpPort1);
         TcpPortCriterion tcpPortCriterion =
                 checkAndConvert(matchTcpDst,
-                        Criterion.Type.TCP_DST,
-                        TcpPortCriterion.class);
+                                Criterion.Type.TCP_DST,
+                                TcpPortCriterion.class);
         assertThat(tcpPortCriterion.tcpPort(), is(equalTo(tpPort1)));
     }
 
@@ -713,8 +740,8 @@ public class CriteriaTest {
         Criterion matchUdpDst = Criteria.matchUdpDst(tpPort1);
         UdpPortCriterion udpPortCriterion =
                 checkAndConvert(matchUdpDst,
-                        Criterion.Type.UDP_DST,
-                        UdpPortCriterion.class);
+                                Criterion.Type.UDP_DST,
+                                UdpPortCriterion.class);
         assertThat(udpPortCriterion.udpPort(), is(equalTo(tpPort1)));
     }
 
@@ -726,6 +753,32 @@ public class CriteriaTest {
         new EqualsTester()
                 .addEqualityGroup(matchUdpPort1, sameAsMatchUdpPort1)
                 .addEqualityGroup(matchUdpPort2)
+                .testEquals();
+    }
+
+    // TcpFlagsCriterion class
+
+    /**
+     * Test the matchTcpFlags method.
+     */
+    @Test
+    public void testMatchTcpFlagsMethod() {
+        Criterion matchTcpFlag = Criteria.matchTcpFlags(tcpFlags1);
+        TcpFlagsCriterion tcpFlagsCriterion =
+                checkAndConvert(matchTcpFlag,
+                        Criterion.Type.TCP_FLAGS,
+                        TcpFlagsCriterion.class);
+        assertThat(tcpFlagsCriterion.flags(), is(equalTo(tcpFlags1)));
+    }
+
+    /**
+     * Test the equals() method of the TcpFlagsCriterion class.
+     */
+    @Test
+    public void testTcpFlagsCriterionEquals() {
+        new EqualsTester()
+                .addEqualityGroup(matchTcpFlags1, sameAsmatchTcpFlags1)
+                .addEqualityGroup(matchTcpFlags2)
                 .testEquals();
     }
 
@@ -752,8 +805,8 @@ public class CriteriaTest {
         Criterion matchSctpDst = Criteria.matchSctpDst(tpPort1);
         SctpPortCriterion sctpPortCriterion =
                 checkAndConvert(matchSctpDst,
-                        Criterion.Type.SCTP_DST,
-                        SctpPortCriterion.class);
+                                Criterion.Type.SCTP_DST,
+                                SctpPortCriterion.class);
         assertThat(sctpPortCriterion.sctpPort(), is(equalTo(tpPort1)));
     }
 
@@ -911,7 +964,7 @@ public class CriteriaTest {
     @Test
     public void testMatchIPv6NDTargetAddressMethod() {
         Criterion matchTargetAddress =
-            Criteria.matchIPv6NDTargetAddress(ip6TargetAddress1);
+                Criteria.matchIPv6NDTargetAddress(ip6TargetAddress1);
         IPv6NDTargetAddressCriterion targetAddressCriterion =
                 checkAndConvert(matchTargetAddress,
                                 Criterion.Type.IPV6_ND_TARGET,
@@ -940,11 +993,11 @@ public class CriteriaTest {
     @Test
     public void testMatchIPv6NDSourceLinkLayerAddressMethod() {
         Criterion matchSrcLlAddr =
-            Criteria.matchIPv6NDSourceLinkLayerAddress(llMac1);
+                Criteria.matchIPv6NDSourceLinkLayerAddress(llMac1);
         IPv6NDLinkLayerAddressCriterion srcLlCriterion =
                 checkAndConvert(matchSrcLlAddr,
-                        Criterion.Type.IPV6_ND_SLL,
-                        IPv6NDLinkLayerAddressCriterion.class);
+                                Criterion.Type.IPV6_ND_SLL,
+                                IPv6NDLinkLayerAddressCriterion.class);
         assertThat(srcLlCriterion.mac(), is(equalTo(llMac1)));
     }
 
@@ -954,11 +1007,11 @@ public class CriteriaTest {
     @Test
     public void testMatchIPv6NDTargetLinkLayerAddressMethod() {
         Criterion matchTargetLlAddr =
-            Criteria.matchIPv6NDTargetLinkLayerAddress(llMac1);
+                Criteria.matchIPv6NDTargetLinkLayerAddress(llMac1);
         IPv6NDLinkLayerAddressCriterion targetLlCriterion =
                 checkAndConvert(matchTargetLlAddr,
-                        Criterion.Type.IPV6_ND_TLL,
-                        IPv6NDLinkLayerAddressCriterion.class);
+                                Criterion.Type.IPV6_ND_TLL,
+                                IPv6NDLinkLayerAddressCriterion.class);
         assertThat(targetLlCriterion.mac(), is(equalTo(llMac1)));
     }
 
@@ -988,8 +1041,8 @@ public class CriteriaTest {
         Criterion matchMplsLabel = Criteria.matchMplsLabel(mpls1);
         MplsCriterion mplsCriterion =
                 checkAndConvert(matchMplsLabel,
-                        Criterion.Type.MPLS_LABEL,
-                        MplsCriterion.class);
+                                Criterion.Type.MPLS_LABEL,
+                                MplsCriterion.class);
         assertThat(mplsCriterion.label(), is(equalTo(mpls1)));
     }
 
@@ -1001,6 +1054,32 @@ public class CriteriaTest {
         new EqualsTester()
                 .addEqualityGroup(matchMpls1, sameAsMatchMpls1)
                 .addEqualityGroup(matchMpls2)
+                .testEquals();
+    }
+
+    // MplsTcCriterion class
+
+    /**
+     * Test the matchMplsTc method.
+     */
+    @Test
+    public void testMatchMplsTcMethod() {
+        Criterion matchMplsTc = Criteria.matchMplsTc(mplsTc1);
+        MplsTcCriterion mplsTcCriterion =
+                checkAndConvert(matchMplsTc,
+                                Criterion.Type.MPLS_TC,
+                                MplsTcCriterion.class);
+        assertThat(mplsTcCriterion.tc(), is(equalTo(mplsTc1)));
+    }
+
+    /**
+     * Test the equals() method of the MplsTcCriterion class.
+     */
+    @Test
+    public void testMplsTcCriterionEquals() {
+        new EqualsTester()
+                .addEqualityGroup(matchMplsTc1, sameAsMatchMplsTc1)
+                .addEqualityGroup(matchMplsTc2)
                 .testEquals();
     }
 
@@ -1025,10 +1104,10 @@ public class CriteriaTest {
      */
     @Test
     public void testTunnelIdCriterionEquals() {
-       new EqualsTester()
-               .addEqualityGroup(matchTunnelId1, sameAsMatchTunnelId1)
-               .addEqualityGroup(matchTunnelId2)
-               .testEquals();
+        new EqualsTester()
+                .addEqualityGroup(matchTunnelId1, sameAsMatchTunnelId1)
+                .addEqualityGroup(matchTunnelId2)
+                .testEquals();
     }
 
     // IPv6ExthdrFlagsCriterion class
@@ -1039,11 +1118,11 @@ public class CriteriaTest {
     @Test
     public void testMatchIPv6ExthdrFlagsMethod() {
         Criterion matchExthdrFlags =
-            Criteria.matchIPv6ExthdrFlags(ipv6ExthdrFlags1);
+                Criteria.matchIPv6ExthdrFlags(ipv6ExthdrFlags1);
         IPv6ExthdrFlagsCriterion exthdrFlagsCriterion =
                 checkAndConvert(matchExthdrFlags,
-                        Criterion.Type.IPV6_EXTHDR,
-                        IPv6ExthdrFlagsCriterion.class);
+                                Criterion.Type.IPV6_EXTHDR,
+                                IPv6ExthdrFlagsCriterion.class);
         assertThat(exthdrFlagsCriterion.exthdrFlags(),
                    is(equalTo(ipv6ExthdrFlags1)));
     }

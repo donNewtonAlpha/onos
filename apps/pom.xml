@@ -47,6 +47,7 @@
         <module>cordfabric</module>
         <module>xos-integration</module>
         <module>pcep-api</module>
+        <module>iptopology-api</module>
         <module>olt</module>
         <module>cip</module>
         <module>flowanalyzer</module>
@@ -58,6 +59,8 @@
         <module>pim</module>
         <module>mlb</module>
         <module>openstackswitching</module>
+        <module>pathpainter</module>
+        <module>cpman</module>
 
         <module>tor</module>
         <module>virtual-gigapower</module>

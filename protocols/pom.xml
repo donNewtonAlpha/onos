@@ -29,19 +29,30 @@
     <artifactId>onos-protocols</artifactId>
     <packaging>pom</packaging>
 
-    <description>ONOS south-bound protocols</description>
+    <description>ONOS southbound protocols</description>
 
     <modules>
         <module>openflow</module>
         <module>netconf</module>
         <module>pcep</module>
-        <!--
         <module>ovsdb</module>
         <module>bgp</module>
-        -->
     </modules>
 
     <dependencies>
+        <dependency>
+            <groupId>org.onosproject</groupId>
+            <artifactId>onlab-misc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.onosproject</groupId>
+            <artifactId>onlab-junit</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

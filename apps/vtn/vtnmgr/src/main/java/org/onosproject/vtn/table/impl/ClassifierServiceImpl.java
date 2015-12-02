@@ -20,7 +20,11 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 import org.onlab.osgi.DefaultServiceDirectory;
 import org.onlab.osgi.ServiceDirectory;
+import org.onlab.packet.EthType.EtherType;
+import org.onlab.packet.Ethernet;
+import org.onlab.packet.Ip4Address;
 import org.onlab.packet.IpAddress;
+import org.onlab.packet.IpPrefix;
 import org.onlab.packet.MacAddress;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.net.DeviceId;
@@ -36,7 +40,6 @@ import org.onosproject.net.flowobjective.FlowObjectiveService;
 import org.onosproject.net.flowobjective.ForwardingObjective;
 import org.onosproject.net.flowobjective.ForwardingObjective.Flag;
 import org.onosproject.net.flowobjective.Objective;
-import org.onosproject.net.flowobjective.Objective.Operation;
 import org.onosproject.vtn.table.ClassifierService;
 import org.onosproject.vtnrsc.SegmentationId;
 import org.slf4j.Logger;
@@ -49,7 +52,10 @@ import com.google.common.collect.Sets;
 public class ClassifierServiceImpl implements ClassifierService {
     private final Logger log = getLogger(getClass());
 
-    private static final int L2_CLAFFIFIER_PRIORITY = 50000;
+    private static final EtherType ETH_TYPE = EtherType.ARP;
+    private static final int ARP_CLASSIFIER_PRIORITY = 60000;
+    private static final int L3_CLASSIFIER_PRIORITY = 0xffff;
+    private static final int L2_CLASSIFIER_PRIORITY = 50000;
 
     private final FlowObjectiveService flowObjectiveService;
     private final ApplicationId appId;
@@ -78,7 +84,7 @@ public class ClassifierServiceImpl implements ClassifierService {
         ForwardingObjective.Builder objective = DefaultForwardingObjective
                 .builder().withTreatment(treatment.build())
                 .withSelector(selector).fromApp(appId).makePermanent()
-                .withFlag(Flag.SPECIFIC).withPriority(L2_CLAFFIFIER_PRIORITY);
+                .withFlag(Flag.SPECIFIC).withPriority(L2_CLASSIFIER_PRIORITY);
         if (type.equals(Objective.Operation.ADD)) {
             log.debug("programLocalIn-->ADD");
             flowObjectiveService.forward(deviceId, objective.add());
@@ -108,7 +114,7 @@ public class ClassifierServiceImpl implements ClassifierService {
             ForwardingObjective.Builder objective = DefaultForwardingObjective
                     .builder().withTreatment(treatment).withSelector(selector)
                     .fromApp(appId).makePermanent().withFlag(Flag.SPECIFIC)
-                    .withPriority(L2_CLAFFIFIER_PRIORITY);
+                    .withPriority(L2_CLASSIFIER_PRIORITY);
             if (type.equals(Objective.Operation.ADD)) {
                 log.debug("programTunnelIn-->ADD");
                 flowObjectiveService.forward(deviceId, objective.add());
@@ -120,26 +126,71 @@ public class ClassifierServiceImpl implements ClassifierService {
     }
 
     @Override
-    public void programL3ExPortClassifierRules(DeviceId deviceId,
-                                               PortNumber exPort,
-                                               IpAddress fIp, Operation type) {
-        // TODO Auto-generated method stub
+    public void programL3ExPortClassifierRules(DeviceId deviceId, PortNumber inPort,
+                                               IpAddress dstIp,
+                                               Objective.Operation type) {
+        TrafficSelector selector = DefaultTrafficSelector.builder()
+                .matchEthType(Ethernet.TYPE_IPV4).matchInPort(inPort)
+                .matchIPDst(IpPrefix.valueOf(dstIp, 32)).build();
+        TrafficTreatment treatment = DefaultTrafficTreatment.builder().build();
+        ForwardingObjective.Builder objective = DefaultForwardingObjective
+                .builder().withTreatment(treatment).withSelector(selector)
+                .fromApp(appId).withFlag(Flag.SPECIFIC)
+                .withPriority(L3_CLASSIFIER_PRIORITY);
+        if (type.equals(Objective.Operation.ADD)) {
+            log.debug("L3ExToInClassifierRules-->ADD");
+            flowObjectiveService.forward(deviceId, objective.add());
+        } else {
+            log.debug("L3ExToInClassifierRules-->REMOVE");
+            flowObjectiveService.forward(deviceId, objective.remove());
+        }
     }
 
     @Override
-    public void programL3InPortClassifierRules(DeviceId deviceId,
-                                               PortNumber inPort,
-                                               MacAddress srcMac,
-                                               MacAddress dstVmGwMac,
-                                               SegmentationId l3Vni,
-                                               Operation type) {
-        // TODO Auto-generated method stub
+    public void programL3InPortClassifierRules(DeviceId deviceId, PortNumber inPort,
+                                               MacAddress srcMac, MacAddress dstMac,
+                                               SegmentationId actionVni,
+                                               Objective.Operation type) {
+        TrafficSelector selector = DefaultTrafficSelector.builder()
+                .matchInPort(inPort).matchEthSrc(srcMac).matchEthDst(dstMac)
+                .build();
+        TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                .setTunnelId(Long.parseLong(actionVni.segmentationId())).build();
+        ForwardingObjective.Builder objective = DefaultForwardingObjective
+                .builder().withTreatment(treatment).withSelector(selector)
+                .fromApp(appId).withFlag(Flag.SPECIFIC)
+                .withPriority(L3_CLASSIFIER_PRIORITY);
+        if (type.equals(Objective.Operation.ADD)) {
+            log.debug("L3InternalClassifierRules-->ADD");
+            flowObjectiveService.forward(deviceId, objective.add());
+        } else {
+            log.debug("L3InternalClassifierRules-->REMOVE");
+            flowObjectiveService.forward(deviceId, objective.remove());
+        }
     }
 
     @Override
-    public void programArpClassifierRules(DeviceId deviceId, IpAddress srcGwIp,
-                                          SegmentationId srcVni, Operation type) {
-        // TODO Auto-generated method stub
+    public void programArpClassifierRules(DeviceId deviceId, IpAddress dstIp,
+                                          SegmentationId actionVni,
+                                          Objective.Operation type) {
+        TrafficSelector selector = DefaultTrafficSelector.builder()
+                .matchEthType(ETH_TYPE.ethType().toShort())
+                .matchArpTpa(Ip4Address.valueOf(dstIp.toString()))
+                .build();
+        TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                .setTunnelId(Long.parseLong(actionVni.segmentationId()))
+                .build();
+        ForwardingObjective.Builder objective = DefaultForwardingObjective
+                .builder().withTreatment(treatment).withSelector(selector)
+                .fromApp(appId).withFlag(Flag.SPECIFIC)
+                .withPriority(ARP_CLASSIFIER_PRIORITY);
+        if (type.equals(Objective.Operation.ADD)) {
+            log.debug("ArpClassifierRules-->ADD");
+            flowObjectiveService.forward(deviceId, objective.add());
+        } else {
+            log.debug("ArpClassifierRules-->REMOVE");
+            flowObjectiveService.forward(deviceId, objective.remove());
+        }
     }
 
 }

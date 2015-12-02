@@ -46,10 +46,6 @@
         <module>cli</module>
 
         <module>protocols</module>
-        <!-- FIXME move to protocols/ -->
-        <module>ovsdb</module>
-        <module>bgp</module>
-
         <module>providers</module>
         <module>drivers</module>
 
@@ -694,12 +690,6 @@
                         <groupId>org.onosproject</groupId>
                         <artifactId>onos-build-conf</artifactId>
                         <version>${onos-build-conf.version}</version>
-                    </dependency>
-                    <!-- For Java 8 lambda support-->
-                    <dependency>
-                        <groupId>com.puppycrawl.tools</groupId>
-                        <artifactId>checkstyle</artifactId>
-                        <version>5.9</version>
                     </dependency>
                 </dependencies>
                 <configuration>

@@ -15,12 +15,14 @@
  */
 package org.onosproject.vtn.manager.impl;
 
+import static org.onosproject.net.flow.instructions.ExtensionTreatmentType.ExtensionTreatmentTypes.NICIRA_SET_TUNNEL_DST;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -30,6 +32,7 @@ import org.apache.felix.scr.annotations.Deactivate;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.apache.felix.scr.annotations.Service;
+import org.onlab.packet.Ip4Address;
 import org.onlab.packet.IpAddress;
 import org.onlab.packet.MacAddress;
 import org.onlab.util.KryoNamespace;
@@ -43,6 +46,7 @@ import org.onosproject.net.Port;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.behaviour.BridgeConfig;
 import org.onosproject.net.behaviour.BridgeDescription;
+import org.onosproject.net.behaviour.ExtensionTreatmentResolver;
 import org.onosproject.net.config.NetworkConfigService;
 import org.onosproject.net.config.basics.BasicDeviceConfig;
 import org.onosproject.net.device.DeviceEvent;
@@ -50,15 +54,24 @@ import org.onosproject.net.device.DeviceListener;
 import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.driver.DriverHandler;
 import org.onosproject.net.driver.DriverService;
+import org.onosproject.net.flow.DefaultTrafficTreatment;
+import org.onosproject.net.flow.TrafficTreatment.Builder;
+import org.onosproject.net.flow.instructions.ExtensionTreatment;
 import org.onosproject.net.flowobjective.Objective;
+import org.onosproject.net.group.DefaultGroupBucket;
+import org.onosproject.net.group.DefaultGroupDescription;
+import org.onosproject.net.group.DefaultGroupKey;
+import org.onosproject.net.group.GroupBucket;
+import org.onosproject.net.group.GroupBuckets;
+import org.onosproject.net.group.GroupDescription;
+import org.onosproject.net.group.GroupKey;
+import org.onosproject.net.group.GroupService;
 import org.onosproject.net.host.HostEvent;
 import org.onosproject.net.host.HostListener;
 import org.onosproject.net.host.HostService;
 import org.onosproject.store.serializers.KryoNamespaces;
-import org.onosproject.store.service.ConsistentMap;
 import org.onosproject.store.service.EventuallyConsistentMap;
 import org.onosproject.store.service.LogicalClockService;
-import org.onosproject.store.service.Serializer;
 import org.onosproject.store.service.StorageService;
 import org.onosproject.vtn.manager.VTNService;
 import org.onosproject.vtn.table.ClassifierService;
@@ -68,6 +81,11 @@ import org.onosproject.vtn.table.impl.L2ForwardServiceImpl;
 import org.onosproject.vtn.util.DataPathIdGenerator;
 import org.onosproject.vtn.util.VtnConfig;
 import org.onosproject.vtn.util.VtnData;
+import org.onosproject.vtnrsc.AllowedAddressPair;
+import org.onosproject.vtnrsc.BindingHostId;
+import org.onosproject.vtnrsc.DefaultVirtualPort;
+import org.onosproject.vtnrsc.FixedIp;
+import org.onosproject.vtnrsc.SecurityGroup;
 import org.onosproject.vtnrsc.SegmentationId;
 import org.onosproject.vtnrsc.SubnetId;
 import org.onosproject.vtnrsc.TenantId;
@@ -79,6 +97,7 @@ import org.onosproject.vtnrsc.tenantnetwork.TenantNetworkService;
 import org.onosproject.vtnrsc.virtualport.VirtualPortService;
 import org.slf4j.Logger;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
 /**
@@ -120,6 +139,9 @@ public class VTNManager implements VTNService {
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected MastershipService mastershipService;
 
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected GroupService groupService;
+
     private ApplicationId appId;
     private ClassifierService classifierService;
     private L2ForwardService l2ForwardService;
@@ -131,11 +153,14 @@ public class VTNManager implements VTNService {
     private static final String CONTROLLER_IP_KEY = "ipaddress";
     public static final String DRIVER_NAME = "onosfw";
     private static final String EX_PORT_NAME = "eth0";
+    private static final String VIRTUALPORT = "vtn-virtual-port";
     private static final String SWITCHES_OF_CONTROLLER = "switchesOfController";
     private static final String SWITCH_OF_LOCAL_HOST_PORTS = "switchOfLocalHostPorts";
+    private static final String DEFAULT_IP = "0.0.0.0";
 
+    private EventuallyConsistentMap<VirtualPortId, VirtualPort> vPortStore;
     private EventuallyConsistentMap<IpAddress, Boolean> switchesOfController;
-    private ConsistentMap<DeviceId, NetworkOfLocalHostPorts> switchOfLocalHostPorts;
+    private EventuallyConsistentMap<DeviceId, NetworkOfLocalHostPorts> switchOfLocalHostPorts;
 
     @Activate
     public void activate() {
@@ -153,7 +178,21 @@ public class VTNManager implements VTNService {
                                 .register(Host.class)
                                 .register(TenantNetwork.class)
                                 .register(TenantId.class)
-                                .register(SubnetId.class);
+                                .register(SubnetId.class)
+                                .register(VirtualPortId.class)
+                                .register(VirtualPort.State.class)
+                                .register(AllowedAddressPair.class)
+                                .register(FixedIp.class)
+                                .register(BindingHostId.class)
+                                .register(SecurityGroup.class)
+                                .register(IpAddress.class)
+                                .register(DefaultVirtualPort.class);
+
+        vPortStore = storageService
+                .<VirtualPortId, VirtualPort>eventuallyConsistentMapBuilder()
+                .withName(VIRTUALPORT).withSerializer(serializer)
+                .withTimestampProvider((k, v) -> clockService.getTimestamp())
+                .build();
 
         switchesOfController = storageService
                 .<IpAddress, Boolean>eventuallyConsistentMapBuilder()
@@ -162,9 +201,9 @@ public class VTNManager implements VTNService {
                 .build();
 
         switchOfLocalHostPorts = storageService
-                .<DeviceId, NetworkOfLocalHostPorts>consistentMapBuilder()
-                .withName(SWITCH_OF_LOCAL_HOST_PORTS)
-                .withSerializer(Serializer.using(serializer.build()))
+                .<DeviceId, NetworkOfLocalHostPorts>eventuallyConsistentMapBuilder()
+                .withName(SWITCH_OF_LOCAL_HOST_PORTS).withSerializer(serializer)
+                .withTimestampProvider((k, v) -> clockService.getTimestamp())
                 .build();
 
         log.info("Started");
@@ -251,44 +290,10 @@ public class VTNManager implements VTNService {
 
     private void programTunnelConfig(DeviceId localDeviceId, IpAddress localIp,
                                      DriverHandler localHandler) {
-        Iterable<Device> devices = deviceService.getAvailableDevices();
-        Sets.newHashSet(devices).stream()
-                .filter(d -> Device.Type.CONTROLLER == d.type())
-                .filter(d -> !localDeviceId.equals(d.id())).forEach(d -> {
-                    DriverHandler tunHandler = driverService
-                            .createHandler(d.id());
-                    String remoteIpAddress = d.annotations()
-                            .value(CONTROLLER_IP_KEY);
-                    IpAddress remoteIp = IpAddress.valueOf(remoteIpAddress);
-                    if (remoteIp.toString()
-                            .equalsIgnoreCase(localIp.toString())) {
-                        log.error("The localIp and remoteIp are the same");
-                        return;
-                    }
-                    if (localHandler != null) {
-                        // Create tunnel in br-int on local controller
-                        if (mastershipService.isLocalMaster(localDeviceId)) {
-                            VtnConfig.applyTunnelConfig(localHandler, localIp, remoteIp);
-                            log.info("Add tunnel between {} and {}", localIp,
-                                     remoteIp);
-                        }
-                        // Create tunnel in br-int on other controllers
-                        if (mastershipService.isLocalMaster(d.id())) {
-                            VtnConfig.applyTunnelConfig(tunHandler, remoteIp,
-                                                        localIp);
-                            log.info("Add tunnel between {} and {}", remoteIp,
-                                     localIp);
-                        }
-                    } else {
-                        // remove tunnel in br-int on other controllers
-                        if (mastershipService.isLocalMaster(d.id())) {
-                            VtnConfig.removeTunnelConfig(tunHandler, remoteIp,
-                                                        localIp);
-                            log.info("Remove tunnel between {} and {}", remoteIp,
-                                     localIp);
-                        }
-                    }
-                });
+        if (mastershipService.isLocalMaster(localDeviceId)) {
+            VtnConfig.applyTunnelConfig(localHandler, localIp, IpAddress.valueOf(DEFAULT_IP));
+            log.info("Add tunnel on {}", localIp);
+        }
     }
 
     private void applyTunnelOut(Device device, Objective.Operation type) {
@@ -321,6 +326,7 @@ public class VTNManager implements VTNService {
         DriverHandler handler = driverService.createHandler(localControllerId);
         Set<PortNumber> ports = VtnConfig.getPortNumbers(handler);
         Iterable<Host> allHosts = hostService.getHosts();
+        String tunnelName = "vxlan-" + DEFAULT_IP;
         if (allHosts != null) {
             Sets.newHashSet(allHosts).stream().forEach(host -> {
                 MacAddress hostMac = host.mac();
@@ -346,13 +352,12 @@ public class VTNManager implements VTNService {
                 }
                 IpAddress remoteIpAddress = IpAddress
                         .valueOf(remoteControllerIp);
-                String tunnelName = "vxlan-" + remoteIpAddress.toString();
                 ports.stream()
                         .filter(p -> p.name().equalsIgnoreCase(tunnelName))
                         .forEach(p -> {
                     l2ForwardService
                             .programTunnelOut(device.id(), segmentationId, p,
-                                              hostMac, type);
+                                              hostMac, type, remoteIpAddress);
                 });
             });
         }
@@ -371,8 +376,7 @@ public class VTNManager implements VTNService {
         VirtualPortId virtualPortId = VirtualPortId.portId(ifaceId);
         VirtualPort virtualPort = virtualPortService.getPort(virtualPortId);
         if (virtualPort == null) {
-            log.error("The virtualPort of host is null");
-            return;
+            virtualPort = vPortStore.get(virtualPortId);
         }
 
         Iterable<Device> devices = deviceService.getAvailableDevices();
@@ -392,36 +396,46 @@ public class VTNManager implements VTNService {
         Collection<PortNumber> localTunnelPorts = VtnData.getLocalTunnelPorts(ports);
         // Get all the local vm's PortNumber in the current node
         Map<TenantNetworkId, Set<PortNumber>> localHostPorts = switchOfLocalHostPorts
-                .get(deviceId).value().getNetworkOfLocalHostPorts();
+                .get(deviceId).getNetworkOfLocalHostPorts();
         Set<PortNumber> networkOflocalHostPorts = localHostPorts.get(network.id());
-
-        l2ForwardService.programLocalBcastRules(deviceId, segmentationId,
-                                                inPort, networkOflocalHostPorts,
-                                                localTunnelPorts,
-                                                type);
-
-        l2ForwardService.programLocalOut(deviceId, segmentationId, inPort, mac,
-                                         type);
+        for (PortNumber p : localTunnelPorts) {
+            programGroupTable(deviceId, appId, p, devices, type);
+        }
 
         if (type == Objective.Operation.ADD) {
+            vPortStore.put(virtualPortId, virtualPort);
             if (networkOflocalHostPorts == null) {
                 networkOflocalHostPorts = new HashSet<PortNumber>();
                 localHostPorts.putIfAbsent(network.id(), networkOflocalHostPorts);
             }
             networkOflocalHostPorts.add(inPort);
+            l2ForwardService.programLocalBcastRules(deviceId, segmentationId,
+                                                    inPort, networkOflocalHostPorts,
+                                                    localTunnelPorts,
+                                                    type);
             classifierService.programTunnelIn(deviceId, segmentationId,
                                               localTunnelPorts,
                                               type);
         } else if (type == Objective.Operation.REMOVE) {
-            networkOflocalHostPorts.remove(inPort);
-            if (networkOflocalHostPorts.isEmpty()) {
-                classifierService.programTunnelIn(deviceId, segmentationId,
-                                                  localTunnelPorts,
-                                                  Objective.Operation.REMOVE);
-                switchOfLocalHostPorts.get(deviceId).value().getNetworkOfLocalHostPorts()
-                                            .remove(virtualPort.networkId());
+            vPortStore.remove(virtualPortId);
+            if (networkOflocalHostPorts != null) {
+                l2ForwardService.programLocalBcastRules(deviceId, segmentationId,
+                                                        inPort, networkOflocalHostPorts,
+                                                        localTunnelPorts,
+                                                        type);
+                networkOflocalHostPorts.remove(inPort);
+                if (networkOflocalHostPorts.isEmpty()) {
+                    classifierService.programTunnelIn(deviceId, segmentationId,
+                                                      localTunnelPorts,
+                                                      type);
+                    switchOfLocalHostPorts.get(deviceId).getNetworkOfLocalHostPorts()
+                                                .remove(virtualPort.networkId());
+                }
             }
         }
+
+        l2ForwardService.programLocalOut(deviceId, segmentationId, inPort, mac,
+                                         type);
 
         l2ForwardService.programTunnelBcastRules(deviceId, segmentationId,
                                                  networkOflocalHostPorts,
@@ -440,9 +454,11 @@ public class VTNManager implements VTNService {
                                    SegmentationId segmentationId,
                                    MacAddress dstMac,
                                    Objective.Operation type) {
-        String tunnelName = "vxlan-" + ipAddress.toString();
+        String tunnelName = "vxlan-" + DEFAULT_IP;
         Sets.newHashSet(devices).stream()
-                .filter(d -> d.type() == Device.Type.CONTROLLER).forEach(d -> {
+                .filter(d -> d.type() == Device.Type.CONTROLLER)
+                .filter(d -> !("ovsdb:" + ipAddress).equals(d.id().toString()))
+                .forEach(d -> {
                     DriverHandler handler = driverService.createHandler(d.id());
                     BridgeConfig bridgeConfig = handler
                             .behaviour(BridgeConfig.class);
@@ -459,7 +475,7 @@ public class VTNManager implements VTNService {
                                 .forEach(p -> {
                             l2ForwardService.programTunnelOut(sw.deviceId(),
                                                               segmentationId, p,
-                                                              dstMac, type);
+                                                              dstMac, type, ipAddress);
                         });
                     }
                 });
@@ -525,4 +541,45 @@ public class VTNManager implements VTNService {
         }
     }
 
+    private void programGroupTable(DeviceId deviceId, ApplicationId appid,
+                                   PortNumber portNumber, Iterable<Device> devices, Objective.Operation type) {
+        if (type.equals(Objective.Operation.REMOVE)) {
+            return;
+        }
+
+        List<GroupBucket> buckets = Lists.newArrayList();
+        Sets.newHashSet(devices)
+        .stream()
+        .filter(d -> d.type() == Device.Type.CONTROLLER)
+        .filter(d -> !deviceId.equals(d.id()))
+        .forEach(d -> {
+                    String ipAddress = d.annotations()
+                             .value(CONTROLLER_IP_KEY);
+                    Ip4Address dst = Ip4Address.valueOf(ipAddress);
+                    Builder builder = DefaultTrafficTreatment.builder();
+
+                    DriverHandler handler = driverService.createHandler(deviceId);
+                    ExtensionTreatmentResolver resolver =  handler.behaviour(ExtensionTreatmentResolver.class);
+                    ExtensionTreatment treatment = resolver.getExtensionInstruction(NICIRA_SET_TUNNEL_DST.type());
+                    try {
+                        treatment.setPropertyValue("tunnelDst", dst);
+                    } catch (Exception e) {
+                       log.error("Failed to get extension instruction to set tunnel dst {}", deviceId);
+                    }
+
+                    builder.extension(treatment, deviceId);
+                    builder.setOutput(portNumber);
+                    GroupBucket bucket = DefaultGroupBucket
+                            .createAllGroupBucket(builder.build());
+                    buckets.add(bucket);
+                 });
+        final GroupKey key = new DefaultGroupKey(APP_ID.getBytes());
+        GroupDescription groupDescription = new DefaultGroupDescription(deviceId,
+                                                                        GroupDescription.Type.ALL,
+                                                                        new GroupBuckets(buckets),
+                                                                        key,
+                                                                        L2ForwardServiceImpl.GROUP_ID,
+                                                                        appid);
+        groupService.addGroup(groupDescription);
+    }
 }

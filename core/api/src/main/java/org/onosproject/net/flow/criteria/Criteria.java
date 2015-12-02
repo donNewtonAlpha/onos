@@ -230,6 +230,16 @@ public final class Criteria {
     }
 
     /**
+     * Creates a match on TCP flags using the specified value.
+     *
+     * @param flags TCP flags
+     * @return match criterion
+     */
+    public static Criterion matchTcpFlags(int flags) {
+        return new TcpFlagsCriterion(flags);
+    }
+
+    /**
      * Creates a match on UDP source port field using the specified value.
      *
      * @param udpPort UDP source port
@@ -438,8 +448,18 @@ public final class Criteria {
      * @param mplsBos boolean value indicating true (BOS=1) or false (BOS=0)
      * @return match criterion
      */
-    public static Criterion matchMplsLabel(boolean mplsBos) {
+    public static Criterion matchMplsBos(boolean mplsBos) {
         return new MplsBosCriterion(mplsBos);
+    }
+
+    /**
+     * Creates a match on MPLS TC.
+     *
+     * @param mplsTc MPLS TC (3 bits)
+     * @return match criterion
+     */
+    public static Criterion matchMplsTc(byte mplsTc) {
+        return new MplsTcCriterion(mplsTc);
     }
 
     /**
@@ -547,6 +567,16 @@ public final class Criteria {
      */
     public static Criterion matchArpSha(MacAddress mac) {
         return new ArpHaCriterion(mac, Type.ARP_SHA);
+    }
+
+    /**
+     * Creates a match on arp operation type field using the specified value.
+     *
+     * @param arpOp arp operation type value
+     * @return match criterion
+     */
+    public static Criterion matchArpOp(int arpOp) {
+        return new ArpOpCriterion(arpOp, Type.ARP_OP);
     }
 
     public static Criterion dummy() {
