@@ -221,12 +221,13 @@ public class Fabric {
                     if(behavior instanceof OltBehavior){
                         OltBehavior olt = (OltBehavior) behavior;
                         //Connect this Olt to the proper server
-                        if(pair.containsServer((olt.getSTag()))){
+                        if(pair.containsServer(SwitchingBehavior.oltVlanToServerVlan(olt.getSTag()))){
                             CustomerServerBehavior server = pair.getServer(olt.getSTag());
 
                             for(Leaf leaf: pair.getLeaves()) {
                                 //Local connection
                                 //Change the vlan then forward to the proper port
+                                //Olt to Server
 
                                 TrafficSelector.Builder vlanSelector = DefaultTrafficSelector.builder();
                                 vlanSelector.matchInPort(olt.getPort());
@@ -263,9 +264,69 @@ public class Fabric {
                                 aclRule.forTable(ACL_TABLE);
                                 aclRule.forDevice(leaf.getDeviceId());
 
+                                VirtualGigaPowerComponent.flowRuleService.applyFlowRules(aclRule.build());
+
+                                //Server to Olt
+
+                                TrafficSelector.Builder serverVlanSelector = DefaultTrafficSelector.builder();
+                                serverVlanSelector.matchInPort(server.getPort());
+                                serverVlanSelector.matchVlanId(VlanId.vlanId((short) server.getSTag()));
+
+                                TrafficTreatment.Builder ServerVlanTreatment = DefaultTrafficTreatment.builder();
+                                ServerVlanTreatment.setVlanId(VlanId.vlanId((short) olt.getSTag()));
+                                ServerVlanTreatment.transition(ACL_TABLE);
+
+                                FlowRule.Builder serverVlanFlow = DefaultFlowRule.builder();
+                                serverVlanFlow.withSelector(serverVlanSelector.build());
+                                serverVlanFlow.withTreatment(ServerVlanTreatment.build());
+                                serverVlanFlow.withPriority(11);
+                                serverVlanFlow.makePermanent();
+                                serverVlanFlow.fromApp(VirtualGigaPowerComponent.appId);
+                                serverVlanFlow.forTable(VLAN_TABLE);
+                                serverVlanFlow.forDevice(leaf.getDeviceId());
+
+                                VirtualGigaPowerComponent.flowRuleService.applyFlowRules(serverVlanFlow.build());
+
+                                TrafficSelector.Builder serverSelector = DefaultTrafficSelector.builder();
+                                serverSelector.matchInPort(server.getPort());
+                                serverSelector.matchVlanId(VlanId.vlanId((short)olt.getSTag()));
+
+                                TrafficTreatment.Builder serverTreatment = DefaultTrafficTreatment.builder();
+                                serverTreatment.group(olt.getGroupId(leaf));
+
+                                FlowRule.Builder serverAclRule = DefaultFlowRule.builder();
+                                serverAclRule.withSelector(serverSelector.build());
+                                serverAclRule.withTreatment(serverTreatment.build());
+                                serverAclRule.withPriority(42002);
+                                serverAclRule.makePermanent();
+                                serverAclRule.fromApp(VirtualGigaPowerComponent.appId);
+                                serverAclRule.forTable(ACL_TABLE);
+                                serverAclRule.forDevice(leaf.getDeviceId());
+
+                                VirtualGigaPowerComponent.flowRuleService.applyFlowRules(serverAclRule.build());
+
+                                olt.handled();
+                                server.handled();
+
                             }
 
+                            //TODO: preemptive failover from one leaf to the other
+                            // - Pseudo wire initiation to spines
+
+
+                        } else {
+                            // OLT and matching server on different pairs
+
+                            //TODO:
+                            // - Psuedo wire initiation to spines, with MPLS label to the proper pair
+
+
+
+
+
+
                         }
+                        // TODO : - input spines connection match and output to the proper behavior's port
 
                     }
                 }

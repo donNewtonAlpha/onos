@@ -13,8 +13,8 @@ import java.util.List;
 public class Leaf extends Switch{
 
     private List<SwitchingBehavior> personalBehaviors;
-    private List<PortNumber> spineConnections;
     private int MplsTag;
+    private MplsGroups mplsGroups;
 
 
 
@@ -24,24 +24,14 @@ public class Leaf extends Switch{
         this.id = id;
         hardwareModel = model;
         personalBehaviors = new LinkedList<>();
-        spineConnections = new LinkedList<>();
+        mplsGroups = new MplsGroups(spineId);
     }
 
     public void addPersonnalBehavior(SwitchingBehavior newBehavior){
         personalBehaviors.add(newBehavior);
     }
 
-    public void connectToSpine(int portNumber){
-        spineConnections.add(PortNumber.portNumber(portNumber));
-    }
 
-    public void disconnectFromSpine(int portNumber){
-        for (PortNumber port: spineConnections) {
-            if(port.toLong() == portNumber){
-                spineConnections.remove(port);
-            }
-        }
-    }
 
     public void setMpls(int tag){
         this.MplsTag = tag;

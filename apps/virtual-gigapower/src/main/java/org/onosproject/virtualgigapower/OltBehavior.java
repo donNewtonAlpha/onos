@@ -23,6 +23,10 @@ public class OltBehavior extends SwitchingBehavior {
         return sTag;
     }
 
+    protected void initiateGroup(Leaf leaf){
+        //TODO : output group  for  this behavior
+    }
+
 
 
 }

@@ -22,22 +22,28 @@ public abstract class SwitchingBehavior {
     }
 
     public static VlanId oltVlanToServerVlan(VlanId oltVlan){
-        return VlanId.vlanId((short)(oltVlan.toShort() + 100));
+        return VlanId.vlanId((short)(oltVlanToServerVlan(oltVlan.toShort())));
     }
 
     public static VlanId serverVlanToOltVlan(VlanId serverVlan){
-        return VlanId.vlanId((short)(serverVlan.toShort() - 100));
+        return VlanId.vlanId((short)(serverVlanToOltVlan(serverVlan.toShort())));
+    }
+    public static int oltVlanToServerVlan(int oltVlan){
+        return oltVlan + 1000;
+    }
+
+    public static int serverVlanToOltVlan(int serverVlan){
+        return serverVlan - 1000;
     }
 
     public PortNumber getPort(){
         return port;
     }
 
-    private void initiateGroup(Switch device){
-        //TODO
-    }
+    protected abstract void initiateGroup(Leaf device);
 
-    public GroupId getGroupId(Switch device){
+
+    public GroupId getGroupId(Leaf device){
         if(groupId == null){
             this.initiateGroup(device);
         }

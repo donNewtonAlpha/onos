@@ -9,6 +9,7 @@ import org.onosproject.core.CoreService;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.flow.*;
+import org.onosproject.net.group.GroupService;
 import org.onosproject.net.packet.PacketService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +46,9 @@ public class VirtualGigaPowerComponent {
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected static FlowRuleService flowRuleService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected static GroupService groupService;
 
     static ApplicationId appId;
 

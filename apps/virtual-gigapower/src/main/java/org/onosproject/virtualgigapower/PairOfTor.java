@@ -14,12 +14,14 @@ public class PairOfTor {
     private Leaf leaf1;
     private Leaf leaf2;
     private List<SwitchingBehavior> groupBehaviors;
+    private List<PortNumber> spineConnections;
 
     public PairOfTor(Leaf leaf1, Leaf leaf2,  int mplsLabel){
         this.leaf1 = leaf1;
         this.leaf2 = leaf2;
         this.pairMplsLabel = mplsLabel;
         this.groupBehaviors = new LinkedList<>();
+        this.spineConnections = new LinkedList<>();
     }
 
     public PairOfTor(Leaf leaf1, Leaf leaf2){
@@ -50,13 +52,15 @@ public class PairOfTor {
     }
 
     public void connectToSpine(int portNumber){
-        leaf1.connectToSpine(portNumber);
-        leaf2.connectToSpine(portNumber);
+        spineConnections.add(PortNumber.portNumber(portNumber));
     }
 
     public void disconnectFromSpine(int portNumber){
-        leaf1.disconnectFromSpine(portNumber);
-        leaf2.disconnectFromSpine(portNumber);
+        for (PortNumber port: spineConnections) {
+            if(port.toLong() == portNumber){
+                spineConnections.remove(port);
+            }
+        }
     }
 
     public void addInternetLink(PortNumber port){
