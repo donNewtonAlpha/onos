@@ -185,7 +185,7 @@ public class TorComponent implements TorService {
         //Listening for API calls
         listen();
 
-        TrafficSelector.Builder uverseSelector = DefaultTrafficSelector.builder();
+/*        TrafficSelector.Builder uverseSelector = DefaultTrafficSelector.builder();
         uverseSelector.matchInPort(internetPort);
         uverseSelector.matchEthType(Ethernet.TYPE_IPV4);
         uverseSelector.matchIPSrc(IpPrefix.valueOf("224.0.0.0/8"));
@@ -199,8 +199,11 @@ public class TorComponent implements TorService {
         uverseRule.forDevice(torId);
         uverseRule.makePermanent();
 
-        uverseBlockingFlow = uverseRule.build();
+        uverseBlockingFlow = uverseRule.build();*/
         //flowRuleService.applyFlowRules(uverseBlockingFlow);
+
+        Testing.initiate(flowRuleService, groupService);
+        Testing.connectPorts(30,31);
 
     }
 
@@ -976,6 +979,7 @@ public class TorComponent implements TorService {
             log.info("Uverse already enabled for customer " + vlanId);
             return;
         }
+
         int i =0;
         while (!customersUverseIP.containsKey(vlanId)){
             detectCustomerIP(vlanId, uverseIpLearningIP);

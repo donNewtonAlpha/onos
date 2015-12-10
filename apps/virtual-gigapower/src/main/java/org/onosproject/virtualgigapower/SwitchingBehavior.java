@@ -2,7 +2,10 @@ package org.onosproject.virtualgigapower;
 
 import org.onlab.packet.VlanId;
 import org.onosproject.core.GroupId;
+import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
+
+import java.util.HashMap;
 
 /**
  * Created by nick on 10/12/15.
@@ -11,7 +14,8 @@ public abstract class SwitchingBehavior {
 
     private boolean handled = false;
     protected PortNumber port;
-    private GroupId groupId;
+    protected HashMap<DeviceId,GroupId> groupIds = new HashMap<>();
+
 
     public boolean isHandled(){
         return handled;
@@ -40,14 +44,14 @@ public abstract class SwitchingBehavior {
         return port;
     }
 
-    protected abstract void initiateGroup(Leaf device);
+    protected abstract void initiateGroup(Leaf leaf);
 
 
-    public GroupId getGroupId(Leaf device){
-        if(groupId == null){
-            this.initiateGroup(device);
+    public GroupId getGroupId(Leaf leaf){
+        if(!groupIds.containsKey(leaf.getDeviceId())){
+            this.initiateGroup(leaf);
         }
-        return groupId;
+        return groupIds.get(leaf.getDeviceId());
     }
 }
 

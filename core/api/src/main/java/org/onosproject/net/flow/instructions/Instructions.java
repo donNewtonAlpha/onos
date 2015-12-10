@@ -45,6 +45,7 @@ import java.util.Objects;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static org.onosproject.net.flow.instructions.L2ModificationInstruction.*;
 
 /**
  * Factory class for creating various traffic treatment instructions.
@@ -149,8 +150,8 @@ public final class Instructions {
      */
     public static L2ModificationInstruction modL2Src(MacAddress addr) {
         checkNotNull(addr, "Src l2 address cannot be null");
-        return new L2ModificationInstruction.ModEtherInstruction(
-                L2ModificationInstruction.L2SubType.ETH_SRC, addr);
+        return new ModEtherInstruction(
+                L2SubType.ETH_SRC, addr);
     }
 
     /**
@@ -161,8 +162,8 @@ public final class Instructions {
      */
     public static L2ModificationInstruction modL2Dst(MacAddress addr) {
         checkNotNull(addr, "Dst l2 address cannot be null");
-        return new L2ModificationInstruction.ModEtherInstruction(
-                L2ModificationInstruction.L2SubType.ETH_DST, addr);
+        return new ModEtherInstruction(
+                L2SubType.ETH_DST, addr);
     }
 
     /**
@@ -173,7 +174,7 @@ public final class Instructions {
      */
     public static L2ModificationInstruction modVlanId(VlanId vlanId) {
         checkNotNull(vlanId, "VLAN id cannot be null");
-        return new L2ModificationInstruction.ModVlanIdInstruction(vlanId);
+        return new ModVlanIdInstruction(vlanId);
     }
 
     /**
@@ -184,7 +185,7 @@ public final class Instructions {
      */
     public static L2ModificationInstruction modVlanPcp(Byte vlanPcp) {
         checkNotNull(vlanPcp, "VLAN Pcp cannot be null");
-        return new L2ModificationInstruction.ModVlanPcpInstruction(vlanPcp);
+        return new ModVlanPcpInstruction(vlanPcp);
     }
 
     /**
@@ -195,7 +196,7 @@ public final class Instructions {
      */
     public static L2ModificationInstruction modMplsLabel(MplsLabel mplsLabel) {
         checkNotNull(mplsLabel, "MPLS label cannot be null");
-        return new L2ModificationInstruction.ModMplsLabelInstruction(mplsLabel);
+        return new ModMplsLabelInstruction(mplsLabel);
     }
 
     /**
@@ -205,7 +206,7 @@ public final class Instructions {
      * @return a L2 Modification
      */
     public static L2ModificationInstruction modMplsBos(boolean mplsBos) {
-        return new L2ModificationInstruction.ModMplsBosInstruction(mplsBos);
+        return new ModMplsBosInstruction(mplsBos);
     }
 
     /**
@@ -214,7 +215,7 @@ public final class Instructions {
      * @return a L2 Modification
      */
     public static L2ModificationInstruction decMplsTtl() {
-        return new L2ModificationInstruction.ModMplsTtlInstruction();
+        return new ModMplsTtlInstruction();
     }
 
     /**
@@ -304,8 +305,8 @@ public final class Instructions {
      * @return a L2 modification.
      */
     public static Instruction pushMpls() {
-        return new L2ModificationInstruction.PushHeaderInstructions(
-                L2ModificationInstruction.L2SubType.MPLS_PUSH,
+        return new PushHeaderInstructions(
+                L2SubType.MPLS_PUSH,
                                           EthType.EtherType.MPLS_UNICAST.ethType());
     }
 
@@ -315,8 +316,8 @@ public final class Instructions {
      * @return a L2 modification.
      */
     public static Instruction popMpls() {
-        return new L2ModificationInstruction.PushHeaderInstructions(
-                L2ModificationInstruction.L2SubType.MPLS_POP,
+        return new PushHeaderInstructions(
+                L2SubType.MPLS_POP,
                 EthType.EtherType.MPLS_UNICAST.ethType());
     }
 
@@ -328,8 +329,8 @@ public final class Instructions {
      */
     public static Instruction popMpls(EthType etherType) {
         checkNotNull(etherType, "Ethernet type cannot be null");
-        return new L2ModificationInstruction.PushHeaderInstructions(
-                L2ModificationInstruction.L2SubType.MPLS_POP, etherType);
+        return new PushHeaderInstructions(
+                L2SubType.MPLS_POP, etherType);
     }
 
     /**
@@ -338,8 +339,8 @@ public final class Instructions {
      * @return a L2 modification
      */
     public static Instruction popVlan() {
-        return new L2ModificationInstruction.PopVlanInstruction(
-                L2ModificationInstruction.L2SubType.VLAN_POP);
+        return new PopVlanInstruction(
+                L2SubType.VLAN_POP);
     }
 
     /**
@@ -348,8 +349,8 @@ public final class Instructions {
      * @return a L2 modification
      */
     public static Instruction pushVlan() {
-        return new L2ModificationInstruction.PushHeaderInstructions(
-                L2ModificationInstruction.L2SubType.VLAN_PUSH,
+        return new PushHeaderInstructions(
+                L2SubType.VLAN_PUSH,
                 EthType.EtherType.VLAN.ethType());
     }
 
@@ -383,7 +384,7 @@ public final class Instructions {
      */
     public static L2ModificationInstruction modTunnelId(long tunnelId) {
         checkNotNull(tunnelId, "Tunnel id cannot be null");
-        return new L2ModificationInstruction.ModTunnelIdInstruction(tunnelId);
+        return new ModTunnelIdInstruction(tunnelId);
     }
 
     /**

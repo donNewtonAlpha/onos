@@ -63,6 +63,10 @@ public class PairOfTor {
         }
     }
 
+    public List<PortNumber> getSpineConnections(){
+        return spineConnections;
+    }
+
     public void addInternetLink(PortNumber port){
         leaf1.addInternetLink(port);
         leaf2.addInternetLink(port);

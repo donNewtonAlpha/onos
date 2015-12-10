@@ -63,7 +63,7 @@
         <module>cpman</module>
 
         <module>tor</module>
-        <module>virtual-gigapower</module>
+
   </modules>
 
     <properties>

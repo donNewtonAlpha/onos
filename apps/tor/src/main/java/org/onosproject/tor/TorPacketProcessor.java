@@ -296,12 +296,14 @@ public class TorPacketProcessor implements PacketProcessor {
 
                     if(!allowed){
                         log.info("domain not allowed");
+                        return;
+                        /*
                         try{
                             DnsProxy.switchResponse(response,redirect);
                         }catch (Exception e){
                             log.error("Switch Response exception" , e);
-                            return;
-                        }
+                        }*/
+
                     }
 
                     log.info("DNS response retrieved");

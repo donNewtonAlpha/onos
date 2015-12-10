@@ -17,9 +17,10 @@ import java.util.List;
  */
 public class Fabric {
 
-    private static final int MPLS_TABLE = 20;
+    private static final int MPLS_TABLE = 30;
     private static final int ACL_TABLE = 60;
     private static final int VLAN_TABLE = 10;
+    private static final int T_MAC_TABLE = 20;
 
     private static Fabric instance;
     private List<Spine> spines;
@@ -326,8 +327,101 @@ public class Fabric {
 
 
                         }
-                        // TODO : - input spines connection match and output to the proper behavior's port
+                    }
+                    
+                    if(behavior instanceof CustomerServerBehavior){
+                        CustomerServerBehavior server = (CustomerServerBehavior) behavior;
 
+                        for(PortNumber spinePort:  pair.getSpineConnections()){
+
+                            for(Leaf leaf: pair.getLeaves()) {
+
+
+                                TrafficSelector.Builder vlanSelector = DefaultTrafficSelector.builder();
+                                vlanSelector.matchInPort(spinePort);
+                                vlanSelector.matchVlanId(VlanId.vlanId((short) server.getSTag()));
+
+                                TrafficTreatment.Builder vlanTreatment = DefaultTrafficTreatment.builder();
+                                vlanTreatment.transition(T_MAC_TABLE);
+
+                                FlowRule.Builder vlanFlow = DefaultFlowRule.builder();
+                                vlanFlow.withSelector(vlanSelector.build());
+                                vlanFlow.withTreatment(vlanTreatment.build());
+                                vlanFlow.withPriority(10);
+                                vlanFlow.makePermanent();
+                                vlanFlow.fromApp(VirtualGigaPowerComponent.appId);
+                                vlanFlow.forTable(VLAN_TABLE);
+                                vlanFlow.forDevice(leaf.getDeviceId());
+
+                                VirtualGigaPowerComponent.flowRuleService.applyFlowRules(vlanFlow.build());
+
+                                TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+                                selector.matchInPort(spinePort);
+                                selector.matchVlanId(VlanId.vlanId((short) server.getSTag()));
+
+                                TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+                                treatment.group(server.getGroupId(leaf));
+
+                                FlowRule.Builder aclRule = DefaultFlowRule.builder();
+                                aclRule.withSelector(selector.build());
+                                aclRule.withTreatment(treatment.build());
+                                aclRule.withPriority(42001);
+                                aclRule.makePermanent();
+                                aclRule.fromApp(VirtualGigaPowerComponent.appId);
+                                aclRule.forTable(ACL_TABLE);
+                                aclRule.forDevice(leaf.getDeviceId());
+
+                                VirtualGigaPowerComponent.flowRuleService.applyFlowRules(aclRule.build());
+
+                            }
+                        }
+                    }
+                    if(behavior instanceof OltBehavior) {
+                        OltBehavior olt = (OltBehavior) behavior;
+
+                        for (PortNumber spinePort : pair.getSpineConnections()) {
+
+                            for (Leaf leaf : pair.getLeaves()) {
+
+
+                                TrafficSelector.Builder vlanSelector = DefaultTrafficSelector.builder();
+                                vlanSelector.matchInPort(spinePort);
+                                vlanSelector.matchVlanId(VlanId.vlanId((short) olt.getSTag()));
+
+                                TrafficTreatment.Builder vlanTreatment = DefaultTrafficTreatment.builder();
+                                vlanTreatment.transition(T_MAC_TABLE);
+
+                                FlowRule.Builder vlanFlow = DefaultFlowRule.builder();
+                                vlanFlow.withSelector(vlanSelector.build());
+                                vlanFlow.withTreatment(vlanTreatment.build());
+                                vlanFlow.withPriority(11);
+                                vlanFlow.makePermanent();
+                                vlanFlow.fromApp(VirtualGigaPowerComponent.appId);
+                                vlanFlow.forTable(VLAN_TABLE);
+                                vlanFlow.forDevice(leaf.getDeviceId());
+
+                                VirtualGigaPowerComponent.flowRuleService.applyFlowRules(vlanFlow.build());
+
+                                TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+                                selector.matchInPort(spinePort);
+                                selector.matchVlanId(VlanId.vlanId((short) olt.getSTag()));
+
+                                TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+                                treatment.group(olt.getGroupId(leaf));
+
+                                FlowRule.Builder aclRule = DefaultFlowRule.builder();
+                                aclRule.withSelector(selector.build());
+                                aclRule.withTreatment(treatment.build());
+                                aclRule.withPriority(42002);
+                                aclRule.makePermanent();
+                                aclRule.fromApp(VirtualGigaPowerComponent.appId);
+                                aclRule.forTable(ACL_TABLE);
+                                aclRule.forDevice(leaf.getDeviceId());
+
+                                VirtualGigaPowerComponent.flowRuleService.applyFlowRules(aclRule.build());
+
+                            }
+                        }
                     }
                 }
             }

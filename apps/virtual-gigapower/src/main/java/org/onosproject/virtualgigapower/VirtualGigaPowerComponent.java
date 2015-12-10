@@ -57,7 +57,6 @@ public class VirtualGigaPowerComponent {
 
     private FailureDetection failureDetection = new FailureDetection();
 
-    private static int currentMPLS = 50;
 
 
 
