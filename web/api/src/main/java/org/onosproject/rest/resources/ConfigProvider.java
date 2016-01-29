@@ -25,6 +25,7 @@ import org.onlab.packet.IpAddress;
 import org.onlab.packet.MacAddress;
 import org.onlab.packet.VlanId;
 import org.onlab.util.Frequency;
+import org.onlab.util.Spectrum;
 import org.onosproject.net.AnnotationKeys;
 import org.onosproject.net.ChannelSpacing;
 import org.onosproject.net.ConnectPoint;
@@ -90,7 +91,10 @@ import static org.onosproject.net.device.DeviceEvent.Type.DEVICE_AVAILABILITY_CH
 
 /**
  * Provider of devices and links parsed from a JSON configuration structure.
+ *
+ * @deprecated in 1.5.0 (Falcon)
  */
+@Deprecated
 class ConfigProvider implements DeviceProvider, LinkProvider, HostProvider {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
@@ -100,9 +104,8 @@ class ConfigProvider implements DeviceProvider, LinkProvider, HostProvider {
 
     private static final String UNKNOWN = "unknown";
 
-    private static final Frequency CENTER = Frequency.ofTHz(193.1);
     // C-band has 4.4 THz (4,400 GHz) total bandwidth
-    private static final Frequency TOTAL = Frequency.ofTHz(4.4);
+    private static final Frequency TOTAL = Frequency.ofGHz(4_400);
 
     private CountDownLatch deviceLatch;
 
@@ -256,7 +259,7 @@ class ConfigProvider implements DeviceProvider, LinkProvider, HostProvider {
                 // Currently, assume OMS when FIBER. Provide sane defaults.
                 annotations = annotations(node.get("annotations"));
                 return new OmsPortDescription(port, node.path("enabled").asBoolean(true),
-                                              CENTER, CENTER.add(TOTAL),
+                        Spectrum.CENTER_FREQUENCY, Spectrum.CENTER_FREQUENCY.add(TOTAL),
                                               Frequency.ofGHz(100), annotations);
             case ODUCLT:
                 annotations = annotations(node.get("annotations"));
@@ -391,8 +394,8 @@ class ConfigProvider implements DeviceProvider, LinkProvider, HostProvider {
         // if true, there was less channels than can be tightly packed.
         Frequency grid = chl.frequency();
         // say Linc's 1st slot starts at CENTER and goes up from there.
-        Frequency min = CENTER.add(grid);
-        Frequency max = CENTER.add(grid.multiply(numChls));
+        Frequency min = Spectrum.CENTER_FREQUENCY.add(grid);
+        Frequency max = Spectrum.CENTER_FREQUENCY.add(grid.multiply(numChls));
 
         PortDescription srcPortDesc = new OmsPortDescription(srcCp.port(), true, min, max, grid);
         PortDescription dstPortDesc = new OmsPortDescription(dstCp.port(), true, min, max, grid);

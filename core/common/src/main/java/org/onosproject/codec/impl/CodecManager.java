@@ -15,8 +15,8 @@
  */
 package org.onosproject.codec.impl;
 
+import com.codahale.metrics.Metric;
 import com.google.common.collect.ImmutableSet;
-
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
@@ -34,15 +34,18 @@ import org.onosproject.net.HostLocation;
 import org.onosproject.net.Link;
 import org.onosproject.net.Path;
 import org.onosproject.net.Port;
+import org.onosproject.net.device.PortStatistics;
 import org.onosproject.net.driver.Driver;
 import org.onosproject.net.flow.FlowEntry;
 import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.flow.TableStatisticsEntry;
-import org.onosproject.net.device.PortStatistics;
 import org.onosproject.net.flow.TrafficSelector;
 import org.onosproject.net.flow.TrafficTreatment;
 import org.onosproject.net.flow.criteria.Criterion;
 import org.onosproject.net.flow.instructions.Instruction;
+import org.onosproject.net.flowobjective.FilteringObjective;
+import org.onosproject.net.flowobjective.ForwardingObjective;
+import org.onosproject.net.flowobjective.NextObjective;
 import org.onosproject.net.group.Group;
 import org.onosproject.net.group.GroupBucket;
 import org.onosproject.net.intent.ConnectivityIntent;
@@ -50,6 +53,8 @@ import org.onosproject.net.intent.Constraint;
 import org.onosproject.net.intent.HostToHostIntent;
 import org.onosproject.net.intent.Intent;
 import org.onosproject.net.intent.PointToPointIntent;
+import org.onosproject.net.meter.Band;
+import org.onosproject.net.meter.Meter;
 import org.onosproject.net.statistic.Load;
 import org.onosproject.net.topology.Topology;
 import org.onosproject.net.topology.TopologyCluster;
@@ -102,8 +107,14 @@ public class CodecManager implements CodecService {
         registerCodec(Driver.class, new DriverCodec());
         registerCodec(GroupBucket.class, new GroupBucketCodec());
         registerCodec(Load.class, new LoadCodec());
+        registerCodec(Meter.class, new MeterCodec());
+        registerCodec(Band.class, new MeterBandCodec());
         registerCodec(TableStatisticsEntry.class, new TableStatisticsEntryCodec());
         registerCodec(PortStatistics.class, new PortStatisticsCodec());
+        registerCodec(Metric.class, new MetricCodec());
+        registerCodec(FilteringObjective.class, new FilteringObjectiveCodec());
+        registerCodec(ForwardingObjective.class, new ForwardingObjectiveCodec());
+        registerCodec(NextObjective.class, new NextObjectiveCodec());
         log.info("Started");
     }
 

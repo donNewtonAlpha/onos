@@ -57,6 +57,11 @@
 
         <command>
             <action class="org.onosproject.cli.cfg.NetworkConfigCommand"/>
+            <completers>
+                <ref component-id="subjectClassKeyCompleter"/>
+                <ref component-id="subjectKeyCompleter"/>
+                <ref component-id="configKeyCompleter"/>
+            </completers>
         </command>
 
         <command>
@@ -111,6 +116,24 @@
         </command>
         <command>
             <action class="org.onosproject.cli.net.DeviceSetControllersCommand"/>
+            <completers>
+                <ref component-id="deviceIdCompleter"/>
+            </completers>
+        </command>
+        <command>
+            <action class="org.onosproject.cli.net.DeviceConfigGetterCommand"/>
+            <completers>
+                <ref component-id="deviceIdCompleter"/>
+            </completers>
+        </command>
+        <command>
+            <action class="org.onosproject.cli.net.DeviceConfigSetterCommand"/>
+            <completers>
+                <ref component-id="deviceIdCompleter"/>
+            </completers>
+        </command>
+        <command>
+            <action class="org.onosproject.cli.net.DevicePortGetterCommand"/>
             <completers>
                 <ref component-id="deviceIdCompleter"/>
             </completers>
@@ -295,6 +318,29 @@
             </completers>
         </command>
         <command>
+            <action class="org.onosproject.cli.net.ResourcesCommand"/>
+            <completers>
+                <ref component-id="deviceIdCompleter"/>
+                <ref component-id="portNumberCompleter"/>
+            </completers>
+        </command>
+        <command>
+            <action class="org.onosproject.cli.net.AllocationsCommand"/>
+            <completers>
+                <ref component-id="deviceIdCompleter"/>
+                <ref component-id="portNumberCompleter"/>
+            </completers>
+        </command>
+        <command>
+            <action class="org.onosproject.cli.net.TestAllocateResource"/>
+            <completers>
+                <ref component-id="deviceIdCompleter"/>
+                <ref component-id="portNumberCompleter"/>
+            </completers>
+        </command>
+
+        <!-- Should deprecate following 3 commands soon. -->
+        <command>
             <action class="org.onosproject.cli.net.ResourceAllocationsCommand"/>
             <completers>
                 <ref component-id="connectPointCompleter"/>
@@ -358,15 +404,16 @@
         </command>
         <command>
             <action class="org.onosproject.cli.net.InterfaceAddCommand"/>
-            <optional-completers>
-                <entry key="-c" value-ref="connectPointCompleter"/>
-                <entry key="--connectPoint" value-ref="connectPointCompleter"/>
-            </optional-completers>
+            <completers>
+                <ref component-id="connectPointCompleter" />
+                <ref component-id="placeholderCompleter" />
+            </completers>
         </command>
         <command>
             <action class="org.onosproject.cli.net.InterfaceRemoveCommand"/>
             <completers>
                 <ref component-id="connectPointCompleter"/>
+                <ref component-id="placeholderCompleter" />
             </completers>
         </command>
         <command>
@@ -386,6 +433,8 @@
             <completers>
                 <ref component-id="flowRuleStatusCompleter"/>
                 <ref component-id="deviceIdCompleter"/>
+                <ref component-id="placeholderCompleter"/>
+                <null/>
             </completers>
         </command>
 
@@ -571,6 +620,7 @@
     <bean id="componentPropertyNameCompleter" class="org.onosproject.cli.cfg.ComponentPropertyNameCompleter"/>
     <bean id="nodeIdCompleter" class="org.onosproject.cli.NodeIdCompleter"/>
     <bean id="deviceIdCompleter" class="org.onosproject.cli.net.DeviceIdCompleter"/>
+    <bean id="portNumberCompleter" class="org.onosproject.cli.net.PortNumberCompleter"/>
     <bean id="clusterIdCompleter" class="org.onosproject.cli.net.ClusterIdCompleter"/>
     <bean id="roleCompleter" class="org.onosproject.cli.net.RoleCompleter"/>
     <bean id="hostIdCompleter" class="org.onosproject.cli.net.HostIdCompleter"/>
@@ -589,5 +639,11 @@
     <bean id="metricNameCompleter" class="org.onosproject.cli.MetricNameCompleter"/>
     <bean id="upDownCompleter" class="org.onosproject.cli.UpDownCompleter"/>
     <bean id="encapTypeCompleter" class="org.onosproject.cli.net.EncapTypeCompleter"/>
+
+    <bean id="placeholderCompleter" class="org.onosproject.cli.PlaceholderCompleter"/>
+
+    <bean id="subjectClassKeyCompleter" class="org.onosproject.cli.cfg.SubjectClassKeyCompleter"/>
+    <bean id="subjectKeyCompleter" class="org.onosproject.cli.cfg.SubjectKeyCompleter"/>
+    <bean id="configKeyCompleter" class="org.onosproject.cli.cfg.ConfigKeyCompleter"/>
 
 </blueprint>

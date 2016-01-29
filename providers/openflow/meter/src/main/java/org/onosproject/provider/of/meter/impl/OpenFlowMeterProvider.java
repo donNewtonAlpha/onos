@@ -132,6 +132,8 @@ public class OpenFlowMeterProvider extends AbstractProvider implements MeterProv
     @Deactivate
     public void deactivate() {
         providerRegistry.unregister(this);
+        collectors.values().forEach(MeterStatsCollector::stop);
+        collectors.clear();
         controller.removeEventListener(listener);
         controller.removeListener(listener);
         providerService = null;
@@ -209,10 +211,12 @@ public class OpenFlowMeterProvider extends AbstractProvider implements MeterProv
         }
     }
 
+    // TODO: ONOS-3546 Support per device enabling/disabling via network config
     private boolean isMeterSupported(OpenFlowSwitch sw) {
         if (sw.factory().getVersion() == OFVersion.OF_10 ||
                 sw.factory().getVersion() == OFVersion.OF_11 ||
-                sw.factory().getVersion() == OFVersion.OF_12) {
+                sw.factory().getVersion() == OFVersion.OF_12 ||
+                sw.softwareDescription().equals("OF-DPA 2.0")) {
             return false;
         }
 

@@ -18,25 +18,33 @@ package org.onosproject.cordvtn;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.Sets;
 import org.onlab.packet.IpAddress;
+import org.onlab.packet.MacAddress;
 import org.onlab.packet.TpPort;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.config.Config;
+import org.slf4j.Logger;
 
 import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static org.slf4j.LoggerFactory.getLogger;
 
 /**
  * Configuration object for CordVtn service.
  */
 public class CordVtnConfig extends Config<ApplicationId> {
 
+    protected final Logger log = getLogger(getClass());
+
     public static final String CORDVTN_NODES = "nodes";
     public static final String HOSTNAME = "hostname";
     public static final String OVSDB_IP = "ovsdbIp";
     public static final String OVSDB_PORT = "ovsdbPort";
     public static final String BRIDGE_ID = "bridgeId";
+    public static final String PHYSICAL_PORT_NAME = "phyPortName";
+    public static final String LOCAL_IP = "localIp";
+    public static final String GATEWAY_MAC = "gatewayMac";
 
     /**
      * Returns the set of nodes read from network config.
@@ -54,9 +62,30 @@ public class CordVtnConfig extends Config<ApplicationId> {
             jsonNode.path(HOSTNAME).asText(),
             IpAddress.valueOf(jsonNode.path(OVSDB_IP).asText()),
             TpPort.tpPort(jsonNode.path(OVSDB_PORT).asInt()),
-            DeviceId.deviceId(jsonNode.path(BRIDGE_ID).asText()))));
+            DeviceId.deviceId(jsonNode.path(BRIDGE_ID).asText()),
+            jsonNode.path(PHYSICAL_PORT_NAME).asText(),
+            IpAddress.valueOf(jsonNode.path(LOCAL_IP).asText()))));
 
         return nodes;
+    }
+
+    /**
+     * Returns gateway MAC address.
+     *
+     * @return mac address, or null
+     */
+    public MacAddress gatewayMac() {
+        JsonNode jsonNode = object.get(GATEWAY_MAC);
+        if (jsonNode == null) {
+            return null;
+        }
+
+        try {
+            return MacAddress.valueOf(jsonNode.asText());
+        } catch (IllegalArgumentException e) {
+            log.error("Wrong MAC address format {}", jsonNode.asText());
+            return null;
+        }
     }
 
     /**
@@ -68,12 +97,17 @@ public class CordVtnConfig extends Config<ApplicationId> {
         private final IpAddress ovsdbIp;
         private final TpPort ovsdbPort;
         private final DeviceId bridgeId;
+        private final String phyPortName;
+        private final IpAddress localIp;
 
-        public CordVtnNodeConfig(String hostname, IpAddress ovsdbIp, TpPort ovsdbPort, DeviceId bridgeId) {
+        public CordVtnNodeConfig(String hostname, IpAddress ovsdbIp, TpPort ovsdbPort,
+                                 DeviceId bridgeId, String phyPortName, IpAddress localIp) {
             this.hostname = checkNotNull(hostname);
             this.ovsdbIp = checkNotNull(ovsdbIp);
             this.ovsdbPort = checkNotNull(ovsdbPort);
             this.bridgeId = checkNotNull(bridgeId);
+            this.phyPortName = checkNotNull(phyPortName);
+            this.localIp = checkNotNull(localIp);
         }
 
         /**
@@ -110,6 +144,24 @@ public class CordVtnConfig extends Config<ApplicationId> {
          */
         public DeviceId bridgeId() {
             return this.bridgeId;
+        }
+
+        /**
+         * Returns physical port name.
+         *
+         * @return physical port name
+         */
+        public String phyPortName() {
+            return this.phyPortName;
+        }
+
+        /**
+         * Returns local IP address.
+         *
+         * @return ip address
+         */
+        public IpAddress localIp() {
+            return this.localIp;
         }
     }
 }

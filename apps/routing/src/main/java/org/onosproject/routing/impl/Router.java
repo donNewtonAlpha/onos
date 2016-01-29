@@ -35,12 +35,11 @@ import org.onlab.packet.IpAddress;
 import org.onlab.packet.IpPrefix;
 import org.onlab.packet.MacAddress;
 import org.onosproject.core.CoreService;
-import org.onosproject.incubator.net.intf.InterfaceService;
 import org.onosproject.net.Host;
 import org.onosproject.net.host.HostEvent;
 import org.onosproject.net.host.HostListener;
 import org.onosproject.net.host.HostService;
-import org.onosproject.routing.BgpService;
+import org.onosproject.routing.RouteSourceService;
 import org.onosproject.routing.FibEntry;
 import org.onosproject.routing.FibListener;
 import org.onosproject.routing.FibUpdate;
@@ -73,7 +72,7 @@ import static org.onosproject.routing.RouteEntry.createBinaryString;
  * (RIB). After route updates have been processed and next hops have been
  * resolved, FIB updates are sent to any listening FIB components.
  */
-@Component(immediate = true)
+@Component(immediate = true, enabled = false)
 @Service
 public class Router implements RoutingService {
 
@@ -104,10 +103,7 @@ public class Router implements RoutingService {
     protected HostService hostService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected BgpService bgpService;
-
-    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected InterfaceService interfaceService;
+    protected RouteSourceService routeSourceService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected RoutingConfigurationService routingConfigurationService;
@@ -123,7 +119,7 @@ public class Router implements RoutingService {
                 new DefaultByteArrayNodeFactory());
 
         routesWaitingOnArp = Multimaps.synchronizedSetMultimap(
-                HashMultimap.<IpAddress, RouteEntry>create());
+                HashMultimap.create());
 
         coreService.registerApplication(ROUTER_APP_ID);
 
@@ -146,14 +142,14 @@ public class Router implements RoutingService {
     public void start() {
         this.hostService.addListener(hostListener);
 
-        bgpService.start(new InternalRouteListener());
+        routeSourceService.start(new InternalRouteListener());
 
         bgpUpdatesExecutor.execute(this::doUpdatesThread);
     }
 
     @Override
     public void stop() {
-        bgpService.stop();
+        routeSourceService.stop();
 
         this.hostService.removeListener(hostListener);
 

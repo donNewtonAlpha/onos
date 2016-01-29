@@ -37,6 +37,10 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+/**
+ * Handler of IP packets that forwards IP packets that are sent to the controller,
+ * except the ICMP packets which are processed by @link{IcmpHandler}.
+ */
 public class IpHandler {
 
     private static Logger log = LoggerFactory.getLogger(IpHandler.class);
@@ -98,7 +102,7 @@ public class IpHandler {
      */
     public void addToPacketBuffer(IPv4 ipPacket) {
 
-        // Better not buffer TPC packets due to out-of-order packet transfer
+        // Better not buffer TCP packets due to out-of-order packet transfer
         if (ipPacket.getProtocol() == IPv4.PROTOCOL_TCP) {
             return;
         }

@@ -27,6 +27,12 @@ import org.onosproject.store.service.EventuallyConsistentMapListener;
  * Testing adapter for EventuallyConsistentMap.
  */
 public class VtnEventuallyConsistentMapAdapter<K, V> implements EventuallyConsistentMap<K, V> {
+
+    @Override
+    public String name() {
+        return null;
+    }
+
     @Override
     public int size() {
         return 0;
@@ -104,11 +110,6 @@ public class VtnEventuallyConsistentMapAdapter<K, V> implements EventuallyConsis
 
     @Override
     public void removeListener(EventuallyConsistentMapListener<K, V> listener) {
-
-    }
-
-    @Override
-    public void destroy() {
 
     }
 }

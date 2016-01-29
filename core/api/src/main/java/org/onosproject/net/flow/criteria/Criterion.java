@@ -21,6 +21,8 @@ package org.onosproject.net.flow.criteria;
  */
 public interface Criterion {
 
+    static final String SEPARATOR = ":";
+
     /**
      * Types of fields to which the selection criterion may apply.
      */
@@ -49,6 +51,20 @@ public interface Criterion {
 
         /** VLAN priority. */
         VLAN_PCP,
+
+        /**
+         * Inner VLAN id.
+         *
+         * Note: Some drivers may not support this.
+         */
+        INNER_VLAN_VID,
+
+        /**
+         * Inner VLAN pcp.
+         *
+         * Note: Some drivers may not support this.
+         */
+        INNER_VLAN_PCP,
 
         /** IP DSCP (6 bits in ToS field). */
         IP_DSCP,
@@ -177,6 +193,9 @@ public interface Criterion {
         /** ODU (Optical channel Data Unit) signal type. */
         ODU_SIGTYPE,
 
+        /** Extension criterion. */
+        EXTENSION,
+
         /** An empty criterion. */
         DUMMY
     }
@@ -228,7 +247,7 @@ public interface Criterion {
         }
     }
 
-    enum TCPFlags {
+    enum TcpFlags {
 
         /** ECN-nonce concealment protection. */
         NS((short) (1 << 0)),
@@ -251,7 +270,7 @@ public interface Criterion {
 
         private short value;
 
-        TCPFlags(short value) {
+        TcpFlags(short value) {
             this.value = value;
         }
 

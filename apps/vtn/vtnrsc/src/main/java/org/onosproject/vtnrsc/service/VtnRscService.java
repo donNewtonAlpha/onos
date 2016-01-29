@@ -15,35 +15,24 @@
  */
 package org.onosproject.vtnrsc.service;
 
-import java.util.Iterator;
-
 import org.onlab.packet.MacAddress;
+import org.onosproject.event.ListenerService;
 import org.onosproject.net.Device;
 import org.onosproject.net.DeviceId;
+import org.onosproject.net.Host;
 import org.onosproject.net.HostId;
 import org.onosproject.vtnrsc.SegmentationId;
 import org.onosproject.vtnrsc.TenantId;
 import org.onosproject.vtnrsc.VirtualPortId;
+import org.onosproject.vtnrsc.event.VtnRscEvent;
 import org.onosproject.vtnrsc.event.VtnRscListener;
+
+import java.util.Iterator;
 
 /**
  * Service for interacting with the inventory of Vtn resource.
  */
-public interface VtnRscService {
-    /**
-     * Adds the specified listener.
-     *
-     * @param listener VtnRsc listener
-     */
-    void addListener(VtnRscListener listener);
-
-    /**
-     * Removes the specified listener.
-     *
-     * @param listener VtnRsc listener
-     */
-    void removeListener(VtnRscListener listener);
-
+public interface VtnRscService extends ListenerService<VtnRscEvent, VtnRscListener> {
     /**
      * Returns the SegmentationId of tenant.
      *
@@ -66,7 +55,7 @@ public interface VtnRscService {
      * @param tenantId tenant identifier
      * @return iterable collection of Device
      */
-    Iterator<Device> getSFFOfTenant(TenantId tenantId);
+    Iterator<Device> getSffOfTenant(TenantId tenantId);
 
     /**
      * Returns gateway mac address of the specific host.
@@ -90,5 +79,25 @@ public interface VtnRscService {
      * @param portId port identifier
      * @return device identifier
      */
-    DeviceId getSFToSFFMaping(VirtualPortId portId);
+    DeviceId getSfToSffMaping(VirtualPortId portId);
+
+    /**
+     * Adds specify Device identifier to Service Function Forward OvsMap
+     * or Classifier OvsMap.
+     *
+     * @param virtualPortId the VirtualPort identifier
+     * @param tenantId the tenant identifier
+     * @param deviceId the device identifier
+     */
+    void addDeviceIdOfOvsMap(VirtualPortId virtualPortId, TenantId tenantId, DeviceId deviceId);
+
+    /**
+     * Removes specify Device identifier from Service Function Forward OvsMap
+     * or Classifier OvsMap.
+     *
+     * @param host Host
+     * @param tenantId the tenant identifier
+     * @param deviceId the device identifier
+     */
+    void removeDeviceIdOfOvsMap(Host host, TenantId tenantId, DeviceId deviceId);
 }

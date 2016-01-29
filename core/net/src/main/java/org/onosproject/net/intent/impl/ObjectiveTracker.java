@@ -34,6 +34,7 @@ import org.onosproject.net.HostId;
 import org.onosproject.net.Link;
 import org.onosproject.net.LinkKey;
 import org.onosproject.net.NetworkResource;
+import org.onosproject.net.PortNumber;
 import org.onosproject.net.device.DeviceEvent;
 import org.onosproject.net.device.DeviceListener;
 import org.onosproject.net.device.DeviceService;
@@ -44,9 +45,9 @@ import org.onosproject.net.intent.Intent;
 import org.onosproject.net.intent.IntentData;
 import org.onosproject.net.intent.IntentService;
 import org.onosproject.net.intent.Key;
-import org.onosproject.net.intent.PartitionEvent;
-import org.onosproject.net.intent.PartitionEventListener;
-import org.onosproject.net.intent.PartitionService;
+import org.onosproject.net.intent.IntentPartitionEvent;
+import org.onosproject.net.intent.IntentPartitionEventListener;
+import org.onosproject.net.intent.IntentPartitionService;
 import org.onosproject.net.link.LinkEvent;
 import org.onosproject.net.newresource.ResourceEvent;
 import org.onosproject.net.newresource.ResourceListener;
@@ -115,7 +116,7 @@ public class ObjectiveTracker implements ObjectiveTrackerService {
     protected IntentService intentService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected PartitionService partitionService;
+    protected IntentPartitionService partitionService;
 
     private ExecutorService executorService =
             newSingleThreadExecutor(groupedThreads("onos/intent", "objectivetracker"));
@@ -126,7 +127,7 @@ public class ObjectiveTracker implements ObjectiveTrackerService {
     private ResourceListener resourceListener = new InternalResourceListener();
     private DeviceListener deviceListener = new InternalDeviceListener();
     private HostListener hostListener = new InternalHostListener();
-    private PartitionEventListener partitionListener = new InternalPartitionListener();
+    private IntentPartitionEventListener partitionListener = new InternalPartitionListener();
     private TopologyChangeDelegate delegate;
 
     protected final AtomicBoolean updateScheduled = new AtomicBoolean(false);
@@ -302,11 +303,11 @@ public class ObjectiveTracker implements ObjectiveTrackerService {
     private class InternalResourceListener implements ResourceListener {
         @Override
         public void event(ResourceEvent event) {
-            Optional<Class<?>> linkEvent = event.subject().components().stream()
+            Optional<Class<?>> deviceEvent = event.subject().components().stream()
                     .map(Object::getClass)
-                    .filter(x -> x == LinkKey.class)
+                    .filter(x -> x == PortNumber.class)
                     .findFirst();
-            if (linkEvent.isPresent()) {
+            if (deviceEvent.isPresent()) {
                 executorService.execute(() -> {
                     if (delegate == null) {
                         return;
@@ -444,9 +445,9 @@ public class ObjectiveTracker implements ObjectiveTrackerService {
         }
     }
 
-    private final class InternalPartitionListener implements PartitionEventListener {
+    private final class InternalPartitionListener implements IntentPartitionEventListener {
         @Override
-        public void event(PartitionEvent event) {
+        public void event(IntentPartitionEvent event) {
             log.debug("got message {}", event.subject());
             scheduleIntentUpdate(1);
         }

@@ -44,31 +44,30 @@ import java.util.Map;
 @Path("dhcp")
 public class DhcpWebResource extends AbstractWebResource {
 
-    final DhcpService service = get(DhcpService.class);
+    private final DhcpService service = get(DhcpService.class);
 
     /**
      * Get DHCP server configuration data.
      * Shows lease, renewal and rebinding times in seconds.
      *
      * @return 200 OK
-     * @rsModel DhcpConfigGet
+     * @onos.rsModel DhcpConfigGet
      */
     @GET
     @Path("config")
     public Response getConfigs() {
-        DhcpService service = get(DhcpService.class);
         ObjectNode node = mapper().createObjectNode()
                 .put("leaseTime", service.getLeaseTime())
                 .put("renewalTime", service.getRenewalTime())
                 .put("rebindingTime", service.getRebindingTime());
-        return ok(node.toString()).build();
+        return ok(node).build();
     }
 
     /**
      * Get all MAC/IP mappings.
      * Shows all MAC/IP mappings held by the DHCP server.
      *
-     * @rsModel DhcpConfigGetMappings
+     * @onos.rsModel DhcpConfigGetMappings
      * @return 200 OK
      */
     @GET
@@ -76,13 +75,13 @@ public class DhcpWebResource extends AbstractWebResource {
     public Response listMappings() {
         ObjectNode root = mapper().createObjectNode();
 
-        final Map<HostId, IpAssignment> intents = service.listMapping();
+        Map<HostId, IpAssignment> intents = service.listMapping();
         ArrayNode arrayNode = root.putArray("mappings");
         intents.entrySet().forEach(i -> arrayNode.add(mapper().createObjectNode()
                                                               .put("host", i.getKey().toString())
                                                               .put("ip", i.getValue().ipAddress().toString())));
 
-        return ok(root.toString()).build();
+        return ok(root).build();
     }
 
 
@@ -90,25 +89,24 @@ public class DhcpWebResource extends AbstractWebResource {
      * Get all available IPs.
      * Shows all the IPs in the free pool of the DHCP Server.
      *
-     * @rsModel DhcpConfigGetAvailable
+     * @onos.rsModel DhcpConfigGetAvailable
      * @return 200 OK
      */
     @GET
     @Path("available")
     public Response listAvailableIPs() {
-        final Iterable<Ip4Address> availableIPList = service.getAvailableIPs();
-
-        final ObjectNode root = mapper().createObjectNode();
+        Iterable<Ip4Address> availableIPList = service.getAvailableIPs();
+        ObjectNode root = mapper().createObjectNode();
         ArrayNode arrayNode = root.putArray("availableIP");
         availableIPList.forEach(i -> arrayNode.add(i.toString()));
-        return ok(root.toString()).build();
+        return ok(root).build();
     }
 
     /**
      * Post a new static MAC/IP binding.
      * Registers a static binding to the DHCP server, and displays the current set of bindings.
      *
-     * @rsModel DhcpConfigPut
+     * @onos.rsModel DhcpConfigPut
      * @param stream JSON stream
      * @return 200 OK
      */
@@ -139,7 +137,7 @@ public class DhcpWebResource extends AbstractWebResource {
         } catch (IOException e) {
             throw new IllegalArgumentException(e.getMessage());
         }
-        return ok(root.toString()).build();
+        return ok(root).build();
     }
 
     /**
@@ -152,7 +150,6 @@ public class DhcpWebResource extends AbstractWebResource {
     @DELETE
     @Path("mappings/{macID}")
     public Response deleteMapping(@PathParam("macID") String macID) {
-
         ObjectNode root = mapper().createObjectNode();
 
         if (!service.removeStaticMapping(MacAddress.valueOf(macID))) {
@@ -164,6 +161,6 @@ public class DhcpWebResource extends AbstractWebResource {
                                                               .put("host", i.getKey().toString())
                                                               .put("ip", i.getValue().ipAddress().toString())));
 
-        return ok(root.toString()).build();
+        return ok(root).build();
     }
 }

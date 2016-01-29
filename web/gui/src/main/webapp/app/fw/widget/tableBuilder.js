@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015,2016 Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,11 +21,10 @@
     'use strict';
 
     // injected refs
-    var $log, $interval, $timeout, fs, wss;
+    var $log, $interval, $timeout, fs, wss, ls;
 
     // constants
-    var refreshInterval = 2000,
-        loadingWait = 500;
+    var refreshInterval = 2000;
 
     // example params to buildTable:
     // {
@@ -49,22 +48,20 @@
             onResp = fs.isF(o.respCb),
             idKey = o.idKey || 'id',
             oldTableData = [],
-            loaded = false,
-            refreshPromise, loadingPromise;
+            refreshPromise;
 
         o.scope.tableData = [];
         o.scope.changedData = [];
-        o.scope.sortParams = {};
-        o.scope.loading = true;
+        o.scope.sortParams = o.sortParams || {};
         o.scope.autoRefresh = true;
         o.scope.autoRefreshTip = 'Toggle auto refresh';
 
         // === websocket functions --------------------
         // response
         function respCb(data) {
-            loaded = true;
-            o.scope.loading = false;
+            ls.stop();
             o.scope.tableData = data[root];
+            o.scope.annots = data.annots;
             onResp && onResp();
 
             // checks if data changed for row flashing
@@ -88,20 +85,13 @@
         // request
         function sortCb(params) {
             var p = angular.extend({}, params, o.query);
-            wss.sendEvent(req, p);
-            stillLoading();
+            if (wss.isConnected()) {
+                wss.sendEvent(req, p);
+                ls.start();
+            }
         }
         o.scope.sortCallback = sortCb;
 
-        // show loading wheel if it's taking a while for the server to respond
-        function stillLoading() {
-            loaded = false;
-            loadingPromise = $timeout(function () {
-                if (!loaded) {
-                    o.scope.loading = true;
-                }
-            }, loadingWait);
-        }
 
         // === selecting a row functions ----------------
         function selCb($event, selRow) {
@@ -112,19 +102,23 @@
         o.scope.selectCallback = selCb;
 
         // === autoRefresh functions ------------------
-        function startRefresh() {
-            refreshPromise = $interval(function () {
+        function fetchDataIfNotWaiting() {
+            if (!ls.waiting()) {
                 if (fs.debugOn('widget')) {
                     $log.debug('Refreshing ' + root + ' page');
                 }
                 sortCb(o.scope.sortParams);
-            }, refreshInterval);
+            }
+        }
+
+        function startRefresh() {
+            refreshPromise = $interval(fetchDataIfNotWaiting, refreshInterval);
         }
 
         function stopRefresh() {
-            if (angular.isDefined(refreshPromise)) {
+            if (refreshPromise) {
                 $interval.cancel(refreshPromise);
-                refreshPromise = undefined;
+                refreshPromise = null;
             }
         }
 
@@ -138,26 +132,25 @@
         o.scope.$on('$destroy', function () {
             wss.unbindHandlers(handlers);
             stopRefresh();
-            if (angular.isDefined(loadingPromise)) {
-                $timeout.cancel(loadingPromise);
-                loadingPromise = undefined;
-            }
+            ls.stop();
         });
 
-        sortCb();
+        sortCb(o.scope.sortParams);
         startRefresh();
     }
 
     angular.module('onosWidget')
         .factory('TableBuilderService',
         ['$log', '$interval', '$timeout', 'FnService', 'WebSocketService',
+            'LoadingService',
 
-            function (_$log_, _$interval_, _$timeout_, _fs_, _wss_) {
+            function (_$log_, _$interval_, _$timeout_, _fs_, _wss_, _ls_) {
                 $log = _$log_;
                 $interval = _$interval_;
                 $timeout = _$timeout_;
                 fs = _fs_;
                 wss = _wss_;
+                ls = _ls_;
 
                 return {
                     buildTable: buildTable

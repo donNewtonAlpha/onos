@@ -1,8 +1,8 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2015 Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in reliance with the License.
+ * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
@@ -15,306 +15,216 @@
  */
 package org.onosproject.pim.impl;
 
-import org.jboss.netty.util.Timeout;
-import org.jboss.netty.util.TimerTask;
 import org.onlab.packet.IpAddress;
 import org.onlab.packet.MacAddress;
-import org.onlab.packet.pim.PIMHello;
 import org.onlab.packet.pim.PIMHelloOption;
-import org.onosproject.net.ConnectPoint;
 import org.slf4j.Logger;
 
 import java.nio.ByteBuffer;
-import java.util.concurrent.TimeUnit;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Map;
 
-import static com.google.common.base.Preconditions.checkNotNull;
 import static org.slf4j.LoggerFactory.getLogger;
 
-/**
- * PIMNeighbor represents all the PIM routers that have sent us
- * hello messages, or that possibly have been statically configured.
- */
 public class PIMNeighbor {
+
     private final Logger log = getLogger(getClass());
 
-    // The primary address of this PIM neighbor
-    private IpAddress primaryAddr;
+    // IP Address of this neighbor
+    private IpAddress ipAddr;
 
-    // The MacAddress of this neighbor
-    private MacAddress macAddress;
+    // MAC Address of the neighbor (Need for sending J/P)
+    private MacAddress macAddr;
 
-    // The ConnectPoint this PIM neighbor is connected to.
-    private ConnectPoint connectPoint;
+    // Hello Options
+    // Our hello opt holdTime
+    private short holdTime;
 
-    // Is this neighbor us?
-    private boolean isThisUs = false;
+    // Our hello opt prune delay
+    private int pruneDelay;
 
-    // The option values this neighbor has sent us.
-    private int priority = 0;
-    private int genId = 0;
-    private short holdtime = 0;
+    // Neighbor priority
+    private int priority;
 
-    // Is this pim neighbor the DR?
-    private boolean isDr = false;
+    // Our current genId
+    private int genId;
 
-    // Timeout for this neighbor
-    private volatile Timeout timeout;
-
-    // A back pointer the neighbors list this neighbor belongs to.
-    private PIMInterface pimInterface;
+    // Our timestamp for this neighbor
+    private Date lastRefresh;
 
     /**
-     * Construct this neighbor from the address and connect point.
+     * Construct a new PIM Neighbor.
      *
-     * @param ipaddr IP Address of neighbor
-     * @param macaddr MAC Address of the neighbor
-     * @param pimInterface The PIMInterface of this neighbor
+     * @param ipAddr the IP Address of our new neighbor
+     * @param opts option map
      */
-    public PIMNeighbor(IpAddress ipaddr, MacAddress macaddr, PIMInterface pimInterface) {
-        this.macAddress = macaddr;
-        this.primaryAddr = ipaddr;
-        this.pimInterface = pimInterface;
-        this.resetTimeout();
+    public PIMNeighbor(IpAddress ipAddr, Map<Short, PIMHelloOption> opts) {
+        this.ipAddr = ipAddr;
+        this.addOptions(opts);
     }
 
     /**
-     * Get the primary address of this neighbor.
+     * Construct a new PIM neighbor.
      *
-     * @return the primary IP address.
+     * @param ipAddr the neighbors IP addr
+     * @param macAddr MAC address
      */
-    public IpAddress getPrimaryAddr() {
-        return primaryAddr;
+    public PIMNeighbor(IpAddress ipAddr, MacAddress macAddr) {
+        this.ipAddr = ipAddr;
+        this.macAddr = macAddr;
     }
 
     /**
-     * Set the primary address of this neighbor.
+     * Get the MAC address of this neighbor.
      *
-     * @param primaryAddr the address we'll use when sending hello messages
+     * @return the mac address
      */
-    public void setPrimaryAddr(IpAddress primaryAddr) {
-        this.primaryAddr = primaryAddr;
+    public MacAddress getMacaddr() {
+        return macAddr;
     }
 
     /**
-     * Get the priority this neighbor has advertised to us.
+     * Get the IP Address of our neighbor.
      *
-     * @return the priority
+     * @return the IP address of our neighbor
+     */
+    public IpAddress getIpaddr() {
+        return ipAddr;
+    }
+
+    /**
+     * Set the IP address of our neighbor.
+     *
+     * @param ipAddr our neighbors IP address
+     */
+    public void setIpaddr(IpAddress ipAddr) {
+        this.ipAddr = ipAddr;
+    }
+
+    /**
+     * Get our neighbors holdTime.
+     *
+     * @return the holdTime
+     */
+    public short getHoldtime() {
+        return holdTime;
+    }
+
+    /**
+     * Set our neighbors holdTime.
+     *
+     * @param holdTime the holdTime
+     */
+    public void setHoldtime(short holdTime) {
+        this.holdTime = holdTime;
+    }
+
+    /**
+     * Get our neighbors prune delay.
+     *
+     * @return our neighbors prune delay
+     */
+    public int getPruneDelay() {
+        return pruneDelay;
+    }
+
+    /**
+     * Set our neighbors prune delay.
+     *
+     * @param pruneDelay the prune delay
+     */
+    public void setPruneDelay(int pruneDelay) {
+        this.pruneDelay = pruneDelay;
+    }
+
+    /**
+     * Get our neighbors priority.
+     *
+     * @return our neighbors priority
      */
     public int getPriority() {
         return priority;
     }
 
     /**
-     * Set the priority for this neighbor.
+     * Set our neighbors priority.
      *
-     * @param priority This neighbors priority.
+     * @param priority our neighbors priority
      */
     public void setPriority(int priority) {
         this.priority = priority;
     }
 
     /**
-     * Get the generation ID.
+     * Get our neighbors Genid.
      *
-     * @return the generation ID.
+     * @return our neighbor Genid
      */
-    public int getGenId() {
+    public int getGenid() {
         return genId;
     }
 
     /**
-     * Set the generation ID.
+     * Set our neighbors GenId.
      *
-     * @param genId the generation ID.
+     * @param genId our neighbors GenId
      */
-    public void setGenId(int genId) {
+    public void setGenid(int genId) {
         this.genId = genId;
     }
 
     /**
-     * Get the holdtime for this neighbor.
+     * Add the options for this neighbor if needed.
      *
-     * @return the holdtime
+     * @param opts the options to be added/modified
+     * @return true if options changed, false if no option has changed
      */
-    public short getHoldtime() {
-        return holdtime;
-    }
+    public boolean addOptions(Map<Short, PIMHelloOption> opts) {
 
-    /**
-     * Set the holdtime for this neighbor.
-     *
-     * @param holdtime the holdtime.
-     */
-    public void setholdtime(short holdtime) {
-        this.holdtime = holdtime;
-    }
+        boolean changed = false;
 
-    /**
-     * Is this neighbor the designated router on this connect point?
-     *
-     * @return true if so, false if not.
-     */
-    public boolean isDr() {
-        return isDr;
-    }
+        for (PIMHelloOption opt : opts.values()) {
+            Short otype = opt.getOptType();
+            ByteBuffer val = ByteBuffer.wrap(opt.getValue());
 
-    /**
-     * Set this router as the designated router on this connect point.
-     *
-     * @param isDr True is this neighbor is the DR false otherwise
-     */
-    public void setIsDr(boolean isDr) {
-        this.isDr = isDr;
-    }
-
-    /**
-     * The ConnectPoint this neighbor is connected to.
-     *
-     * @return the ConnectPoint
-     */
-    public PIMInterface getPimInterface() {
-        return pimInterface;
-    }
-
-    /**
-     * We have received a fresh hello from this neighbor, now we need to process it.
-     * Depending on the values received in the the hello options may force a
-     * re-election process.
-     *
-     * We will also refresh the timeout for this neighbor.
-     *
-     * @param hello copy of the hello we'll be able to extract options from.
-     */
-    public void refresh(PIMHello hello) {
-        checkNotNull(hello);
-
-        boolean reelect = false;
-        for (PIMHelloOption opt : hello.getOptions().values()) {
-
-            int len = opt.getOptLength();
-            ByteBuffer bb = ByteBuffer.wrap(opt.getValue());
-
-            switch (opt.getOptType()) {
-                case PIMHelloOption.OPT_GENID:
-                    int newid = bb.getInt();
-                    if (this.genId != newid) {
-
-                        // We have a newly rebooted neighbor, this is where we would
-                        // send them our joins.
-                        this.genId = newid;
-                    }
-                    break;
-
-                case PIMHelloOption.OPT_PRIORITY:
-                    int newpri = bb.getInt();
-                    if (this.priority != newpri) {
-
-                        // The priorities have changed.  We may need to re-elect a new DR?
-                        if (this.isDr || pimInterface.getDesignatedRouter().getPriority() < priority) {
-                            reelect = true;
-                        }
-                        this.priority = newpri;
-                    }
-                    break;
-
-                case PIMHelloOption.OPT_HOLDTIME:
-                    short holdtime = bb.getShort();
-                    if (this.holdtime != holdtime) {
-                        this.holdtime = holdtime;
-                        if (holdtime == 0) {
-                            // We have a neighbor going down.  We can remove all joins
-                            // we have learned from them.
-
-                            log.debug("PIM Neighbor has timed out: {}", this.primaryAddr.toString());
-                            return;
-                        }
-                    }
-                    break;
-
-                case PIMHelloOption.OPT_PRUNEDELAY:
-                case PIMHelloOption.OPT_ADDRLIST:
-                    // TODO: implement prune delay and addr list.  Fall through for now.
-
-                default:
-                    log.debug("PIM Hello option type: {} not yet supported or unknown.", opt.getOptType());
-                    break;
+            if (otype == PIMHelloOption.OPT_ADDRLIST) {
+                // TODO: Will implement someday
+            } else if (otype == PIMHelloOption.OPT_GENID) {
+                int newval = val.getInt();
+                if (newval != genId) {
+                    genId = newval;
+                    changed = true;
+                }
+            } else if (otype == PIMHelloOption.OPT_HOLDTIME) {
+                short newval = val.getShort();
+                if (newval != holdTime) {
+                    holdTime = newval;
+                    changed = true;
+                }
+            } else if (otype == PIMHelloOption.OPT_PRIORITY) {
+                int newval = val.getInt();
+                if (newval != priority) {
+                    priority = newval;
+                    changed = true;
+                }
+            } else if (otype == PIMHelloOption.OPT_PRUNEDELAY) {
+                int newval = val.getInt();
+                if (newval != pruneDelay) {
+                    pruneDelay = newval;
+                    changed = true;
+                }
+            } else {
+                log.warn("received unknown pim hello options" + otype);
             }
         }
-
-        if (reelect) {
-            pimInterface.electDR(this);
-        }
-
-        // Reset the next timeout timer
-        this.resetTimeout();
-    }
-
-    /* --------------------------------------- Timer functions -------------------------- */
-
-    /**
-     * Restart the timeout task for this neighbor.
-     */
-    private void resetTimeout() {
-
-        if (this.holdtime == 0) {
-
-            // Prepare to die.
-            log.debug("shutting down timer for nbr {}", this.primaryAddr.toString());
-            if (this.timeout != null) {
-                this.timeout.cancel();
-                this.timeout = null;
-            }
-            return;
-        }
-
-        // Cancel the existing timeout and start a fresh new one.
-        if (this.timeout != null) {
-            this.timeout.cancel();
-        }
-
-        this.timeout = PIMTimer.getTimer().newTimeout(new NeighborTimeoutTask(this), holdtime, TimeUnit.SECONDS);
+        return changed;
     }
 
     /**
-     * The task to run when a neighbor timeout expires.
+     * Refresh this neighbors timestamp.
      */
-    private final class NeighborTimeoutTask implements TimerTask {
-        PIMNeighbor nbr;
-
-        NeighborTimeoutTask(PIMNeighbor nbr) {
-            this.nbr = nbr;
-        }
-
-        @Override
-        public void run(Timeout timeout) throws Exception {
-
-            log.debug("PIM Neighbor {} has timed out: ", nbr.toString());
-            nbr.pimInterface.removeNeighbor(nbr);
-        }
-    }
-
-    /**
-     * Stop the timeout timer.
-     *
-     * This happens when we remove the neighbor.
-     */
-    private final void stopTimeout() {
-        this.timeout.cancel();
-        this.timeout = null;
-    }
-
-    @Override
-    public String toString() {
-        String out = "";
-        if (this.isDr) {
-            out += "*NBR:";
-        } else {
-            out += "NBR:";
-        }
-        out += "\tIP: " + this.primaryAddr.toString();
-        out += "\tPr: " + String.valueOf(this.priority);
-        out += "\tHoldTime: " + String.valueOf(this.holdtime);
-        out += "\tGenID: " + String.valueOf(this.genId) + "\n";
-        return out;
+    public void refreshTimestamp() {
+        lastRefresh = Calendar.getInstance().getTime();
     }
 }

@@ -28,18 +28,25 @@ import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.config.Config;
 import org.onosproject.net.host.InterfaceIpAddress;
 
+import java.util.Iterator;
 import java.util.Set;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Configuration for interfaces.
  */
 @Beta
 public class InterfaceConfig extends Config<ConnectPoint> {
+    public static final String NAME = "name";
     public static final String IPS = "ips";
     public static final String MAC = "mac";
     public static final String VLAN = "vlan";
 
-    public static final String CONFIG_VALUE_ERROR = "Error parsing config value";
+    private static final String CONFIG_VALUE_ERROR = "Error parsing config value";
+    private static final String INTF_NULL_ERROR = "Interface cannot be null";
+    private static final String INTF_NAME_ERROR = "Interface must have a valid name";
 
     /**
      * Retrieves all interfaces configured on this port.
@@ -52,6 +59,8 @@ public class InterfaceConfig extends Config<ConnectPoint> {
 
         try {
             for (JsonNode intfNode : array) {
+                String name = intfNode.path(NAME).asText(null);
+
                 Set<InterfaceIpAddress> ips = getIps(intfNode);
 
                 String mac = intfNode.path(MAC).asText();
@@ -59,7 +68,7 @@ public class InterfaceConfig extends Config<ConnectPoint> {
 
                 VlanId vlan = getVlan(intfNode);
 
-                interfaces.add(new Interface(subject, ips, macAddr, vlan));
+                interfaces.add(new Interface(name, subject, ips, macAddr, vlan));
             }
         } catch (IllegalArgumentException e) {
             throw new ConfigException(CONFIG_VALUE_ERROR, e);
@@ -74,7 +83,15 @@ public class InterfaceConfig extends Config<ConnectPoint> {
      * @param intf interface to add
      */
     public void addInterface(Interface intf) {
+        checkNotNull(intf, INTF_NULL_ERROR);
+        checkArgument(!intf.name().equals(Interface.NO_INTERFACE_NAME), INTF_NAME_ERROR);
+
+        // Remove old interface with this name if it exists
+        removeInterface(intf.name());
+
         ObjectNode intfNode = array.addObject();
+
+        intfNode.put(NAME, intf.name());
 
         if (intf.mac() != null) {
             intfNode.put(MAC, intf.mac().toString());
@@ -92,12 +109,17 @@ public class InterfaceConfig extends Config<ConnectPoint> {
     /**
      * Removes an interface from the config.
      *
-     * @param intf interface to remove
+     * @param name name of the interface to remove
      */
-    public void removeInterface(Interface intf) {
-        for (int i = 0; i < array.size(); i++) {
-            if (intf.vlan().equals(getVlan(node))) {
-                array.remove(i);
+    public void removeInterface(String name) {
+        checkNotNull(name, INTF_NULL_ERROR);
+        checkArgument(!name.equals(Interface.NO_INTERFACE_NAME), INTF_NAME_ERROR);
+
+        Iterator<JsonNode> it = array.iterator();
+        while (it.hasNext()) {
+            JsonNode node = it.next();
+            if (node.path(NAME).asText().equals(name)) {
+                it.remove();
                 break;
             }
         }

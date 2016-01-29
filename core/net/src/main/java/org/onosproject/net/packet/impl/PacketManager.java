@@ -17,15 +17,19 @@ package org.onosproject.net.packet.impl;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.apache.felix.scr.annotations.Service;
+import org.onosproject.cluster.ClusterService;
+import org.onosproject.cluster.NodeId;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.net.Device;
+import org.onosproject.net.DeviceId;
 import org.onosproject.net.device.DeviceEvent;
 import org.onosproject.net.device.DeviceListener;
 import org.onosproject.net.device.DeviceService;
@@ -57,6 +61,7 @@ import org.onosproject.net.provider.AbstractProviderService;
 import org.slf4j.Logger;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -87,6 +92,9 @@ public class PacketManager
     private CoreService coreService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    private ClusterService clusterService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     private DeviceService deviceService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
@@ -105,11 +113,13 @@ public class PacketManager
     private final List<ProcessorEntry> processors = Lists.newCopyOnWriteArrayList();
 
     private ApplicationId appId;
+    private NodeId localNodeId;
 
     @Activate
     public void activate() {
         eventHandlingExecutor = Executors.newSingleThreadExecutor(
                 groupedThreads("onos/net/packet", "event-handler"));
+        localNodeId = clusterService.getLocalNode().id();
         appId = coreService.getAppId(CoreService.CORE_APP_NAME);
         store.setDelegate(delegate);
         deviceService.addListener(deviceListener);
@@ -167,8 +177,24 @@ public class PacketManager
         checkNotNull(selector, "Selector cannot be null");
         checkNotNull(appId, "Application ID cannot be null");
 
-        PacketRequest request = new DefaultPacketRequest(selector, priority, appId);
+        PacketRequest request = new DefaultPacketRequest(selector, priority, appId,
+                                                         localNodeId, Optional.empty());
         store.requestPackets(request);
+    }
+
+    @Override
+    public void requestPackets(TrafficSelector selector, PacketPriority priority,
+                               ApplicationId appId, Optional<DeviceId> deviceId) {
+        checkPermission(PACKET_READ);
+        checkNotNull(selector, "Selector cannot be null");
+        checkNotNull(appId, "Application ID cannot be null");
+
+        PacketRequest request =
+                new DefaultPacketRequest(selector, priority, appId,
+                                         localNodeId, deviceId);
+
+        store.requestPackets(request);
+
     }
 
     @Override
@@ -178,7 +204,22 @@ public class PacketManager
         checkNotNull(selector, "Selector cannot be null");
         checkNotNull(appId, "Application ID cannot be null");
 
-        PacketRequest request = new DefaultPacketRequest(selector, priority, appId);
+
+        PacketRequest request = new DefaultPacketRequest(selector, priority, appId,
+                                                         localNodeId, Optional.empty());
+        store.cancelPackets(request);
+    }
+
+    @Override
+    public void cancelPackets(TrafficSelector selector, PacketPriority priority,
+                              ApplicationId appId, Optional<DeviceId> deviceId) {
+        checkPermission(PACKET_READ);
+        checkNotNull(selector, "Selector cannot be null");
+        checkNotNull(appId, "Application ID cannot be null");
+
+        PacketRequest request = new DefaultPacketRequest(selector, priority,
+                                                         appId, localNodeId,
+                                                         deviceId);
         store.cancelPackets(request);
     }
 
@@ -195,7 +236,12 @@ public class PacketManager
     private void pushRulesToDevice(Device device) {
         log.debug("Pushing packet requests to device {}", device.id());
         for (PacketRequest request : store.existingRequests()) {
-            pushRule(device, request);
+            if (!request.deviceId().isPresent()) {
+                pushRule(device, request);
+            } else if (request.deviceId().get().equals(device.id())) {
+                pushRule(device, request);
+            }
+
         }
     }
 
@@ -324,6 +370,7 @@ public class PacketManager
 
     }
 
+
     /**
      * Internal callback from the packet store.
      */
@@ -335,12 +382,24 @@ public class PacketManager
 
         @Override
         public void requestPackets(PacketRequest request) {
-            pushToAllDevices(request);
+            DeviceId deviceid = request.deviceId().orElse(null);
+
+            if (deviceid != null) {
+                pushRule(deviceService.getDevice(deviceid), request);
+            } else {
+                pushToAllDevices(request);
+            }
         }
 
         @Override
         public void cancelPackets(PacketRequest request) {
-            removeFromAllDevices(request);
+            DeviceId deviceid = request.deviceId().orElse(null);
+
+            if (deviceid != null) {
+                removeRule(deviceService.getDevice(deviceid), request);
+            } else {
+                removeFromAllDevices(request);
+            }
         }
     }
 

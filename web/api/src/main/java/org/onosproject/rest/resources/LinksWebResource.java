@@ -15,6 +15,7 @@
  */
 package org.onosproject.rest.resources;
 
+import org.onosproject.net.Direction;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.Link;
@@ -35,16 +36,10 @@ import static org.onosproject.net.PortNumber.portNumber;
 @Path("links")
 public class LinksWebResource extends AbstractWebResource {
 
-    enum Direction {
-        ALL,
-        INGRESS,
-        EGRESS
-    }
-
     /**
      * Get infrastructure links.
      * Returns array of all links, or links for the specified device or port.
-     * @rsModel LinksGet
+     * @onos.rsModel LinksGet
      * @param deviceId  (optional) device identifier
      * @param port      (optional) port number
      * @param direction (optional) direction qualifier

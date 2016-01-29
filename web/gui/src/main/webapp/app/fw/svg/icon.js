@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015,2016 Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,8 +45,6 @@
         upArrow: 'triangleUp',
         downArrow: 'triangleDown',
 
-        loading: 'loading',
-
         appInactive: 'unknown',
 
         devIcon_SWITCH: 'switch',
@@ -55,6 +53,7 @@
         flowTable: 'flowTable',
         portTable: 'portTable',
         groupTable: 'groupTable',
+        meterTable: 'meterTable',
 
         hostIcon_endstation: 'endstation',
         hostIcon_router: 'router',
@@ -149,6 +148,10 @@
             rx: 4
         },
         host: {
+            badge: {
+                dx: 14,
+                dy: -14
+            },
             radius: {
                 noGlyph: 9,
                 withGlyph: 14
@@ -206,26 +209,16 @@
     }
 
     function sortIcons() {
-        function sortAsc(div) {
+        function _s(div, gid) {
             div.style('display', 'inline-block');
-            loadEmbeddedIcon(div, 'upArrow', 10);
+            loadEmbeddedIcon(div, gid, 10);
             div.classed('tableColSort', true);
-        }
-
-        function sortDesc(div) {
-            div.style('display', 'inline-block');
-            loadEmbeddedIcon(div, 'downArrow', 10);
-            div.classed('tableColSort', true);
-        }
-
-        function sortNone(div) {
-            div.remove();
         }
 
         return {
-            sortAsc: sortAsc,
-            sortDesc: sortDesc,
-            sortNone: sortNone
+            asc: function (div) { _s(div, 'upArrow'); },
+            desc: function (div) { _s(div, 'downArrow'); },
+            none: function (div) { div.remove(); }
         };
     }
 

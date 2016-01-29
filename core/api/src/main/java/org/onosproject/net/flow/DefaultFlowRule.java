@@ -15,6 +15,7 @@
  */
 package org.onosproject.net.flow;
 
+import com.google.common.annotations.Beta;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.DefaultGroupId;
 import org.onosproject.core.GroupId;
@@ -284,6 +285,11 @@ public class DefaultFlowRule implements FlowRule {
         return tableId;
     }
 
+    @Beta
+    public long created() {
+        return created;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -295,8 +301,8 @@ public class DefaultFlowRule implements FlowRule {
         private Integer priority;
         private DeviceId deviceId;
         private Integer tableId = 0;
-        private TrafficSelector selector;
-        private TrafficTreatment treatment;
+        private TrafficSelector selector = DefaultTrafficSelector.builder().build();
+        private TrafficTreatment treatment = DefaultTrafficTreatment.builder().build();
         private Integer timeout;
         private Boolean permanent;
 
@@ -338,7 +344,7 @@ public class DefaultFlowRule implements FlowRule {
 
         @Override
         public FlowRule.Builder withTreatment(TrafficTreatment treatment) {
-            this.treatment = treatment;
+            this.treatment = checkNotNull(treatment);
             return this;
         }
 

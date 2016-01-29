@@ -33,6 +33,7 @@ import org.onosproject.net.flow.DefaultTrafficTreatment;
 import org.onosproject.net.flow.TrafficSelector;
 import org.onosproject.net.flow.TrafficTreatment;
 import org.onosproject.net.host.InterfaceIpAddress;
+import org.onosproject.net.intent.IntentUtils;
 import org.onosproject.net.intent.Key;
 import org.onosproject.net.intent.PointToPointIntent;
 import org.onosproject.routing.IntentSynchronizationService;
@@ -134,7 +135,7 @@ public class PeerConnectivityManager {
 
             buildSpeakerIntents(bgpSpeaker).forEach(i -> {
                 PointToPointIntent intent = existingIntents.remove(i.key());
-                if (intent == null || !IntentUtils.equals(i, intent)) {
+                if (intent == null || !IntentUtils.intentsAreEqual(i, intent)) {
                     peerIntents.put(i.key(), i);
                     intentSynchronizer.submit(i);
                 }

@@ -16,7 +16,6 @@
 package org.onosproject.net.flowobjective.impl;
 
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
@@ -49,13 +48,16 @@ import org.onosproject.net.flowobjective.NextObjective;
 import org.onosproject.net.flowobjective.Objective;
 import org.onosproject.net.flowobjective.ObjectiveError;
 import org.onosproject.net.flowobjective.ObjectiveEvent;
+import org.onosproject.net.flowobjective.ObjectiveEvent.Type;
 import org.onosproject.net.group.GroupService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -228,8 +230,10 @@ public class FlowObjectiveManager implements FlowObjectiveService {
                 flowObjectiveStore.getNextGroup(fwd.nextId()) == null) {
             log.trace("Queuing forwarding objective for nextId {}", fwd.nextId());
             // TODO: change to computeIfAbsent
-            Set<PendingNext> pnext = pendingForwards.putIfAbsent(fwd.nextId(),
-                                         Sets.newHashSet(new PendingNext(deviceId, fwd)));
+            Set<PendingNext> newset = Collections.newSetFromMap(
+                                          new ConcurrentHashMap<PendingNext, Boolean>());
+            newset.add(new PendingNext(deviceId, fwd));
+            Set<PendingNext> pnext = pendingForwards.putIfAbsent(fwd.nextId(), newset);
             if (pnext != null) {
                 pnext.add(new PendingNext(deviceId, fwd));
             }
@@ -378,19 +382,20 @@ public class FlowObjectiveManager implements FlowObjectiveService {
     private class InternalStoreDelegate implements FlowObjectiveStoreDelegate {
         @Override
         public void notify(ObjectiveEvent event) {
-            log.debug("Received notification of obj event {}", event);
-            Set<PendingNext> pending = pendingForwards.remove(event.subject());
+            if (event.type() == Type.ADD) {
+                log.debug("Received notification of obj event {}", event);
+                Set<PendingNext> pending = pendingForwards.remove(event.subject());
 
-            if (pending == null) {
-                log.debug("Nothing pending for this obj event");
-                return;
+                if (pending == null) {
+                    log.warn("Nothing pending for this obj event {}", event);
+                    return;
+                }
+
+                log.debug("Processing {} pending forwarding objectives for nextId {}",
+                         pending.size(), event.subject());
+                pending.forEach(p -> getDevicePipeliner(p.deviceId())
+                                .forward(p.forwardingObjective()));
             }
-
-            log.debug("Processing pending forwarding objectives {}", pending.size());
-
-            pending.forEach(p -> getDevicePipeliner(p.deviceId())
-                    .forward(p.forwardingObjective()));
-
         }
     }
 

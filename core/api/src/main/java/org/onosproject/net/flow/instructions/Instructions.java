@@ -35,6 +35,9 @@ import org.onosproject.net.flow.instructions.L0ModificationInstruction.ModOchSig
 import org.onosproject.net.flow.instructions.L1ModificationInstruction.ModOduSignalIdInstruction;
 import org.onosproject.net.flow.instructions.L3ModificationInstruction.L3SubType;
 import org.onosproject.net.flow.instructions.L3ModificationInstruction.ModIPInstruction;
+import org.onosproject.net.flow.instructions.L3ModificationInstruction.ModArpIPInstruction;
+import org.onosproject.net.flow.instructions.L3ModificationInstruction.ModArpEthInstruction;
+import org.onosproject.net.flow.instructions.L3ModificationInstruction.ModArpOpInstruction;
 import org.onosproject.net.flow.instructions.L3ModificationInstruction.ModIPv6FlowLabelInstruction;
 import org.onosproject.net.flow.instructions.L3ModificationInstruction.ModTtlInstruction;
 import org.onosproject.net.flow.instructions.L4ModificationInstruction.L4SubType;
@@ -51,6 +54,8 @@ import static org.onosproject.net.flow.instructions.L2ModificationInstruction.*;
  * Factory class for creating various traffic treatment instructions.
  */
 public final class Instructions {
+
+    private static final String SEPARATOR = ":";
 
     // Ban construction
     private Instructions() {}
@@ -300,6 +305,39 @@ public final class Instructions {
     }
 
     /**
+     * Creates a L3 ARP IP src modification.
+     *
+     * @param addr the ip address to modify to
+     * @return a L3 modification
+     */
+    public static L3ModificationInstruction modArpSpa(IpAddress addr) {
+        checkNotNull(addr, "Src l3 ARP IP address cannot be null");
+        return new ModArpIPInstruction(L3SubType.ARP_SPA, addr);
+    }
+
+    /**
+     * Creates a l3 ARP Ether src modification.
+     *
+     * @param addr the mac address to modify to
+     * @return a l3 modification
+     */
+    public static L3ModificationInstruction modArpSha(MacAddress addr) {
+        checkNotNull(addr, "Src l3 ARP address cannot be null");
+        return new ModArpEthInstruction(L3SubType.ARP_SHA, addr);
+    }
+
+    /**
+     * Creates a l3 ARP operation modification.
+     *
+     * @param op the ARP operation to modify to
+     * @return a l3 modification
+     */
+    public static L3ModificationInstruction modL3ArpOp(short op) {
+        checkNotNull(op, "Arp operation cannot be null");
+        return new ModArpOpInstruction(L3SubType.ARP_OP, op);
+    }
+
+    /**
      * Creates a push MPLS header instruction.
      *
      * @return a L2 modification.
@@ -512,7 +550,7 @@ public final class Instructions {
 
         @Override
         public String toString() {
-            return toStringHelper(type().toString()).toString();
+            return type().toString();
         }
 
         @Override
@@ -546,7 +584,7 @@ public final class Instructions {
 
         @Override
         public String toString() {
-            return toStringHelper(type().toString()).toString();
+            return type().toString();
         }
 
         @Override
@@ -584,10 +622,10 @@ public final class Instructions {
         public Type type() {
             return Type.OUTPUT;
         }
+
         @Override
         public String toString() {
-            return toStringHelper(type().toString())
-                    .add("port", port).toString();
+            return type().toString() + SEPARATOR + port.toString();
         }
 
         @Override
@@ -630,9 +668,7 @@ public final class Instructions {
 
         @Override
         public String toString() {
-            return toStringHelper(type().toString())
-                    .addValue("group ID=0x" + Integer.toHexString(groupId.id()))
-                    .toString();
+            return type().toString() + SEPARATOR + Integer.toHexString(groupId.id());
         }
 
         @Override
@@ -735,8 +771,7 @@ public final class Instructions {
 
         @Override
         public String toString() {
-            return toStringHelper(type().toString())
-                    .add("meter ID", meterId.id()).toString();
+            return type().toString() + SEPARATOR + meterId.id();
         }
 
         @Override
@@ -779,8 +814,7 @@ public final class Instructions {
 
         @Override
         public String toString() {
-            return toStringHelper(type().toString())
-                    .add("tableId", this.tableId).toString();
+            return type().toString() + SEPARATOR + this.tableId;
         }
 
         @Override
@@ -829,10 +863,9 @@ public final class Instructions {
 
         @Override
         public String toString() {
-            return toStringHelper(type().toString())
-                    .add("metadata", Long.toHexString(this.metadata))
-                    .add("metadata mask", Long.toHexString(this.metadataMask))
-                    .toString();
+            return type().toString() + SEPARATOR +
+                    Long.toHexString(this.metadata) + "/" +
+                    Long.toHexString(this.metadataMask);
         }
 
         @Override
@@ -882,10 +915,7 @@ public final class Instructions {
 
         @Override
         public String toString() {
-            return toStringHelper(type().toString())
-                    .add("extension", extensionTreatment)
-                    .add("deviceId", deviceId)
-                    .toString();
+            return type().toString() + SEPARATOR + deviceId + "/" + extensionTreatment;
         }
 
         @Override

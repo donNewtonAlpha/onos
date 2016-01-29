@@ -20,56 +20,68 @@ import ch.ethz.ssh2.Connection;
 import ch.ethz.ssh2.Session;
 import com.google.common.base.Preconditions;
 import org.onosproject.netconf.NetconfDeviceInfo;
+import org.onosproject.netconf.NetconfDeviceOutputEvent;
+import org.onosproject.netconf.NetconfDeviceOutputEventListener;
+import org.onosproject.netconf.NetconfException;
 import org.onosproject.netconf.NetconfSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
+
 
 /**
  * Implementation of a NETCONF session to talk to a device.
  */
 public class NetconfSessionImpl implements NetconfSession {
 
-    public static final Logger log = LoggerFactory
+    private static final Logger log = LoggerFactory
             .getLogger(NetconfSessionImpl.class);
+
+
     private static final int CONNECTION_TIMEOUT = 0;
+    private static final String ENDPATTERN = "]]>]]>";
+    private static final AtomicInteger MESSAGE_ID_INTEGER = new AtomicInteger(0);
+    private static final String MESSAGE_ID_STRING = "message-id";
+    private static final String HELLO = "hello";
+    private static final String NEW_LINE = "\n";
 
 
     private Connection netconfConnection;
     private NetconfDeviceInfo deviceInfo;
     private Session sshSession;
     private boolean connectionActive;
-    private BufferedReader bufferReader = null;
     private PrintWriter out = null;
-    private int messageID = 0;
-
     private List<String> deviceCapabilities =
-            new ArrayList<>(
-                    Arrays.asList("urn:ietf:params:netconf:base:1.0"));
-
+            Collections.singletonList("urn:ietf:params:netconf:base:1.0");
     private String serverCapabilities;
-    private String endpattern = "]]>]]>";
+    private NetconfStreamHandler t;
+    private Map<Integer, CompletableFuture<String>> replies;
 
 
-    public NetconfSessionImpl(NetconfDeviceInfo deviceInfo) throws IOException {
+    public NetconfSessionImpl(NetconfDeviceInfo deviceInfo) throws NetconfException {
         this.deviceInfo = deviceInfo;
         connectionActive = false;
+        replies = new HashMap<>();
         startConnection();
     }
 
 
-    private void startConnection() throws IOException {
+    private void startConnection() throws NetconfException {
         if (!connectionActive) {
             netconfConnection = new Connection(deviceInfo.ip().toString(), deviceInfo.port());
-            netconfConnection.connect(null, CONNECTION_TIMEOUT, 0);
+            try {
+                netconfConnection.connect(null, CONNECTION_TIMEOUT, 5000);
+            } catch (IOException e) {
+                throw new NetconfException("Cannot open a connection with device" + deviceInfo, e);
+            }
             boolean isAuthenticated;
             try {
                 if (deviceInfo.getKeyFile() != null) {
@@ -77,39 +89,49 @@ public class NetconfSessionImpl implements NetconfSession {
                             deviceInfo.name(), deviceInfo.getKeyFile(),
                             deviceInfo.password());
                 } else {
-                    log.info("authenticate with username {} and password {}",
-                             deviceInfo.name(), deviceInfo.password());
+                    log.debug("Authenticating to device {} with username {}",
+                              deviceInfo.getDeviceId(), deviceInfo.name(), deviceInfo.password());
                     isAuthenticated = netconfConnection.authenticateWithPassword(
                             deviceInfo.name(), deviceInfo.password());
                 }
             } catch (IOException e) {
-                throw new IOException("Authentication connection failed:" +
-                                              e.getMessage());
+                log.error("Authentication connection to device " +
+                                  deviceInfo.getDeviceId() + " failed:" +
+                                  e.getMessage());
+                throw new NetconfException("Authentication connection to device " +
+                                                   deviceInfo.getDeviceId() + " failed", e);
             }
 
             connectionActive = true;
             Preconditions.checkArgument(isAuthenticated,
-                                        "Authentication password and username failed");
+                                        "Authentication to device {} with username " +
+                                                "{} Failed",
+                                        deviceInfo.getDeviceId(), deviceInfo.name(),
+                                        deviceInfo.password());
             startSshSession();
         }
     }
 
-    private void startSshSession() throws IOException {
+    private void startSshSession() throws NetconfException {
         try {
             sshSession = netconfConnection.openSession();
             sshSession.startSubSystem("netconf");
-            bufferReader = new BufferedReader(new InputStreamReader(
-                    sshSession.getStdout()));
             out = new PrintWriter(sshSession.getStdin());
+            t = new NetconfStreamThread(sshSession.getStdout(), sshSession.getStdin(),
+                                        sshSession.getStderr(), deviceInfo,
+                                        new NetconfSessionDelegateImpl());
+            this.addDeviceOutputListener(new NetconfDeviceOutputEventListenerImpl(deviceInfo));
             sendHello();
         } catch (IOException e) {
-            throw new IOException("Failed to create ch.ethz.ssh2.Session session:" +
-                                          e.getMessage());
+            log.error("Failed to create ch.ethz.ssh2.Session session:" +
+                              e.getMessage());
+            throw new NetconfException("Failed to create ch.ethz.ssh2.Session session with device" +
+                                               deviceInfo, e);
         }
     }
 
     private void sendHello() throws IOException {
-        serverCapabilities = doRequest(createHelloString());
+        serverCapabilities = sendRequest(createHelloString());
     }
 
     private String createHelloString() {
@@ -121,59 +143,68 @@ public class NetconfSessionImpl implements NetconfSession {
                 cap -> hellobuffer.append("    <capability>" + cap + "</capability>\n"));
         hellobuffer.append("  </capabilities>\n");
         hellobuffer.append("</hello>\n");
-        hellobuffer.append(endpattern);
+        hellobuffer.append(ENDPATTERN);
         return hellobuffer.toString();
 
     }
 
-    @Override
-    public String doRPC(String request) {
-        String reply = "ERROR";
-        try {
-            reply = doRequest(request);
-            if (checkReply(reply)) {
-                return reply;
-            } else {
-                return "ERROR " + reply;
-            }
-        } catch (IOException e) {
-            log.error("Problem in the reading from the SSH connection " + e);
-        }
-        return reply;
-    }
-
-    private String doRequest(String request) throws IOException {
-        log.info("sshState " + sshSession.getState() + "request" + request);
+    private void checkAndRestablishSession() throws NetconfException {
         if (sshSession.getState() != 2) {
             try {
                 startSshSession();
             } catch (IOException e) {
-                log.info("the connection had to be reopened");
-                startConnection();
+                log.debug("The connection with {} had to be reopened", deviceInfo.getDeviceId());
+                try {
+                    startConnection();
+                } catch (IOException e2) {
+                    log.error("No connection {} for device, exception {}", netconfConnection, e2);
+                    throw new NetconfException("Cannot re-open the connection with device" + deviceInfo, e);
+                }
             }
-            sendHello();
         }
-        log.info("sshState after" + sshSession.getState());
-        out.print(request);
-        out.flush();
-        messageID++;
-        return readOne();
     }
 
     @Override
-    public String get(String request) {
-        return doRPC(request);
+    public String requestSync(String request) throws NetconfException {
+        String reply = sendRequest(request + NEW_LINE + ENDPATTERN);
+        return checkReply(reply) ? reply : "ERROR " + reply;
     }
 
     @Override
-    public String getConfig(String targetConfiguration) {
+    public CompletableFuture<String> request(String request) {
+        CompletableFuture<String> ftrep = t.sendMessage(request);
+        replies.put(MESSAGE_ID_INTEGER.get(), ftrep);
+        return ftrep;
+    }
+
+    private String sendRequest(String request) throws NetconfException {
+        checkAndRestablishSession();
+        //FIXME find out a better way to enforce the presence of message-id
+        if (!request.contains(MESSAGE_ID_STRING) && !request.contains(HELLO)) {
+            request = request.replaceFirst("\">", "\" message-id=\""
+                    + MESSAGE_ID_INTEGER.get() + "\"" + ">");
+        }
+        CompletableFuture<String> futureReply = request(request);
+        MESSAGE_ID_INTEGER.incrementAndGet();
+        String rp = futureReply.join();
+        log.debug("Reply from device {}", rp);
+        return rp;
+    }
+
+    @Override
+    public String get(String request) throws NetconfException {
+        return requestSync(request);
+    }
+
+    @Override
+    public String getConfig(String targetConfiguration) throws NetconfException {
         return getConfig(targetConfiguration, null);
     }
 
     @Override
-    public String getConfig(String targetConfiguration, String configurationSchema) {
+    public String getConfig(String targetConfiguration, String configurationSchema) throws NetconfException {
         StringBuilder rpc = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
-        rpc.append("<rpc message-id=\"" + messageID + "\"  "
+        rpc.append("<rpc message-id=\"" + MESSAGE_ID_INTEGER.get() + "\"  "
                            + "xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">\n");
         rpc.append("<get-config>\n");
         rpc.append("<source>\n");
@@ -186,31 +217,43 @@ public class NetconfSessionImpl implements NetconfSession {
         }
         rpc.append("</get-config>\n");
         rpc.append("</rpc>\n");
-        rpc.append(endpattern);
-        String reply = null;
-        try {
-            reply = doRequest(rpc.toString());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        return checkReply(reply) ? reply : null;
+        rpc.append(ENDPATTERN);
+        String reply = sendRequest(rpc.toString());
+        return checkReply(reply) ? reply : "ERROR " + reply;
     }
 
     @Override
-    public boolean editConfig(String newConfiguration) {
-        newConfiguration = newConfiguration + endpattern;
-        String reply = null;
-        try {
-            reply = doRequest(newConfiguration);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return checkReply(reply);
+    public boolean editConfig(String newConfiguration) throws NetconfException {
+        newConfiguration = newConfiguration + ENDPATTERN;
+        return checkReply(sendRequest(newConfiguration));
     }
 
     @Override
-    public boolean copyConfig(String targetConfiguration, String newConfiguration) {
+    public boolean editConfig(String targetConfiguration, String mode, String newConfiguration)
+            throws NetconfException {
+        newConfiguration = newConfiguration.trim();
+        StringBuilder rpc = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+        rpc.append("<rpc message-id=\"" + MESSAGE_ID_INTEGER.get() + "\"  "
+                           + "xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">\n");
+        rpc.append("<edit-config>");
+        rpc.append("<target>");
+        rpc.append("<" + targetConfiguration + "/>");
+        rpc.append("</target>");
+        rpc.append("<default-operation>");
+        rpc.append(mode);
+        rpc.append("</default-operation>");
+        rpc.append("<config>");
+        rpc.append(newConfiguration);
+        rpc.append("</config>");
+        rpc.append("</edit-config>");
+        rpc.append("</rpc>");
+        rpc.append(ENDPATTERN);
+        return checkReply(sendRequest(rpc.toString()));
+    }
+
+    @Override
+    public boolean copyConfig(String targetConfiguration, String newConfiguration)
+            throws NetconfException {
         newConfiguration = newConfiguration.trim();
         if (!newConfiguration.startsWith("<configuration>")) {
             newConfiguration = "<configuration>" + newConfiguration
@@ -228,19 +271,12 @@ public class NetconfSessionImpl implements NetconfSession {
         rpc.append("</source>");
         rpc.append("</copy-config>");
         rpc.append("</rpc>");
-        rpc.append(endpattern);
-        String reply = null;
-        try {
-            reply = doRequest(rpc.toString());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        return checkReply(reply);
+        rpc.append(ENDPATTERN);
+        return checkReply(sendRequest(rpc.toString()));
     }
 
     @Override
-    public boolean deleteConfig(String targetConfiguration) {
+    public boolean deleteConfig(String targetConfiguration) throws NetconfException {
         if (targetConfiguration.equals("running")) {
             log.warn("Target configuration for delete operation can't be \"running\"",
                      targetConfiguration);
@@ -255,19 +291,12 @@ public class NetconfSessionImpl implements NetconfSession {
         rpc.append("</target>");
         rpc.append("</delete-config>");
         rpc.append("</rpc>");
-        rpc.append(endpattern);
-        String reply = null;
-        try {
-            reply = doRequest(rpc.toString());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        return checkReply(reply);
+        rpc.append(ENDPATTERN);
+        return checkReply(sendRequest(rpc.toString()));
     }
 
     @Override
-    public boolean lock() {
+    public boolean lock() throws NetconfException {
         StringBuilder rpc = new StringBuilder("<?xml version=\"1.0\" " +
                                                       "encoding=\"UTF-8\"?>");
         rpc.append("<rpc>");
@@ -277,18 +306,12 @@ public class NetconfSessionImpl implements NetconfSession {
         rpc.append("</target>");
         rpc.append("</lock>");
         rpc.append("</rpc>");
-        rpc.append(endpattern);
-        String reply = null;
-        try {
-            reply = doRequest(rpc.toString());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return checkReply(reply);
+        rpc.append(ENDPATTERN);
+        return checkReply(sendRequest(rpc.toString()));
     }
 
     @Override
-    public boolean unlock() {
+    public boolean unlock() throws NetconfException {
         StringBuilder rpc = new StringBuilder("<?xml version=\"1.0\" " +
                                                       "encoding=\"UTF-8\"?>");
         rpc.append("<rpc>");
@@ -298,22 +321,16 @@ public class NetconfSessionImpl implements NetconfSession {
         rpc.append("</target>");
         rpc.append("</unlock>");
         rpc.append("</rpc>");
-        rpc.append(endpattern);
-        String reply = null;
-        try {
-            reply = doRequest(rpc.toString());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return checkReply(reply);
+        rpc.append(ENDPATTERN);
+        return checkReply(sendRequest(rpc.toString()));
     }
 
     @Override
-    public boolean close() {
+    public boolean close() throws NetconfException {
         return close(false);
     }
 
-    private boolean close(boolean force) {
+    private boolean close(boolean force) throws NetconfException {
         StringBuilder rpc = new StringBuilder();
         rpc.append("<rpc>");
         if (force) {
@@ -323,8 +340,8 @@ public class NetconfSessionImpl implements NetconfSession {
         }
         rpc.append("<close-configuration/>");
         rpc.append("</rpc>");
-        rpc.append(endpattern);
-        return checkReply(rpc.toString()) ? true : close(true);
+        rpc.append(ENDPATTERN);
+        return checkReply(sendRequest(rpc.toString())) || close(true);
     }
 
     @Override
@@ -352,7 +369,17 @@ public class NetconfSessionImpl implements NetconfSession {
         deviceCapabilities = capabilities;
     }
 
-    private boolean checkReply(String reply) {
+    @Override
+    public void addDeviceOutputListener(NetconfDeviceOutputEventListener listener) {
+        t.addDeviceEventListener(listener);
+    }
+
+    @Override
+    public void removeDeviceOutputListener(NetconfDeviceOutputEventListener listener) {
+        t.removeDeviceEventListener(listener);
+    }
+
+    private boolean checkReply(String reply) throws NetconfException {
         if (reply != null) {
             if (!reply.contains("<rpc-error>")) {
                 return true;
@@ -362,35 +389,18 @@ public class NetconfSessionImpl implements NetconfSession {
                 return true;
             }
         }
+        log.warn("Device " + deviceInfo + "has error in reply {}", reply);
         return false;
     }
 
-    private String readOne() throws IOException {
-        //TODO try a simple string
-        final StringWriter reply = new StringWriter();
-        while (true) {
-            int charRead = bufferReader.read();
-            if (charRead == -1) {
-                throw new IOException("Session closed");
-            }
+    public class NetconfSessionDelegateImpl implements NetconfSessionDelegate {
 
-            for (int i = 0; i < endpattern.length(); i++) {
-                if (charRead == endpattern.charAt(i)) {
-                    if (i < endpattern.length() - 1) {
-                        charRead = bufferReader.read();
-                    } else {
-                        return reply.getBuffer().toString();
-                    }
-                } else {
-                    String s = endpattern.substring(0, i);
-                    for (int j = 0; i < s.length(); j++) {
-                        reply.write(s.charAt(j));
-                    }
-                    reply.write(charRead);
-                    break;
-                }
-            }
+        @Override
+        public void notify(NetconfDeviceOutputEvent event) {
+            CompletableFuture<String> completedReply = replies.get(event.getMessageID());
+            completedReply.complete(event.getMessagePayload());
         }
     }
+
 
 }

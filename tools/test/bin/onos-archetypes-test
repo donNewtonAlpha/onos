@@ -19,10 +19,10 @@ _EOF_
 set -e
 
 export AROOT=/tmp/foo
-export ARCHETYPE_OPTS="-DarchetypeGroupId=org.onosproject -DarchetypeVersion=1.4.0-SNAPSHOT"
+export ARCHETYPE_OPTS="-DarchetypeGroupId=org.onosproject -DarchetypeVersion=1.5.0-SNAPSHOT"
 
 mkdir -p $AROOT
-for an in api bundle cli ui; do
+for an in api bundle cli rest ui uitab uitopo; do
     cd $AROOT
     rm -fr $AROOT/foo-$an
     mvn archetype:generate $ARCHETYPE_OPTS \

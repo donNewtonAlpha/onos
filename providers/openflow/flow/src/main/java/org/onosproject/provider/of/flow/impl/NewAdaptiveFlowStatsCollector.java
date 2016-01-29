@@ -20,6 +20,7 @@ import com.google.common.base.Objects;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import org.onosproject.net.driver.DriverService;
 import org.onosproject.net.flow.DefaultTypedFlowEntry;
 import org.onosproject.net.flow.FlowEntry;
 import org.onosproject.net.flow.FlowId;
@@ -55,9 +56,9 @@ import static org.slf4j.LoggerFactory.getLogger;
  * Efficiently and adaptively collects flow statistics for the specified switch.
  */
 public class NewAdaptiveFlowStatsCollector {
-
     private final Logger log = getLogger(getClass());
 
+    private final DriverService driverService;
     private final OpenFlowSwitch sw;
 
     private ScheduledExecutorService adaptiveFlowStatsScheduler =
@@ -109,9 +110,10 @@ public class NewAdaptiveFlowStatsCollector {
      * @param sw           switch to pull
      * @param pollInterval cal and immediate poll frequency in seconds
      */
-    NewAdaptiveFlowStatsCollector(OpenFlowSwitch sw, int pollInterval) {
+    NewAdaptiveFlowStatsCollector(
+            DriverService driverService, OpenFlowSwitch sw, int pollInterval) {
+        this.driverService = driverService;
         this.sw = sw;
-
         initMemberVars(pollInterval);
     }
 
@@ -232,7 +234,7 @@ public class NewAdaptiveFlowStatsCollector {
     private void ofFlowStatsRequestFlowSend(FlowEntry fe) {
         // set find match
         Match match = FlowModBuilder.builder(fe, sw.factory(), Optional.empty(),
-                Optional.empty()).buildMatch();
+                Optional.of(driverService)).buildMatch();
         // set find tableId
         TableId tableId = TableId.of(fe.tableId());
         // set output port
@@ -416,6 +418,7 @@ public class NewAdaptiveFlowStatsCollector {
                                    + " AdaptiveStats collection thread for {}",
                            sw.getStringId());
 
+                   //FIXME modification of "stored" flow entry outside of store
                    stored.setLastSeen();
                    continue;
                } else if (fe.life() < stored.life()) {
@@ -428,11 +431,13 @@ public class NewAdaptiveFlowStatsCollector {
                                ", new life=" + fe.life() + ", old life=" + stored.life() +
                                ", new lastSeen=" + fe.lastSeen() + ", old lastSeen=" + stored.lastSeen());
                    // go next
+                   //FIXME modification of "stored" flow entry outside of store
                    stored.setLastSeen();
                    continue;
                }
 
                // update now
+               //FIXME modification of "stored" flow entry outside of store
                stored.setLife(fe.life());
                stored.setPackets(fe.packets());
                stored.setBytes(fe.bytes());

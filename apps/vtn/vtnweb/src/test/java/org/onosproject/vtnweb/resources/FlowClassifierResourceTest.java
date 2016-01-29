@@ -33,6 +33,7 @@ import java.util.Set;
 
 import javax.ws.rs.core.MediaType;
 
+import com.eclipsesource.json.Json;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -40,11 +41,13 @@ import org.onlab.osgi.ServiceDirectory;
 import org.onlab.osgi.TestServiceDirectory;
 import org.onlab.packet.IpPrefix;
 import org.onlab.rest.BaseResource;
+import org.onosproject.codec.CodecService;
 import org.onosproject.vtnrsc.FlowClassifier;
 import org.onosproject.vtnrsc.FlowClassifierId;
 import org.onosproject.vtnrsc.TenantId;
 import org.onosproject.vtnrsc.VirtualPortId;
 import org.onosproject.vtnrsc.flowclassifier.FlowClassifierService;
+import org.onosproject.vtnweb.web.SfcCodecContext;
 
 import com.eclipsesource.json.JsonObject;
 import com.sun.jersey.api.client.ClientResponse;
@@ -192,8 +195,11 @@ public class FlowClassifierResourceTest extends VtnResourceTest {
      */
     @Before
     public void setUpTest() {
-        ServiceDirectory testDirectory = new TestServiceDirectory().add(FlowClassifierService.class,
-                                                                        flowClassifierService);
+        SfcCodecContext context = new SfcCodecContext();
+
+        ServiceDirectory testDirectory = new TestServiceDirectory()
+        .add(FlowClassifierService.class, flowClassifierService)
+        .add(CodecService.class, context.codecManager());
         BaseResource.setServiceDirectory(testDirectory);
 
     }
@@ -233,7 +239,7 @@ public class FlowClassifierResourceTest extends VtnResourceTest {
 
         final WebResource rs = resource();
         final String response = rs.path("flow_classifiers/4a334cd4-fe9c-4fae-af4b-321c5e2eb051").get(String.class);
-        final JsonObject result = JsonObject.readFrom(response);
+        final JsonObject result = Json.parse(response).asObject();
         assertThat(result, notNullValue());
     }
 

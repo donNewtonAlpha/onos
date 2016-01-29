@@ -304,6 +304,12 @@
             return c.properties.continent === 'South America';
         },
 
+        ns_america: function (c) {
+            return c.properties.custom === 'US-cont' ||
+                c.properties.subregion === 'Central America' ||
+                c.properties.continent === 'South America';
+        },
+
         japan: function (c) {
             return c.properties.geounit === 'Japan';
         },

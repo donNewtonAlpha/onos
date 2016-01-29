@@ -42,7 +42,7 @@ import org.onosproject.net.host.HostService;
 import org.onosproject.net.intent.IntentService;
 import org.onosproject.net.intent.IntentExtensionService;
 import org.onosproject.net.intent.IntentClockService;
-import org.onosproject.net.intent.PartitionService;
+import org.onosproject.net.intent.IntentPartitionService;
 import org.onosproject.net.link.LinkAdminService;
 import org.onosproject.net.link.LinkService;
 import org.onosproject.net.packet.PacketService;
@@ -54,11 +54,12 @@ import org.onosproject.net.topology.TopologyService;
 import org.onosproject.security.SecurityAdminService;
 import org.onosproject.store.service.StorageAdminService;
 import org.onosproject.store.service.StorageService;
-import org.osgi.framework.BundlePermission;
-import org.osgi.framework.CapabilityPermission;
 import org.osgi.framework.ServicePermission;
-import org.osgi.framework.PackagePermission;
+import org.osgi.framework.AdminPermission;
 import org.osgi.framework.AdaptPermission;
+import org.osgi.framework.CapabilityPermission;
+import org.osgi.framework.BundlePermission;
+import org.osgi.framework.PackagePermission;
 import org.osgi.service.cm.ConfigurationPermission;
 
 import javax.net.ssl.SSLPermission;
@@ -68,6 +69,7 @@ import javax.security.auth.kerberos.DelegationPermission;
 import javax.sound.sampled.AudioPermission;
 import java.io.FilePermission;
 import java.io.SerializablePermission;
+import java.lang.reflect.ReflectPermission;
 import java.net.NetPermission;
 import java.net.SocketPermission;
 import java.security.Permissions;
@@ -159,6 +161,7 @@ public final class DefaultPolicyBuilder {
         permSet.add(new PackagePermission("*", PackagePermission.IMPORT));
         permSet.add(new AdaptPermission("*", AdaptPermission.ADAPT));
         permSet.add(new ConfigurationPermission("*", ConfigurationPermission.CONFIGURE));
+        permSet.add(new AdminPermission("*", AdminPermission.METADATA));
         return permSet;
     }
 
@@ -190,7 +193,7 @@ public final class DefaultPolicyBuilder {
         permSet.add(new ServicePermission(IntentService.class.getName(), ServicePermission.GET));
         permSet.add(new ServicePermission(IntentClockService.class.getName(), ServicePermission.GET));
         permSet.add(new ServicePermission(IntentExtensionService.class.getName(), ServicePermission.GET));
-        permSet.add(new ServicePermission(PartitionService.class.getName(), ServicePermission.GET));
+        permSet.add(new ServicePermission(IntentPartitionService.class.getName(), ServicePermission.GET));
         permSet.add(new ServicePermission(LinkService.class.getName(), ServicePermission.GET));
         permSet.add(new ServicePermission(LinkResourceService.class.getName(), ServicePermission.GET));
 //      permSet.add(new ServicePermission(LabelResourceService.class.getName(), ServicePermission.GET));
@@ -259,7 +262,7 @@ public final class DefaultPolicyBuilder {
         serviceDirectory.put(HOST_EVENT, ImmutableSet.of(
                 HostService.class.getName()));
         serviceDirectory.put(INTENT_READ, ImmutableSet.of(
-                IntentService.class.getName(), PartitionService.class.getName(),
+                IntentService.class.getName(), IntentPartitionService.class.getName(),
                 IntentClockService.class.getName()));
         serviceDirectory.put(INTENT_WRITE, ImmutableSet.of(
                 IntentService.class.getName()));
@@ -359,6 +362,12 @@ public final class DefaultPolicyBuilder {
         } else if (permission instanceof ServicePermission) {
             return new org.onosproject.security.Permission(
                     ServicePermission.class.getName(), permission.getName(), permission.getActions());
+        } else if (permission instanceof AdminPermission) {
+            return new org.onosproject.security.Permission(
+                    AdminPermission.class.getName(), permission.getName(), permission.getActions());
+        } else if (permission instanceof ConfigurationPermission) {
+            return new org.onosproject.security.Permission(
+                    ConfigurationPermission.class.getName(), permission.getName(), permission.getActions());
         }
         return null;
     }
@@ -416,10 +425,16 @@ public final class DefaultPolicyBuilder {
             return new PackagePermission(name, actions);
         } else if (ServicePermission.class.getName().equals(classname)) {
             return new ServicePermission(name, actions);
+        } else if (AdminPermission.class.getName().equals(classname)) {
+            return new AdminPermission(name, actions);
+        } else if (ConfigurationPermission.class.getName().equals(classname)) {
+            return new ConfigurationPermission(name, actions);
+        } else if (ReflectPermission.class.getName().equals(classname)) {
+            return new ReflectPermission(name, actions);
         }
 
         //AllPermission, SecurityPermission, UnresolvedPermission
-        //AWTPermission, AdminPermission(osgi), ReflectPermission not allowed
+        //AWTPermission,  ReflectPermission not allowed
         return null;
 
     }
@@ -445,4 +460,3 @@ public final class DefaultPolicyBuilder {
         return permissions;
     }
 }
-

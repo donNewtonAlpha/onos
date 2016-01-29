@@ -30,7 +30,7 @@
     var tos = 'TopoOverlayService: ';
 
     // injected refs
-    var $log, fs, gs, wss, ns, tss, tps, api;
+    var $log, $timeout, fs, gs, wss, ns, tss, tps, api;
 
     // internal state
     var overlays = {},
@@ -181,6 +181,11 @@
             gid: 'groupTable',
             tt: 'Show Group View for this Device',
             path: 'group'
+        },
+        showMeterView: {
+            gid: 'meterTable',
+            tt: 'Show Meter View for this Device',
+            path: 'meter'
         }
     };
 
@@ -280,7 +285,20 @@
         tss = _tss_;
     }
 
+    //process highlight event with optional delay
     function showHighlights(data) {
+        function doHighlight() {
+            _showHighlights(data);
+        }
+
+        if (data.delay) {
+            $timeout(doHighlight, data.delay);
+        } else {
+            doHighlight();
+        }
+    }
+
+    function _showHighlights(data) {
         var less;
 
         /*
@@ -312,8 +330,11 @@
         }
 
         data.hosts.forEach(function (host) {
-            var hdata = api.findNodeById(host.id);
+            var hdata = api.findNodeById(host.id),
+                badgeData = host.badge || null;
+
             if (hdata && !hdata.el.empty()) {
+                hdata.badge = badgeData;
                 if (!host.subdue) {
                     api.unsupNode(hdata.id, less);
                 }
@@ -338,7 +359,6 @@
             var ldata = api.findLinkById(link.id),
                 lab = link.label,
                 units, portcls, magnitude;
-
             if (ldata && !ldata.el.empty()) {
                 if (!link.subdue) {
                     api.unsupLink(ldata.key, less);
@@ -372,11 +392,12 @@
 
     angular.module('ovTopo')
     .factory('TopoOverlayService',
-        ['$log', 'FnService', 'GlyphService', 'WebSocketService', 'NavService',
-            'TopoPanelService',
+        ['$log', '$timeout', 'FnService', 'GlyphService', 'WebSocketService',
+            'NavService', 'TopoPanelService',
 
-        function (_$log_, _fs_, _gs_, _wss_, _ns_, _tps_) {
+        function (_$log_, _$timeout_, _fs_, _gs_, _wss_, _ns_, _tps_) {
             $log = _$log_;
+            $timeout = _$timeout_;
             fs = _fs_;
             gs = _gs_;
             wss = _wss_;

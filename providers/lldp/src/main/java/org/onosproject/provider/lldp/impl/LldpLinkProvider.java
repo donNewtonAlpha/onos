@@ -27,6 +27,7 @@ import static org.onosproject.net.config.basics.SubjectFactories.APP_SUBJECT_FAC
 import static org.onosproject.net.config.basics.SubjectFactories.CONNECT_POINT_SUBJECT_FACTORY;
 import static org.onosproject.net.config.basics.SubjectFactories.DEVICE_SUBJECT_FACTORY;
 import static org.slf4j.LoggerFactory.getLogger;
+import static org.onosproject.cluster.ClusterMetadata.NO_NAME;
 
 import java.util.Dictionary;
 import java.util.EnumSet;
@@ -45,7 +46,10 @@ import org.apache.felix.scr.annotations.Property;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.onlab.packet.Ethernet;
+import org.onlab.util.Tools;
 import org.onosproject.cfg.ComponentConfigService;
+import org.onosproject.cluster.ClusterMetadata;
+import org.onosproject.cluster.ClusterMetadataService;
 import org.onosproject.cluster.ClusterService;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
@@ -62,6 +66,7 @@ import org.onosproject.net.config.NetworkConfigEvent;
 import org.onosproject.net.config.NetworkConfigListener;
 import org.onosproject.net.config.NetworkConfigRegistry;
 import org.onosproject.net.device.DeviceEvent;
+import org.onosproject.net.device.DeviceEvent.Type;
 import org.onosproject.net.device.DeviceListener;
 import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.flow.DefaultTrafficSelector;
@@ -77,6 +82,7 @@ import org.onosproject.net.packet.PacketProcessor;
 import org.onosproject.net.packet.PacketService;
 import org.onosproject.net.provider.AbstractProvider;
 import org.onosproject.net.provider.ProviderId;
+import org.onosproject.store.service.ConsistentMapException;
 import org.osgi.service.component.ComponentContext;
 import org.slf4j.Logger;
 
@@ -98,6 +104,9 @@ public class LldpLinkProvider extends AbstractProvider implements LinkProvider {
 
     // When a Device/Port has this annotation, do not send out LLDP/BDDP
     public static final String NO_LLDP = "no-lldp";
+
+    private static final int MAX_RETRIES = 5;
+    private static final int RETRY_DELAY = 1_000; // millis
 
     private final Logger log = getLogger(getClass());
 
@@ -128,6 +137,9 @@ public class LldpLinkProvider extends AbstractProvider implements LinkProvider {
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected NetworkConfigRegistry cfgRegistry;
 
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected ClusterMetadataService clusterMetadataService;
+
     private LinkProviderService providerService;
 
     private ScheduledExecutorService executor;
@@ -147,13 +159,13 @@ public class LldpLinkProvider extends AbstractProvider implements LinkProvider {
     private boolean useBddp = true;
 
     private static final String PROP_PROBE_RATE = "probeRate";
-    private static final int DEFAULT_PROBE_RATE = 3_000;
+    private static final int DEFAULT_PROBE_RATE = 3000;
     @Property(name = PROP_PROBE_RATE, intValue = DEFAULT_PROBE_RATE,
             label = "LLDP and BDDP probe rate specified in millis")
     private int probeRate = DEFAULT_PROBE_RATE;
 
     private static final String PROP_STALE_LINK_AGE = "staleLinkAge";
-    private static final int DEFAULT_STALE_LINK_AGE = 10_000;
+    private static final int DEFAULT_STALE_LINK_AGE = 10000;
     @Property(name = PROP_STALE_LINK_AGE, intValue = DEFAULT_STALE_LINK_AGE,
             label = "Number of millis beyond which links will be considered stale")
     private int staleLinkAge = DEFAULT_STALE_LINK_AGE;
@@ -180,6 +192,7 @@ public class LldpLinkProvider extends AbstractProvider implements LinkProvider {
 
     public static final String CONFIG_KEY = "suppression";
     public static final String FEATURE_NAME = "linkDiscovery";
+    public static final String FINGERPRINT_FEATURE_NAME = "fingerprint";
 
     private final Set<ConfigFactory<?, ?>> factories = ImmutableSet.of(
             new ConfigFactory<ApplicationId, SuppressionConfig>(APP_SUBJECT_FACTORY,
@@ -203,6 +216,13 @@ public class LldpLinkProvider extends AbstractProvider implements LinkProvider {
                 public LinkDiscoveryFromPort createConfig() {
                     return new LinkDiscoveryFromPort();
                 }
+            },
+            new ConfigFactory<DeviceId, FingerprintProbeFromDevice>(DEVICE_SUBJECT_FACTORY,
+                    FingerprintProbeFromDevice.class, FINGERPRINT_FEATURE_NAME) {
+                @Override
+                public FingerprintProbeFromDevice createConfig() {
+                    return new FingerprintProbeFromDevice();
+                }
             }
     );
 
@@ -224,18 +244,27 @@ public class LldpLinkProvider extends AbstractProvider implements LinkProvider {
         cfgRegistry.addListener(cfgListener);
         factories.forEach(cfgRegistry::registerConfigFactory);
 
-        SuppressionConfig cfg = cfgRegistry.getConfig(appId, SuppressionConfig.class);
+        SuppressionConfig cfg =
+                Tools.retryable(() -> cfgRegistry.getConfig(appId, SuppressionConfig.class),
+                                ConsistentMapException.class, MAX_RETRIES, RETRY_DELAY).get();
         if (cfg == null) {
             // If no configuration is found, register default.
-            cfg = cfgRegistry.addConfig(appId, SuppressionConfig.class);
-            cfg.deviceTypes(DEFAULT_RULES.getSuppressedDeviceType())
-               .annotation(DEFAULT_RULES.getSuppressedAnnotation())
-               .apply();
+            cfg = Tools.retryable(this::setDefaultSuppressionConfig,
+                                  ConsistentMapException.class,
+                                  MAX_RETRIES, RETRY_DELAY).get();
         }
         cfgListener.reconfigureSuppressionRules(cfg);
 
         modified(context);
         log.info("Started");
+    }
+
+    private SuppressionConfig setDefaultSuppressionConfig() {
+        SuppressionConfig cfg = cfgRegistry.addConfig(appId, SuppressionConfig.class);
+        cfg.deviceTypes(DEFAULT_RULES.getSuppressedDeviceType())
+           .annotation(DEFAULT_RULES.getSuppressedAnnotation())
+           .apply();
+        return cfg;
     }
 
     @Deactivate
@@ -373,6 +402,14 @@ public class LldpLinkProvider extends AbstractProvider implements LinkProvider {
         return isBlacklisted(new ConnectPoint(port.element().id(), port.number()));
     }
 
+    private boolean isFingerprinted(DeviceId did) {
+        FingerprintProbeFromDevice cfg = cfgRegistry.getConfig(did, FingerprintProbeFromDevice.class);
+        if (cfg == null) {
+            return false;
+        }
+        return cfg.enabled();
+    }
+
     /**
      * Updates discovery helper for specified device.
      *
@@ -391,8 +428,14 @@ public class LldpLinkProvider extends AbstractProvider implements LinkProvider {
             removeDevice(device.id());
             return Optional.empty();
         }
+
         LinkDiscovery ld = discoverers.computeIfAbsent(device.id(),
                                      did -> new LinkDiscovery(device, context));
+        if (isFingerprinted(device.id())) {
+            ld.enableFingerprint();
+        } else {
+            ld.disableFingerprint();
+        }
         if (ld.isStopped()) {
             ld.start();
         }
@@ -531,6 +574,9 @@ public class LldpLinkProvider extends AbstractProvider implements LinkProvider {
     private class InternalDeviceListener implements DeviceListener {
         @Override
         public void event(DeviceEvent event) {
+            if (event.type() == Type.PORT_STATS_UPDATED) {
+                return;
+            }
             Device device = event.subject();
             Port port = event.port();
             if (device == null) {
@@ -570,7 +616,7 @@ public class LldpLinkProvider extends AbstractProvider implements LinkProvider {
                 case DEVICE_AVAILABILITY_CHANGED:
                     if (deviceService.isAvailable(deviceId)) {
                         log.debug("Device up {}", deviceId);
-                        updateDevice(device);
+                        updateDevice(device).ifPresent(ld -> updatePorts(ld, deviceId));
                     } else {
                         log.debug("Device down {}", deviceId);
                         removeDevice(deviceId);
@@ -703,6 +749,17 @@ public class LldpLinkProvider extends AbstractProvider implements LinkProvider {
         public void touchLink(LinkKey key) {
             linkTimes.put(key, System.currentTimeMillis());
         }
+
+        @Override
+        public String fingerprint() {
+            ClusterMetadata mdata = clusterMetadataService.getClusterMetadata();
+            return mdata == null ? NO_NAME : mdata.getName();
+        }
+
+        @Override
+        public DeviceService deviceService() {
+            return deviceService;
+        }
     }
 
     static final EnumSet<NetworkConfigEvent.Type> CONFIG_CHANGED
@@ -746,6 +803,15 @@ public class LldpLinkProvider extends AbstractProvider implements LinkProvider {
                         Port port = deviceService.getPort(did, cp.port());
                         updateDevice(device).ifPresent(ld -> updatePort(ld, port));
                     }
+                }
+
+            } else if (event.configClass() == FingerprintProbeFromDevice.class &&
+                    CONFIG_CHANGED.contains(event.type())) {
+
+                if (event.subject() instanceof DeviceId) {
+                    final DeviceId did = (DeviceId) event.subject();
+                    Device device = deviceService.getDevice(did);
+                    updateDevice(device);
                 }
 
             } else if (event.configClass().equals(SuppressionConfig.class) &&

@@ -200,22 +200,16 @@
         };
     }
 
-
     function updateDeviceRendering(d) {
         var label = trimLabel(deviceLabel(d)),
             noLabel = !label,
             node = d.el,
             dim = icfg.device.dim,
-            box, dx, dy, bsel,
-            bdg = d.badge,
-            bcr = badgeConfig.radius,
-            bcgd = badgeConfig.gdelta;
+            box, dx, dy,
+            bdg = d.badge;
 
         node.select('text')
-            .text(label)
-            .style('opacity', 0)
-            .transition()
-            .style('opacity', 1);
+            .text(label);
 
         if (noLabel) {
             box = emptyBox();
@@ -237,31 +231,50 @@
 
         // handle badge, if defined
         if (bdg) {
-            node.select('g.badge').remove();
+            renderBadge(node, bdg, { dx: dx + dim, dy: dy });
+        }
+    }
 
-            bsel = node.append('g')
-                .classed('badge', true)
-                .classed(badgeStatus(bdg), true)
-                .attr('transform', sus.translate(dx + dim, dy));
+    function updateHostRendering(d) {
+        var node = d.el,
+            bdg = d.badge;
 
-            bsel.append('circle')
-                .attr('r', bcr);
+        updateHostLabel(d);
 
-            if (bdg.txt) {
-                bsel.append('text')
-                    .attr('dy', badgeConfig.yoff)
-                    .attr('text-anchor', 'middle')
-                    .text(bdg.txt);
-            } else if (bdg.gid) {
-                bsel.append('use')
-                    .attr({
-                        width: bcgd * 2,
-                        height: bcgd * 2,
-                        transform: sus.translate(-bcgd, -bcgd),
-                        'xlink:href': '#' + bdg.gid
-                    });
+        // handle badge, if defined
+        if (bdg) {
+            renderBadge(node, bdg, icfg.host.badge);
+        }
+    }
 
-            }
+    function renderBadge(node, bdg, boff) {
+        var bsel,
+            bcr = badgeConfig.radius,
+            bcgd = badgeConfig.gdelta;
+
+        node.select('g.badge').remove();
+
+        bsel = node.append('g')
+            .classed('badge', true)
+            .classed(badgeStatus(bdg), true)
+            .attr('transform', sus.translate(boff.dx, boff.dy));
+
+        bsel.append('circle')
+            .attr('r', bcr);
+
+        if (bdg.txt) {
+            bsel.append('text')
+                .attr('dy', badgeConfig.yoff)
+                .attr('text-anchor', 'middle')
+                .text(bdg.txt);
+        } else if (bdg.gid) {
+            bsel.append('use')
+                .attr({
+                    width: bcgd * 2,
+                    height: bcgd * 2,
+                    transform: sus.translate(-bcgd, -bcgd),
+                    'xlink:href': '#' + bdg.gid
+                });
         }
     }
 
@@ -292,7 +305,7 @@
     }
 
     function hostExisting(d) {
-        updateHostLabel(d);
+        updateHostRendering(d);
         api.posNode(d, true);
     }
 

@@ -27,7 +27,7 @@ import org.onosproject.bgpio.exceptions.BgpParseException;
 import org.onosproject.bgpio.types.BgpErrorType;
 import org.onosproject.bgpio.types.BgpValueType;
 import org.onosproject.bgpio.types.IPReachabilityInformationTlv;
-import org.onosproject.bgpio.types.OSPFRouteTypeTlv;
+import org.onosproject.bgpio.types.OspfRouteTypeTlv;
 import org.onosproject.bgpio.types.attr.BgpAttrNodeMultiTopologyId;
 import org.onosproject.bgpio.util.UnSupportedAttribute;
 import org.slf4j.Logger;
@@ -139,8 +139,8 @@ public class BgpPrefixLSIdentifier implements Comparable<Object> {
             }
             tempCb = cb.readBytes(length);
             switch (type) {
-            case OSPFRouteTypeTlv.TYPE:
-                tlv = OSPFRouteTypeTlv.read(tempCb);
+            case OspfRouteTypeTlv.TYPE:
+                tlv = OspfRouteTypeTlv.read(tempCb);
                 break;
             case IPReachabilityInformationTlv.TYPE:
                 tlv = IPReachabilityInformationTlv.read(tempCb, length);
@@ -238,6 +238,7 @@ public class BgpPrefixLSIdentifier implements Comparable<Object> {
             return 0;
         }
         int result = this.localNodeDescriptors.compareTo(((BgpPrefixLSIdentifier) o).localNodeDescriptors);
+        boolean tlvFound = false;
         if (result != 0) {
             return result;
         } else {
@@ -249,20 +250,25 @@ public class BgpPrefixLSIdentifier implements Comparable<Object> {
                 } else {
                     return -1;
                 }
-           }
+            }
 
             ListIterator<BgpValueType> listIterator = prefixDescriptor.listIterator();
-            ListIterator<BgpValueType> listIteratorOther = ((BgpPrefixLSIdentifier) o).prefixDescriptor.listIterator();
             while (listIterator.hasNext()) {
-                BgpValueType tlv = listIterator.next();
-                BgpValueType tlv1 = listIteratorOther.next();
-                if (prefixDescriptor.contains(tlv) && ((BgpPrefixLSIdentifier) o).prefixDescriptor.contains(tlv1)) {
-                    int res = prefixDescriptor.get(prefixDescriptor.indexOf(tlv)).compareTo(
-                            ((BgpPrefixLSIdentifier) o).prefixDescriptor
-                                    .get(((BgpPrefixLSIdentifier) o).prefixDescriptor.indexOf(tlv1)));
-                    if (res != 0) {
-                        return res;
+                BgpValueType tlv1 = listIterator.next();
+                for (BgpValueType tlv : ((BgpPrefixLSIdentifier) o).prefixDescriptor) {
+                    if (tlv.getType() == tlv1.getType()) {
+                        result = prefixDescriptor.get(prefixDescriptor.indexOf(tlv1)).compareTo(
+                                ((BgpPrefixLSIdentifier) o).prefixDescriptor
+                                        .get(((BgpPrefixLSIdentifier) o).prefixDescriptor.indexOf(tlv)));
+                        if (result != 0) {
+                            return result;
+                        }
+                        tlvFound = true;
+                        break;
                     }
+                }
+                if (!tlvFound) {
+                    return 1;
                 }
             }
         }

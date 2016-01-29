@@ -15,7 +15,6 @@
  */
 package org.onosproject.net.flow.criteria;
 
-import com.google.common.base.MoreObjects;
 import org.onosproject.net.IndexedLambda;
 
 import java.util.Objects;
@@ -24,7 +23,10 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Implementation of indexed lambda criterion.
+ *
+ * @deprecated in Emu (ONOS 1.4).
  */
+@Deprecated
 public class IndexedLambdaCriterion implements Criterion {
 
     private final IndexedLambda lambda;
@@ -73,8 +75,6 @@ public class IndexedLambdaCriterion implements Criterion {
 
     @Override
     public String toString() {
-        return MoreObjects.toStringHelper(this)
-                .add("lambda", lambda)
-                .toString();
+        return type().toString() + SEPARATOR + lambda;
     }
 }

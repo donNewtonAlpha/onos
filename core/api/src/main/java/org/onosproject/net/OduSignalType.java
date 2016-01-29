@@ -24,10 +24,25 @@ package org.onosproject.net;
  * </p>
  */
 public enum OduSignalType {
-    ODU0,
-    ODU1,
-    ODU2,
-    ODU2e,
-    ODU3,
-    ODU4
+    /** bit rate in Mbps. */
+    ODU0(1_250),
+    ODU1(2_500),
+    ODU2(10_000),
+    ODU2e(10_000),
+    ODU3(40_000),
+    ODU4(100_000);
+
+    private final long bitRate;
+
+    OduSignalType(long bitRate) {
+        this.bitRate = bitRate;
+    }
+
+    /**
+     * Return the bit rate in Mbps of the port.
+     * @return bit rate
+     */
+    public long bitRate() {
+        return this.bitRate;
+    }
 }

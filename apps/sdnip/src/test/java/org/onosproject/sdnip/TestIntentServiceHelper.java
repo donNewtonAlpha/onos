@@ -17,6 +17,7 @@ package org.onosproject.sdnip;
 
 import org.easymock.IArgumentMatcher;
 import org.onosproject.net.intent.Intent;
+import org.onosproject.net.intent.IntentUtils;
 
 import static org.easymock.EasyMock.reportMatcher;
 
@@ -83,7 +84,7 @@ public final class TestIntentServiceHelper {
             Intent providedIntent = (Intent) object;
             providedString = providedIntent.toString();
 
-            return IntentUtils.equals(intent, providedIntent);
+            return IntentUtils.intentsAreEqual(intent, providedIntent);
         }
     }
 

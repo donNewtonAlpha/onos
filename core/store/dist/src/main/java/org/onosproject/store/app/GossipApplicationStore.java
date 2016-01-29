@@ -62,6 +62,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 import static com.google.common.collect.Multimaps.newSetMultimap;
@@ -93,6 +94,8 @@ public class GossipApplicationStore extends ApplicationArchive
     private static final int RETRY_DELAY_MS = 2_000;
 
     private static final int FETCH_TIMEOUT_MS = 10_000;
+
+    private static final int APP_LOAD_DELAY_MS = 500;
 
     public enum InternalState {
         INSTALLED, ACTIVATED, DEACTIVATED
@@ -198,7 +201,10 @@ public class GossipApplicationStore extends ApplicationArchive
                 // Directly return if app already exists
                 ApplicationId appId = getId(appName);
                 if (appId != null) {
-                    return getApplication(appId);
+                    Application application = getApplication(appId);
+                    if (application != null) {
+                        return application;
+                    }
                 }
 
                 ApplicationDescription appDesc = getApplicationDescription(appName);
@@ -227,7 +233,7 @@ public class GossipApplicationStore extends ApplicationArchive
     @Override
     public void setDelegate(ApplicationStoreDelegate delegate) {
         super.setDelegate(delegate);
-        loadFromDisk();
+        executor.schedule(() -> loadFromDisk(), APP_LOAD_DELAY_MS, TimeUnit.MILLISECONDS);
     }
 
     @Override
@@ -502,8 +508,9 @@ public class GossipApplicationStore extends ApplicationArchive
     private Application registerApp(ApplicationDescription appDesc) {
         ApplicationId appId = idStore.registerApplication(appDesc.name());
         return new DefaultApplication(appId, appDesc.version(), appDesc.description(),
-                                      appDesc.origin(), appDesc.role(), appDesc.permissions(),
-                                      appDesc.featuresRepo(), appDesc.features(),
-                                      appDesc.requiredApps());
+                                      appDesc.origin(), appDesc.category(), appDesc.url(),
+                                      appDesc.readme(), appDesc.icon(), appDesc.role(),
+                                      appDesc.permissions(), appDesc.featuresRepo(),
+                                      appDesc.features(), appDesc.requiredApps());
     }
 }

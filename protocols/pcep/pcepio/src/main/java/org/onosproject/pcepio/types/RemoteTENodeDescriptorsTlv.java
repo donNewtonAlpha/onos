@@ -185,7 +185,7 @@ public class RemoteTENodeDescriptorsTlv implements PcepValueType {
      * @return object of RemoteTENodeDescriptorsTLV
      * @throws PcepParseException if mandatory fields are missing
      */
-    public static PcepValueType read(ChannelBuffer c , short length) throws PcepParseException {
+    public static PcepValueType read(ChannelBuffer c, short length) throws PcepParseException {
 
         // Node Descriptor Sub-TLVs (variable)
         LinkedList<PcepValueType> llRemoteTENodeDescriptorSubTLVs = new LinkedList<>();
@@ -204,13 +204,13 @@ public class RemoteTENodeDescriptorsTlv implements PcepValueType {
                 iValue = tempCb.readInt();
                 tlv = new AutonomousSystemTlv(iValue);
                 break;
-            case BGPLSidentifierTlv.TYPE:
+            case BgpLsIdentifierTlv.TYPE:
                 iValue = tempCb.readInt();
-                tlv = new BGPLSidentifierTlv(iValue);
+                tlv = new BgpLsIdentifierTlv(iValue);
                 break;
-            case OSPFareaIDsubTlv.TYPE:
+            case OspfAreaIdSubTlv.TYPE:
                 iValue = tempCb.readInt();
-                tlv = new OSPFareaIDsubTlv(iValue);
+                tlv = new OspfAreaIdSubTlv(iValue);
                 break;
             case RouterIDSubTlv.TYPE:
                 tlv = RouterIDSubTlv.read(tempCb, hLength);

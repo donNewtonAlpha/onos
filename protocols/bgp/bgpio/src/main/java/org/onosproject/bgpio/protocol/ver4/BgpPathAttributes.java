@@ -24,6 +24,7 @@ import org.onosproject.bgpio.types.As4Path;
 import org.onosproject.bgpio.types.AsPath;
 import org.onosproject.bgpio.types.BgpErrorType;
 import org.onosproject.bgpio.types.BgpValueType;
+import org.onosproject.bgpio.types.LinkStateAttributes;
 import org.onosproject.bgpio.types.LocalPref;
 import org.onosproject.bgpio.types.Med;
 import org.onosproject.bgpio.types.NextHop;
@@ -54,7 +55,7 @@ public class BgpPathAttributes {
     */
     protected static final Logger log = LoggerFactory.getLogger(BgpPathAttributes.class);
 
-    public static final int LINK_STATE_ATTRIBUTE_TYPE = 50;
+    public static final int LINK_STATE_ATTRIBUTE_TYPE = 29;
     public static final int MPREACHNLRI_TYPE = 14;
     public static final int MPUNREACHNLRI_TYPE = 15;
 
@@ -139,7 +140,7 @@ public class BgpPathAttributes {
                         .isMpUnReachNlriSet();
                 break;
             case LINK_STATE_ATTRIBUTE_TYPE:
-                //TODO: To be merged later
+                pathAttribute = LinkStateAttributes.read(cb);
                 break;
             default:
                 //skip bytes for unsupported attribute types
@@ -166,6 +167,11 @@ public class BgpPathAttributes {
     public static void checkMandatoryAttr(boolean isOrigin, boolean isAsPath,
             boolean isNextHop, boolean isMpReach, boolean isMpUnReach)
             throws BgpParseException {
+        // Mandatory attributes validation not required for MP_UNREACH
+        if (isMpUnReach) {
+            return;
+        }
+
         if (!isOrigin) {
             log.debug("Mandatory Attributes not Present");
             Validation.validateType(BgpErrorType.UPDATE_MESSAGE_ERROR,

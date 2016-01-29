@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-2016 Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,11 +32,14 @@ import org.onosproject.net.flow.instructions.ExtensionTreatmentType;
 import org.onosproject.net.flow.instructions.Instructions;
 
 /**
- * Created by jono on 10/29/15.
+ * Serializer for extension instructions.
  */
 public class ExtensionInstructionSerializer extends
         Serializer<Instructions.ExtensionInstructionWrapper> {
 
+    /**
+     * Constructs a extension instruction serializer.
+     */
     public ExtensionInstructionSerializer() {
         super(false, true);
     }
@@ -45,9 +48,7 @@ public class ExtensionInstructionSerializer extends
     public void write(Kryo kryo, Output output, Instructions.ExtensionInstructionWrapper object) {
         kryo.writeClassAndObject(output, object.extensionInstruction().type());
         kryo.writeClassAndObject(output, object.deviceId());
-
         kryo.writeClassAndObject(output, object.extensionInstruction().serialize());
-
     }
 
     @Override
@@ -61,7 +62,6 @@ public class ExtensionInstructionSerializer extends
                 new DefaultDriverData(driverService.getDriver(deviceId), deviceId));
 
         ExtensionTreatmentResolver resolver = handler.behaviour(ExtensionTreatmentResolver.class);
-
         ExtensionTreatment instruction = resolver.getExtensionInstruction(exType);
 
         byte[] bytes = (byte[]) kryo.readClassAndObject(input);

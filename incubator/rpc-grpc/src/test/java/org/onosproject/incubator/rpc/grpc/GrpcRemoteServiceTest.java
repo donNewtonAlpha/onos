@@ -17,9 +17,8 @@ package org.onosproject.incubator.rpc.grpc;
 
 import static org.junit.Assert.*;
 import static org.onosproject.net.DeviceId.deviceId;
+import static org.onosproject.net.PortNumber.portNumber;
 
-import java.io.IOException;
-import java.net.ServerSocket;
 import java.net.URI;
 import java.util.Collection;
 import java.util.Collections;
@@ -28,18 +27,20 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.lang3.RandomUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.onlab.junit.TestTools;
 import org.onlab.packet.ChassisId;
 import org.onosproject.incubator.rpc.RemoteServiceContext;
 import org.onosproject.incubator.rpc.RemoteServiceContextProvider;
 import org.onosproject.incubator.rpc.RemoteServiceContextProviderService;
 import org.onosproject.incubator.rpc.RemoteServiceProviderRegistry;
+import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.DefaultAnnotations;
 import org.onosproject.net.Device.Type;
 import org.onosproject.net.DeviceId;
+import org.onosproject.net.Link;
 import org.onosproject.net.MastershipRole;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.SparseAnnotations;
@@ -51,6 +52,11 @@ import org.onosproject.net.device.DeviceProviderRegistry;
 import org.onosproject.net.device.DeviceProviderService;
 import org.onosproject.net.device.PortDescription;
 import org.onosproject.net.device.PortStatistics;
+import org.onosproject.net.link.DefaultLinkDescription;
+import org.onosproject.net.link.LinkDescription;
+import org.onosproject.net.link.LinkProvider;
+import org.onosproject.net.link.LinkProviderRegistry;
+import org.onosproject.net.link.LinkProviderService;
 import org.onosproject.net.provider.AbstractProviderRegistry;
 import org.onosproject.net.provider.AbstractProviderService;
 import org.onosproject.net.provider.ProviderId;
@@ -99,31 +105,22 @@ public class GrpcRemoteServiceTest {
 
     private MTestDeviceProviderService svDeviceProviderService;
 
+    private ServerSideLinkProviderService svLinkProviderService;
+
+
     private CountDownLatch serverReady;
 
     private URI uri;
-
-    public static int pickListenPort() {
-        try {
-            // pick unused port
-            ServerSocket socket = new ServerSocket(0);
-            int port = socket.getLocalPort();
-            socket.close();
-            return port;
-        } catch (IOException e) {
-            // something went wrong, try picking randomly
-            return RandomUtils.nextInt(49152, 0xFFFF + 1);
-        }
-    }
 
     @Before
     public void setUp() throws Exception {
         serverReady = new CountDownLatch(1);
         server = new GrpcRemoteServiceServer();
         server.deviceProviderRegistry = new MTestDeviceProviderRegistry();
-        // todo: pass proper ComponentContext
-        server.listenPort = pickListenPort();
+        server.linkProviderRegistry = new ServerSideLinkProviderRegistry();
+        server.listenPort = TestTools.findAvailablePort(11984);
         uri = URI.create("grpc://localhost:" + server.listenPort);
+        // todo: pass proper ComponentContext
         server.activate(null);
 
         client = new GrpcRemoteServiceProvider();
@@ -135,6 +132,7 @@ public class GrpcRemoteServiceTest {
     public void tearDown() {
         client.deactivate();
         server.deactivate();
+        svLinkProviderService = null;
     }
 
     private static void assertEqualsButNotSame(Object expected, Object actual) {
@@ -144,7 +142,7 @@ public class GrpcRemoteServiceTest {
     }
 
     @Test
-    public void basics() throws InterruptedException {
+    public void deviceServiceBasics() throws InterruptedException {
         RemoteServiceContext remoteServiceContext = client.get(uri);
         assertNotNull(remoteServiceContext);
 
@@ -215,6 +213,116 @@ public class GrpcRemoteServiceTest {
         assertEquals(DEVICE_ID, clDeviceProvider.isReachableDid);
         assertNotSame("Cannot be same instance if it properly went through gRPC",
                       DEVICE_ID, clDeviceProvider.isReachableDid);
+    }
+
+    @Test
+    public void linkVanishedDevice() throws InterruptedException {
+        RemoteServiceContext remoteServiceContext = client.get(uri);
+        assertNotNull(remoteServiceContext);
+
+        LinkProviderRegistry providerRegistry = remoteServiceContext.get(LinkProviderRegistry.class);
+        assertNotNull(providerRegistry);
+
+        final String schemeTest = "test";
+        LinkProviderService client = providerRegistry.register(new StubLinkProvider(schemeTest));
+        assertNotNull(client);
+
+        client.linksVanished(DEVICE_ID);
+
+        assertEquals(schemeTest, svLinkProviderService.provider().id().scheme());
+        assertTrue(svLinkProviderService.calls.await(10, TimeUnit.SECONDS));
+        assertEqualsButNotSame(DEVICE_ID, svLinkProviderService.arg);
+    }
+
+    @Test
+    public void linkVanishedPort() throws InterruptedException {
+        RemoteServiceContext remoteServiceContext = client.get(uri);
+        assertNotNull(remoteServiceContext);
+
+        LinkProviderRegistry providerRegistry = remoteServiceContext.get(LinkProviderRegistry.class);
+        assertNotNull(providerRegistry);
+
+        final String schemeTest = "test";
+        LinkProviderService client = providerRegistry.register(new StubLinkProvider(schemeTest));
+        assertNotNull(client);
+
+
+        final ConnectPoint cp = new ConnectPoint(DEVICE_ID, PORT);
+        client.linksVanished(cp);
+        assertEquals(schemeTest, svLinkProviderService.provider().id().scheme());
+        assertTrue(svLinkProviderService.calls.await(10, TimeUnit.SECONDS));
+        assertEqualsButNotSame(cp, svLinkProviderService.arg);
+    }
+
+    @Test
+    public void linkVanishedDescription() throws InterruptedException {
+        RemoteServiceContext remoteServiceContext = client.get(uri);
+        assertNotNull(remoteServiceContext);
+
+        LinkProviderRegistry providerRegistry = remoteServiceContext.get(LinkProviderRegistry.class);
+        assertNotNull(providerRegistry);
+
+        final String schemeTest = "test";
+        LinkProviderService client = providerRegistry.register(new StubLinkProvider(schemeTest));
+        assertNotNull(client);
+
+        ConnectPoint src = new ConnectPoint(deviceId("dev:1"), portNumber(10));
+        ConnectPoint dst = new ConnectPoint(deviceId("dev:2"), portNumber(20));
+        LinkDescription linkDescription = new DefaultLinkDescription(src, dst, Link.Type.DIRECT, ANON);
+        client.linkVanished(linkDescription);
+        assertEquals(schemeTest, svLinkProviderService.provider().id().scheme());
+        assertTrue(svLinkProviderService.calls.await(10, TimeUnit.SECONDS));
+        assertEqualsButNotSame(linkDescription, svLinkProviderService.arg);
+    }
+
+    @Test
+    public void linkDetected() throws InterruptedException {
+        RemoteServiceContext remoteServiceContext = client.get(uri);
+        assertNotNull(remoteServiceContext);
+
+        LinkProviderRegistry providerRegistry = remoteServiceContext.get(LinkProviderRegistry.class);
+        assertNotNull(providerRegistry);
+
+        final String schemeTest = "test";
+        LinkProviderService client = providerRegistry.register(new StubLinkProvider(schemeTest));
+        assertNotNull(client);
+
+        ConnectPoint src = new ConnectPoint(deviceId("dev:1"), portNumber(10));
+        ConnectPoint dst = new ConnectPoint(deviceId("dev:2"), portNumber(20));
+        LinkDescription linkDescription = new DefaultLinkDescription(src, dst, Link.Type.DIRECT, ANON);
+        client.linkDetected(linkDescription);
+        assertEquals(schemeTest, svLinkProviderService.provider().id().scheme());
+        assertTrue(svLinkProviderService.calls.await(10, TimeUnit.SECONDS));
+        assertEqualsButNotSame(linkDescription, svLinkProviderService.arg);
+    }
+
+    @Test
+    public void linkServiceBasics() throws InterruptedException {
+        RemoteServiceContext remoteServiceContext = client.get(uri);
+        assertNotNull(remoteServiceContext);
+
+        LinkProviderRegistry providerRegistry = remoteServiceContext.get(LinkProviderRegistry.class);
+        assertNotNull(providerRegistry);
+
+        final String schemeTest = "test";
+        LinkProviderService client = providerRegistry.register(new StubLinkProvider(schemeTest));
+        assertNotNull(client);
+
+        ConnectPoint src = new ConnectPoint(deviceId("dev:1"), portNumber(10));
+        ConnectPoint dst = new ConnectPoint(deviceId("dev:2"), portNumber(20));
+        LinkDescription linkDescription = new DefaultLinkDescription(src, dst, Link.Type.DIRECT, ANON);
+
+        client.linkDetected(linkDescription);
+        assertEquals(schemeTest, svLinkProviderService.provider().id().scheme());
+        assertTrue(svLinkProviderService.calls.await(10, TimeUnit.SECONDS));
+        assertEqualsButNotSame(linkDescription, svLinkProviderService.arg);
+
+        svLinkProviderService.reset();
+
+        client.linkVanished(linkDescription);
+        assertEquals(schemeTest, svLinkProviderService.provider().id().scheme());
+        assertTrue(svLinkProviderService.calls.await(10, TimeUnit.SECONDS));
+        assertEqualsButNotSame(linkDescription, svLinkProviderService.arg);
     }
 
     /**
@@ -392,6 +500,63 @@ public class GrpcRemoteServiceTest {
             log.info("deviceDisconnected({}) on Server called", deviceId);
             deviceDisconnectedDid = deviceId;
             deviceDisconnected.countDown();
+        }
+    }
+
+    public class ServerSideLinkProviderRegistry
+            extends AbstractProviderRegistry<LinkProvider, LinkProviderService>
+            implements LinkProviderRegistry {
+
+        @Override
+        protected LinkProviderService createProviderService(LinkProvider provider) {
+            svLinkProviderService = new ServerSideLinkProviderService(provider);
+            return svLinkProviderService;
+        }
+
+    }
+
+    public class ServerSideLinkProviderService
+            extends AbstractProviderService<LinkProvider>
+            implements LinkProviderService {
+
+        CountDownLatch calls = new CountDownLatch(1);
+        Object arg = null;
+
+        public void reset() {
+            calls = new CountDownLatch(1);
+            arg = null;
+        }
+
+        public ServerSideLinkProviderService(LinkProvider provider) {
+            super(provider);
+        }
+
+        @Override
+        public void linksVanished(DeviceId deviceId) {
+            log.info("linksVanished({})", deviceId);
+            arg = deviceId;
+            calls.countDown();
+        }
+
+        @Override
+        public void linksVanished(ConnectPoint connectPoint) {
+            log.info("linksVanished({})", connectPoint);
+            arg = connectPoint;
+            calls.countDown();
+        }
+
+        @Override
+        public void linkVanished(LinkDescription linkDescription) {
+            log.info("linksVanished({})", linkDescription);
+            arg = linkDescription;
+            calls.countDown();
+        }
+
+        @Override
+        public void linkDetected(LinkDescription linkDescription) {
+            log.info("linkDetected({})", linkDescription);
+            arg = linkDescription;
+            calls.countDown();
         }
     }
 

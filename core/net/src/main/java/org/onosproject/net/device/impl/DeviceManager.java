@@ -417,8 +417,10 @@ public class DeviceManager
                     .collect(Collectors.toList());
             List<DeviceEvent> events = store.updatePorts(this.provider().id(),
                                                          deviceId, portDescriptions);
-            for (DeviceEvent event : events) {
-                post(event);
+            if (events != null) {
+                for (DeviceEvent event : events) {
+                    post(event);
+                }
             }
         }
 
@@ -491,9 +493,12 @@ public class DeviceManager
                 if (Objects.equals(requested, mastershipService.getLocalRole(deviceId))) {
                     return;
                 } else {
-                    return;
-                    // FIXME roleManager got the device to comply, but doesn't agree with
+                    log.warn("Role mismatch on {}. set to {}, but store demands {}",
+                             deviceId, response, mastershipService.getLocalRole(deviceId));
+                    // roleManager got the device to comply, but doesn't agree with
                     // the store; use the store's view, then try to reassert.
+                    backgroundService.submit(() -> reassertRole(deviceId, mastershipService.getLocalRole(deviceId)));
+                    return;
                 }
             } else {
                 // we didn't get back what we asked for. Reelect someone else.
@@ -547,6 +552,7 @@ public class DeviceManager
         provider.roleChanged(deviceId, newRole);
 
         if (newRole.equals(MastershipRole.MASTER)) {
+            log.debug("sent TriggerProbe({})", deviceId);
             // only trigger event when request was sent to provider
             provider.triggerProbe(deviceId);
         }
@@ -565,12 +571,19 @@ public class DeviceManager
 
         MastershipRole myNextRole = nextRole;
         if (myNextRole == NONE) {
-            mastershipService.requestRoleFor(did);
-            MastershipTerm term = termService.getMastershipTerm(did);
-            if (term != null && localNodeId.equals(term.master())) {
-                myNextRole = MASTER;
-            } else {
-                myNextRole = STANDBY;
+            try {
+                mastershipService.requestRoleFor(did).get();
+                MastershipTerm term = termService.getMastershipTerm(did);
+                if (term != null && localNodeId.equals(term.master())) {
+                    myNextRole = MASTER;
+                } else {
+                    myNextRole = STANDBY;
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.error("Interrupted waiting for Mastership", e);
+            } catch (ExecutionException e) {
+                log.error("Encountered an error waiting for Mastership", e);
             }
         }
 
@@ -730,7 +743,7 @@ public class DeviceManager
         public void event(NetworkConfigEvent event) {
             DeviceEvent de = null;
             if (event.configClass().equals(BasicDeviceConfig.class)) {
-                log.info("Detected Device network config event {}", event.type());
+                log.debug("Detected device network config event {}", event.type());
                 DeviceId did = (DeviceId) event.subject();
                 BasicDeviceConfig cfg = networkConfigService.getConfig(did, BasicDeviceConfig.class);
 

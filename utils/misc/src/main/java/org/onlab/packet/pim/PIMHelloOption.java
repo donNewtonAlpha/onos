@@ -85,6 +85,7 @@ public class PIMHelloOption {
             case OPT_ADDRLIST:
                 this.optLength = 0;   // We don't know what the length will be yet.
                 this.optValue = null;
+                break;
 
             default:
                 //log.error("Unkown option type: " + type + "\n" );
@@ -130,7 +131,7 @@ public class PIMHelloOption {
         return opt;
     }
 
-    public byte [] serialize() {
+    public byte[] serialize() {
         int len = 4 + this.optLength;
         ByteBuffer bb = ByteBuffer.allocate(len);
         bb.putShort(this.optType);

@@ -26,6 +26,17 @@ import java.util.function.Predicate;
  * Testing adapter for the consistent map.
  */
 public class ConsistentMapAdapter<K, V> implements ConsistentMap<K, V> {
+
+    @Override
+    public String name() {
+        return null;
+    }
+
+    @Override
+    public DistributedPrimitive.Type type() {
+        return DistributedPrimitive.Type.CONSISTENT_MAP;
+    }
+
     @Override
     public int size() {
         return 0;
@@ -120,6 +131,11 @@ public class ConsistentMapAdapter<K, V> implements ConsistentMap<K, V> {
     @Override
     public boolean remove(K key, long version) {
         return false;
+    }
+
+    @Override
+    public Versioned<V> replace(K key, V value) {
+        return null;
     }
 
     @Override

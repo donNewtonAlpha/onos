@@ -22,12 +22,18 @@ import org.onosproject.net.DeviceId;
 import java.util.Objects;
 
 /**
- * Class definition of Key for Subnet to NextObjective store.
+ * Key of Subnet to NextObjective store.
  */
 public class SubnetNextObjectiveStoreKey {
     private final DeviceId deviceId;
     private final IpPrefix prefix;
 
+    /**
+     * Constructs the key of subnet next objective store.
+     *
+     * @param deviceId device ID
+     * @param prefix subnet information
+     */
     public SubnetNextObjectiveStoreKey(DeviceId deviceId,
                                        IpPrefix prefix) {
         this.deviceId = deviceId;

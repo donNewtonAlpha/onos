@@ -33,6 +33,7 @@ public final class TopoJson {
     static final String HOSTS = "hosts";
     static final String LINKS = "links";
     static final String SUBDUE = "subdue";
+    static final String DELAY = "delay";
 
     static final String ID = "id";
     static final String LABEL = "label";
@@ -99,6 +100,10 @@ public final class TopoJson {
         if (!toSubdue.equals(Highlights.Amount.ZERO)) {
             payload.put(SUBDUE, toSubdue.toString());
         }
+        int delay = highlights.delayMs();
+        if (delay > 0) {
+            payload.put(DELAY, delay);
+        }
         return payload;
     }
 
@@ -130,6 +135,10 @@ public final class TopoJson {
                 .put(ID, hh.elementId());
         if (hh.subdued()) {
             n.put(SUBDUE, true);
+        }
+        NodeBadge badge = hh.badge();
+        if (badge != null) {
+            n.set(BADGE, json(badge));
         }
         return n;
     }

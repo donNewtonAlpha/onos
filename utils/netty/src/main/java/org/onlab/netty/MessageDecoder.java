@@ -15,8 +15,6 @@
  */
 package org.onlab.netty;
 
-import static com.google.common.base.Preconditions.checkState;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ReplayingDecoder;
@@ -30,6 +28,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Charsets;
+
+import static com.google.common.base.Preconditions.checkState;
 
 /**
  * Decoder for inbound messages.
@@ -54,6 +54,7 @@ public class MessageDecoder extends ReplayingDecoder<DecoderState> {
     }
 
     @Override
+    @java.lang.SuppressWarnings("squid:S128") // suppress switch fall through warning
     protected void decode(
             ChannelHandlerContext context,
             ByteBuf buffer,

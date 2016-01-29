@@ -15,8 +15,6 @@
  */
 package org.onosproject.net.flow;
 
-import java.util.Set;
-
 import org.onlab.packet.Ip4Address;
 import org.onlab.packet.Ip6Address;
 import org.onlab.packet.IpPrefix;
@@ -24,8 +22,12 @@ import org.onlab.packet.MacAddress;
 import org.onlab.packet.MplsLabel;
 import org.onlab.packet.TpPort;
 import org.onlab.packet.VlanId;
+import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.flow.criteria.Criterion;
+import org.onosproject.net.flow.criteria.ExtensionSelector;
+
+import java.util.Set;
 
 /**
  * Abstraction of a slice of network traffic.
@@ -125,6 +127,22 @@ public interface TrafficSelector {
          * @return a selection builder
          */
         Builder matchVlanPcp(byte vlanPcp);
+
+        /**
+         * Matches the inner vlan id.
+         *
+         * @param vlanId a vlan id
+         * @return a selection builder
+         */
+        Builder matchInnerVlanId(VlanId vlanId);
+
+        /**
+         * Matches a vlan priority.
+         *
+         * @param vlanPcp a vlan priority
+         * @return a selection builder
+         */
+        Builder matchInnerVlanPcp(byte vlanPcp);
 
         /**
          * Matches an IP DSCP (6 bits in ToS field).
@@ -425,6 +443,15 @@ public interface TrafficSelector {
          * @return a selection builder
          */
         Builder matchArpOp(int arpOp);
+
+        /**
+         * Uses an extension selector.
+         *
+         * @param extensionSelector extension selector
+         * @param deviceId device ID
+         * @return a selection builder
+         */
+        Builder extension(ExtensionSelector extensionSelector, DeviceId deviceId);
 
         /**
          * Builds an immutable traffic selector.

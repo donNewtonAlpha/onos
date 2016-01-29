@@ -15,15 +15,42 @@
  */
 package org.onosproject.sfc.manager.impl;
 
-import static org.slf4j.LoggerFactory.getLogger;
-
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
+import org.apache.felix.scr.annotations.Reference;
+import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.apache.felix.scr.annotations.Service;
+import org.onlab.util.ItemNotFoundException;
+import org.onlab.util.KryoNamespace;
+import org.onosproject.core.ApplicationId;
+import org.onosproject.core.CoreService;
+import org.onosproject.net.NshServicePathId;
+import org.onosproject.sfc.forwarder.ServiceFunctionForwarderService;
+import org.onosproject.sfc.forwarder.impl.ServiceFunctionForwarderImpl;
+import org.onosproject.sfc.installer.FlowClassifierInstallerService;
+import org.onosproject.sfc.installer.impl.FlowClassifierInstallerImpl;
+import org.onosproject.sfc.manager.NshSpiIdGenerators;
 import org.onosproject.sfc.manager.SfcService;
+import org.onosproject.vtnrsc.FlowClassifier;
+import org.onosproject.vtnrsc.FlowClassifierId;
 import org.onosproject.vtnrsc.PortChain;
+import org.onosproject.vtnrsc.PortChainId;
+import org.onosproject.vtnrsc.PortPair;
+import org.onosproject.vtnrsc.PortPairGroup;
+import org.onosproject.vtnrsc.PortPairGroupId;
+import org.onosproject.vtnrsc.PortPairId;
+import org.onosproject.vtnrsc.TenantId;
+import org.onosproject.vtnrsc.event.VtnRscEvent;
+import org.onosproject.vtnrsc.event.VtnRscEventFeedback;
+import org.onosproject.vtnrsc.event.VtnRscListener;
+import org.onosproject.vtnrsc.service.VtnRscService;
 import org.slf4j.Logger;
+
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+import static org.slf4j.LoggerFactory.getLogger;
 
 /**
  * Provides implementation of SFC Service.
@@ -33,93 +60,163 @@ import org.slf4j.Logger;
 public class SfcManager implements SfcService {
 
     private final Logger log = getLogger(getClass());
+    private static final String APP_ID = "org.onosproject.app.vtn";
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected VtnRscService vtnRscService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected CoreService coreService;
+
+    protected ApplicationId appId;
+    private ServiceFunctionForwarderService serviceFunctionForwarderService;
+    private FlowClassifierInstallerService flowClassifierInstallerService;
+
+    private final VtnRscListener vtnRscListener = new InnerVtnRscListener();
+
+    private ConcurrentMap<PortChainId, NshServicePathId> nshSpiPortChainMap = new ConcurrentHashMap<>();
 
     @Activate
     public void activate() {
+        appId = coreService.registerApplication(APP_ID);
+        serviceFunctionForwarderService = new ServiceFunctionForwarderImpl(appId);
+        flowClassifierInstallerService = new FlowClassifierInstallerImpl(appId);
+
+        vtnRscService.addListener(vtnRscListener);
+
+        KryoNamespace.Builder serializer = KryoNamespace.newBuilder()
+                .register(TenantId.class)
+                .register(PortPairId.class)
+                .register(PortPairGroupId.class)
+                .register(FlowClassifierId.class)
+                .register(PortChainId.class);
+
         log.info("Started");
     }
 
     @Deactivate
     public void deactivate() {
+        vtnRscService.removeListener(vtnRscListener);
+
         log.info("Stopped");
     }
 
+    /*
+     * Handle events.
+     */
+    private class InnerVtnRscListener implements VtnRscListener {
+        @Override
+        public void event(VtnRscEvent event) {
+
+            if (VtnRscEvent.Type.PORT_PAIR_PUT == event.type()) {
+                PortPair portPair = ((VtnRscEventFeedback) event.subject()).portPair();
+                onPortPairCreated(portPair);
+            } else if (VtnRscEvent.Type.PORT_PAIR_DELETE == event.type()) {
+                PortPair portPair = ((VtnRscEventFeedback) event.subject()).portPair();
+                onPortPairDeleted(portPair);
+            } else if (VtnRscEvent.Type.PORT_PAIR_UPDATE == event.type()) {
+                PortPair portPair = ((VtnRscEventFeedback) event.subject()).portPair();
+                onPortPairDeleted(portPair);
+                onPortPairCreated(portPair);
+            } else if (VtnRscEvent.Type.PORT_PAIR_GROUP_PUT == event.type()) {
+                PortPairGroup portPairGroup = ((VtnRscEventFeedback) event.subject()).portPairGroup();
+                onPortPairGroupCreated(portPairGroup);
+            } else if (VtnRscEvent.Type.PORT_PAIR_GROUP_DELETE == event.type()) {
+                PortPairGroup portPairGroup = ((VtnRscEventFeedback) event.subject()).portPairGroup();
+                onPortPairGroupDeleted(portPairGroup);
+            } else if (VtnRscEvent.Type.PORT_PAIR_GROUP_UPDATE == event.type()) {
+                PortPairGroup portPairGroup = ((VtnRscEventFeedback) event.subject()).portPairGroup();
+                onPortPairGroupDeleted(portPairGroup);
+                onPortPairGroupCreated(portPairGroup);
+            } else if (VtnRscEvent.Type.FLOW_CLASSIFIER_PUT == event.type()) {
+                FlowClassifier flowClassifier = ((VtnRscEventFeedback) event.subject()).flowClassifier();
+                onFlowClassifierCreated(flowClassifier);
+            } else if (VtnRscEvent.Type.FLOW_CLASSIFIER_DELETE == event.type()) {
+                FlowClassifier flowClassifier = ((VtnRscEventFeedback) event.subject()).flowClassifier();
+                onFlowClassifierDeleted(flowClassifier);
+            } else if (VtnRscEvent.Type.FLOW_CLASSIFIER_UPDATE == event.type()) {
+                FlowClassifier flowClassifier = ((VtnRscEventFeedback) event.subject()).flowClassifier();
+                onFlowClassifierDeleted(flowClassifier);
+                onFlowClassifierCreated(flowClassifier);
+            } else if (VtnRscEvent.Type.PORT_CHAIN_PUT == event.type()) {
+                PortChain portChain = (PortChain) ((VtnRscEventFeedback) event.subject()).portChain();
+                onPortChainCreated(portChain);
+            } else if (VtnRscEvent.Type.PORT_CHAIN_DELETE == event.type()) {
+                PortChain portChain = (PortChain) ((VtnRscEventFeedback) event.subject()).portChain();
+                onPortChainDeleted(portChain);
+            } else if (VtnRscEvent.Type.PORT_CHAIN_UPDATE == event.type()) {
+                PortChain portChain = (PortChain) ((VtnRscEventFeedback) event.subject()).portChain();
+                onPortChainDeleted(portChain);
+                onPortChainCreated(portChain);
+            }
+        }
+    }
+
     @Override
-    public void onPortPairCreated() {
+    public void onPortPairCreated(PortPair portPair) {
         log.debug("onPortPairCreated");
-        // TODO: Process port-pair on creation.
-        // TODO: Parameter also needs to be modified.
+        // TODO: Modify forwarding rule on port-pair creation.
     }
 
     @Override
-    public void onPortPairDeleted() {
+    public void onPortPairDeleted(PortPair portPair) {
         log.debug("onPortPairDeleted");
-        // TODO: Process port-pair on deletion.
-        // TODO: Parameter also needs to be modified.
+        // TODO: Modify forwarding rule on port-pair deletion.
     }
 
     @Override
-    public void onPortPairGroupCreated() {
+    public void onPortPairGroupCreated(PortPairGroup portPairGroup) {
         log.debug("onPortPairGroupCreated");
-        // TODO: Process port-pair-group on creation.
-        // TODO: Parameter also needs to be modified.
+        // TODO: Modify forwarding rule on port-pair-group creation.
     }
 
     @Override
-    public void onPortPairGroupDeleted() {
+    public void onPortPairGroupDeleted(PortPairGroup portPairGroup) {
         log.debug("onPortPairGroupDeleted");
-        // TODO: Process port-pair-group on deletion.
-        // TODO: Parameter also needs to be modified.
+        // TODO: Modify forwarding rule on port-pair-group deletion.
     }
 
     @Override
-    public void onFlowClassifierCreated() {
+    public void onFlowClassifierCreated(FlowClassifier flowClassifier) {
         log.debug("onFlowClassifierCreated");
-        // TODO: Process flow-classifier on creation.
-        // TODO: Parameter also needs to be modified.
+        // TODO: Modify forwarding rule on flow-classifier creation.
     }
 
     @Override
-    public void onFlowClassifierDeleted() {
+    public void onFlowClassifierDeleted(FlowClassifier flowClassifier) {
         log.debug("onFlowClassifierDeleted");
-        // TODO: Process flow-classifier on deletion.
-        // TODO: Parameter also needs to be modified.
+        // TODO: Modify forwarding rule on flow-classifier deletion.
     }
 
     @Override
-    public void onPortChainCreated() {
-        log.debug("onPortChainCreated");
-        // TODO: Process port-chain on creation.
-        // TODO: Parameter also needs to be modified.
+    public void onPortChainCreated(PortChain portChain) {
+        NshServicePathId nshSpi;
+        log.info("onPortChainCreated");
+        if (nshSpiPortChainMap.containsKey(portChain.portChainId())) {
+            nshSpi = nshSpiPortChainMap.get(portChain.portChainId());
+        } else {
+            nshSpi = NshServicePathId.of(NshSpiIdGenerators.create());
+            nshSpiPortChainMap.put(portChain.portChainId(), nshSpi);
+        }
 
+        // install in OVS.
+        flowClassifierInstallerService.installFlowClassifier(portChain, nshSpi);
+        serviceFunctionForwarderService.installForwardingRule(portChain, nshSpi);
     }
 
     @Override
-    public void onPortChainDeleted() {
-        log.debug("onPortChainDeleted");
-        // TODO: Process port-chain on deletion.
-        // TODO: Parameter also needs to be modified.
-    }
+    public void onPortChainDeleted(PortChain portChain) {
+        log.info("onPortChainDeleted");
+        if (!nshSpiPortChainMap.containsKey(portChain.portChainId())) {
+            throw new ItemNotFoundException("Unable to find NSH SPI");
+        }
 
-    /**
-     * Install SF Forwarding rule into OVS.
-     *
-     * @param portChain
-     *            port chain
-     */
-    public void installForwardingRule(PortChain portChain) {
-        log.debug("installForwardingRule");
-        // TODO: Installation of SF Forwarding rule into OVS.
-    }
+        NshServicePathId nshSpi = nshSpiPortChainMap.get(portChain.portChainId());
+        // uninstall from OVS.
+        flowClassifierInstallerService.unInstallFlowClassifier(portChain, nshSpi);
+        serviceFunctionForwarderService.unInstallForwardingRule(portChain, nshSpi);
 
-    /**
-     * Uninstall SF Forwarding rule from OVS.
-     *
-     * @param portChain
-     *            port chain
-     */
-    public void unInstallForwardingRule(PortChain portChain) {
-        log.debug("unInstallForwardingRule");
-        // TODO: Uninstallation of SF Forwarding rule from OVS.
+        // remove SPI. No longer it will be used.
+        nshSpiPortChainMap.remove(nshSpi);
     }
 }

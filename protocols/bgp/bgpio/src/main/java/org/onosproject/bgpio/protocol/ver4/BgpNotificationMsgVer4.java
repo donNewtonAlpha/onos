@@ -122,11 +122,11 @@ class BgpNotificationMsgVer4 implements BgpNotificationMsg {
         private BgpHeader bgpHeader;
         private boolean isErrorCodeSet = false;
         private boolean isErrorSubCodeSet = false;
-        private boolean isBGPHeaderSet = false;
+        private boolean isBgpHeaderSet = false;
 
         @Override
         public BgpNotificationMsg build() throws BgpParseException {
-            BgpHeader bgpHeader = this.isBGPHeaderSet ? this.bgpHeader : DEFAULT_MESSAGE_HEADER;
+            BgpHeader bgpHeader = this.isBgpHeaderSet ? this.bgpHeader : DEFAULT_MESSAGE_HEADER;
             if (!this.isErrorCodeSet) {
                 throw new BgpParseException("Error code must be present");
             }
@@ -194,7 +194,9 @@ class BgpNotificationMsgVer4 implements BgpNotificationMsg {
             }
             cb.writeByte(message.errorCode);
             cb.writeByte(message.errorSubCode);
-            cb.writeBytes(message.data);
+            if (message.data != null) {
+                cb.writeBytes(message.data);
+            }
 
             //Update message length field in notification message
             int length = cb.writerIndex() - msgStartIndex;

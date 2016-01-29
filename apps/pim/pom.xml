@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  ~ Copyright 2015 Open Networking Laboratory
+  ~ Copyright 2015-2016 Open Networking Laboratory
   ~
   ~ Licensed under the Apache License, Version 2.0 (the "License");
   ~ you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@
     <parent>
         <groupId>org.onosproject</groupId>
         <artifactId>onos-apps</artifactId>
-        <version>1.4.0-SNAPSHOT</version>
+        <version>1.5.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -33,6 +33,9 @@
 
     <properties>
         <onos.app.name>org.onosproject.pim</onos.app.name>
+        <onos.app.category>default</onos.app.category>
+        <onos.app.url>http://onosproject.org</onos.app.url>
+        <onos.app.readme>Protocol independent multicast emulation.</onos.app.readme>
     </properties>
 
     <dependencies>
@@ -75,7 +78,6 @@
         <dependency>
             <groupId>org.apache.felix</groupId>
             <artifactId>org.apache.felix.scr.annotations</artifactId>
-            <version>1.9.8</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>
@@ -94,16 +96,11 @@
                         <Import-Package>
                             org.slf4j,
                             org.osgi.framework,
-                            org.apache.commons.lang.math.*,
                             com.google.common.*,
                             org.apache.karaf.shell.commands,
                             org.apache.karaf.shell.console,
                             org.onlab.packet.*,
-                            org.onlab.rest.*,
                             org.onosproject.*,
-                            org.onosproject.mfwd.impl.*;
-                            org.onlab.util.*,
-                            org.jboss.netty.util.*
                         </Import-Package>
                     </instructions>
                 </configuration>
@@ -111,7 +108,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>2.5.1</version>
                 <configuration>
                     <source>1.8</source>
                     <target>1.8</target>

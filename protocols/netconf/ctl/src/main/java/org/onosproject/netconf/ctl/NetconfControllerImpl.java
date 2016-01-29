@@ -26,11 +26,11 @@ import org.onosproject.netconf.NetconfController;
 import org.onosproject.netconf.NetconfDevice;
 import org.onosproject.netconf.NetconfDeviceInfo;
 import org.onosproject.netconf.NetconfDeviceListener;
+import org.onosproject.netconf.NetconfException;
 import org.osgi.service.component.ComponentContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -80,20 +80,19 @@ public class NetconfControllerImpl implements NetconfController {
 
     @Override
     public NetconfDevice getNetconfDevice(IpAddress ip, int port) {
-        NetconfDevice device = null;
         for (DeviceId info : netconfDeviceMap.keySet()) {
             if (IpAddress.valueOf(info.uri().getHost()).equals(ip) &&
                     info.uri().getPort() == port) {
                 return netconfDeviceMap.get(info);
             }
         }
-        return device;
+        return null;
     }
 
     @Override
-    public NetconfDevice connectDevice(NetconfDeviceInfo deviceInfo) {
+    public NetconfDevice connectDevice(NetconfDeviceInfo deviceInfo) throws NetconfException {
         if (netconfDeviceMap.containsKey(deviceInfo.getDeviceId())) {
-            log.warn("Device {} is already present");
+            log.info("Device {} is already present", deviceInfo);
             return netconfDeviceMap.get(deviceInfo.getDeviceId());
         } else {
             log.info("Creating NETCONF device {}", deviceInfo);
@@ -104,25 +103,18 @@ public class NetconfControllerImpl implements NetconfController {
     @Override
     public void removeDevice(NetconfDeviceInfo deviceInfo) {
         if (netconfDeviceMap.containsKey(deviceInfo.getDeviceId())) {
-            log.warn("Device {} is not present");
+            log.warn("Device {} is not present", deviceInfo);
         } else {
             stopDevice(deviceInfo);
         }
     }
 
-    private NetconfDevice createDevice(NetconfDeviceInfo deviceInfo) {
-        NetconfDevice netconfDevice = null;
-        try {
-            netconfDevice = new NetconfDeviceImpl(deviceInfo);
-            for (NetconfDeviceListener l : netconfDeviceListeners) {
-                l.deviceAdded(deviceInfo);
-            }
-            netconfDeviceMap.put(deviceInfo.getDeviceId(), netconfDevice);
-        } catch (IOException e) {
-            throw new IllegalStateException("Cannot create NETCONF device " +
-                                                    "with device Info: " +
-                                                    deviceInfo + " \n" + e);
+    private NetconfDevice createDevice(NetconfDeviceInfo deviceInfo) throws NetconfException {
+        NetconfDevice netconfDevice = new NetconfDeviceImpl(deviceInfo);
+        for (NetconfDeviceListener l : netconfDeviceListeners) {
+            l.deviceAdded(deviceInfo);
         }
+        netconfDeviceMap.put(deviceInfo.getDeviceId(), netconfDevice);
         return netconfDevice;
     }
 

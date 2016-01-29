@@ -20,8 +20,10 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.onosproject.net.Provided;
+import org.onosproject.net.provider.ProviderId;
+
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Verify.verifyNotNull;
 import static com.google.common.base.Verify.verify;
 
 import com.google.common.base.MoreObjects;
@@ -32,22 +34,53 @@ import com.google.common.collect.Sets;
 /**
  * Cluster metadata.
  * <p>
- * Metadata specifies the attributes that define a ONOS cluster and comprises the collection
+ * Metadata specifies how a ONOS cluster is constituted and is made up of the collection
  * of {@link org.onosproject.cluster.ControllerNode nodes} and the collection of data
  * {@link org.onosproject.cluster.Partition partitions}.
  */
-public final class ClusterMetadata {
+public final class ClusterMetadata implements Provided {
 
-    private String name;
-    private Set<ControllerNode> nodes;
-    private Set<Partition> partitions;
+    // Name to use when the ClusterMetadataService is in transient state
+    public static final String NO_NAME = "";
 
-    /**
-     * Returns a new cluster metadata builder.
-     * @return The cluster metadata builder.
-     */
-    public static Builder builder() {
-        return new Builder();
+    private final ProviderId providerId;
+    private final String name;
+    private final Set<ControllerNode> nodes;
+    private final Set<Partition> partitions;
+
+    private ClusterMetadata() {
+        providerId = null;
+        name = null;
+        nodes = null;
+        partitions = null;
+    }
+
+    public ClusterMetadata(ProviderId providerId,
+            String name,
+            Set<ControllerNode> nodes,
+            Set<Partition> partitions) {
+        this.providerId = checkNotNull(providerId);
+        this.name = checkNotNull(name);
+        this.nodes = ImmutableSet.copyOf(checkNotNull(nodes));
+        // verify that partitions are constituted from valid cluster nodes.
+        boolean validPartitions = Collections2.transform(nodes, ControllerNode::id)
+                .containsAll(partitions
+                        .stream()
+                        .flatMap(r -> r.getMembers().stream())
+                        .collect(Collectors.toSet()));
+        verify(validPartitions, "Partition locations must be valid cluster nodes");
+        this.partitions = ImmutableSet.copyOf(checkNotNull(partitions));
+    }
+
+    public ClusterMetadata(String name,
+            Set<ControllerNode> nodes,
+            Set<Partition> partitions) {
+        this(new ProviderId("none", "none"), name, nodes, partitions);
+    }
+
+    @Override
+    public ProviderId providerId() {
+        return providerId;
     }
 
     /**
@@ -68,7 +101,8 @@ public final class ClusterMetadata {
     }
 
     /**
-     * Returns the collection of data {@link org.onosproject.cluster.Partition partitions} that make up the cluster.
+     * Returns the collection of {@link org.onosproject.cluster.Partition partitions} that make
+     * up the cluster.
      * @return collection of partitions.
      */
     public Collection<Partition> getPartitions() {
@@ -78,6 +112,7 @@ public final class ClusterMetadata {
     @Override
     public String toString() {
         return MoreObjects.toStringHelper(ClusterMetadata.class)
+                .add("providerId", providerId)
                 .add("name", name)
                 .add("nodes", nodes)
                 .add("partitions", partitions)
@@ -86,11 +121,11 @@ public final class ClusterMetadata {
 
     @Override
     public int hashCode() {
-        return Arrays.deepHashCode(new Object[] {name, nodes, partitions});
+        return Arrays.deepHashCode(new Object[] {providerId, name, nodes, partitions});
     }
 
     /*
-     * Provide a deep quality check of the meta data (non-Javadoc)
+     * Provide a deep equality check of the cluster metadata (non-Javadoc)
      *
      * @see java.lang.Object#equals(java.lang.Object)
      */
@@ -109,77 +144,5 @@ public final class ClusterMetadata {
 
         return Sets.symmetricDifference(this.nodes, that.nodes).isEmpty()
                 && Sets.symmetricDifference(this.partitions, that.partitions).isEmpty();
-    }
-
-    /**
-     * Builder for a {@link ClusterMetadata} instance.
-     */
-    public static class Builder {
-
-        private final ClusterMetadata metadata;
-
-        public Builder() {
-            metadata = new ClusterMetadata();
-        }
-
-        /**
-         * Sets the cluster name, returning the cluster metadata builder for method chaining.
-         * @param name cluster name
-         * @return this cluster metadata builder
-         */
-        public Builder withName(String name) {
-            metadata.name = checkNotNull(name);
-            return this;
-        }
-
-        /**
-         * Sets the collection of cluster nodes, returning the cluster metadata builder for method chaining.
-         * @param controllerNodes collection of cluster nodes
-         * @return this cluster metadata builder
-         */
-        public Builder withControllerNodes(Collection<ControllerNode> controllerNodes) {
-            metadata.nodes = ImmutableSet.copyOf(checkNotNull(controllerNodes));
-            return this;
-        }
-
-        /**
-         * Sets the collection of data partitions, returning the cluster metadata builder for method chaining.
-         * @param partitions collection of partitions
-         * @return this cluster metadata builder
-         */
-        public Builder withPartitions(Collection<Partition> partitions) {
-            metadata.partitions = ImmutableSet.copyOf(checkNotNull(partitions));
-            return this;
-        }
-
-        /**
-         * Builds the cluster metadata.
-         * @return cluster metadata
-         * @throws com.google.common.base.VerifyException VerifyException if the metadata is misconfigured
-         */
-        public ClusterMetadata build() {
-            verifyMetadata();
-            return metadata;
-        }
-
-        /**
-         * Validates the constructed metadata for semantic correctness.
-         * @throws VerifyException if the metadata is misconfigured.
-         */
-        private void verifyMetadata() {
-            verifyNotNull(metadata.getName(), "Cluster name must be specified");
-            verifyNotNull(metadata.getNodes(), "Cluster nodes must be specified");
-            verifyNotNull(metadata.getPartitions(), "Cluster partitions must be specified");
-            verify(!metadata.getNodes().isEmpty(), "Cluster nodes must not be empty");
-            verify(!metadata.getPartitions().isEmpty(), "Cluster nodes must not be empty");
-
-            // verify that partitions are constituted from valid cluster nodes.
-            boolean validPartitions = Collections2.transform(metadata.getNodes(), ControllerNode::id)
-                    .containsAll(metadata.getPartitions()
-                            .stream()
-                            .flatMap(r -> r.getMembers().stream())
-                            .collect(Collectors.toSet()));
-            verify(validPartitions, "Partition locations must be valid cluster nodes");
-        }
     }
 }

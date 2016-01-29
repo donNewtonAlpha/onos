@@ -17,15 +17,17 @@ package org.onlab.packet;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import org.slf4j.Logger;
 
-import static org.slf4j.LoggerFactory.getLogger;
+import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static org.onlab.packet.PacketUtils.checkInput;
-
+import static org.slf4j.LoggerFactory.getLogger;
 
 /**
  * Implements IGMP control packet format.
@@ -153,9 +155,10 @@ public class IGMP extends BasePacket {
      *
      * @return the serialized IGMP message
      */
+    @java.lang.SuppressWarnings("squid:S128") // suppress switch fall through warning
     @Override
     public byte[] serialize() {
-        byte [] data = new byte[8915];
+        byte[] data = new byte[8915];
 
         ByteBuffer bb = ByteBuffer.wrap(data);
         bb.put(this.getIgmpType());
@@ -189,7 +192,7 @@ public class IGMP extends BasePacket {
 
         int size = bb.position();
         bb.position(0);
-        byte [] rdata = new byte[size];
+        byte[] rdata = new byte[size];
         bb.get(rdata, 0, size);
         return rdata;
     }
@@ -331,5 +334,16 @@ public class IGMP extends BasePacket {
         result = prime * result + this.checksum;
         result = prime * result + this.groups.hashCode();
         return result;
+    }
+
+    @Override
+    public String toString() {
+        return toStringHelper(getClass())
+                .add("igmpType", Byte.toString(igmpType))
+                .add("resField", Byte.toString(resField))
+                .add("checksum", Short.toString(checksum))
+                .add("unsupportTypeData", Arrays.toString(unsupportTypeData))
+                .toString();
+        // TODO: need to handle groups
     }
 }

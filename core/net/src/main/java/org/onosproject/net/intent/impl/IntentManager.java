@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2014-2016 Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,16 +15,16 @@
  */
 package org.onosproject.net.intent.impl;
 
-import com.google.common.collect.ImmutableList;
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.apache.felix.scr.annotations.Service;
-import org.onosproject.event.AbstractListenerManager;
+import org.onlab.util.Tools;
 import org.onosproject.core.CoreService;
 import org.onosproject.core.IdGenerator;
+import org.onosproject.event.AbstractListenerManager;
 import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.flow.FlowRuleOperations;
 import org.onosproject.net.flow.FlowRuleOperationsContext;
@@ -44,29 +44,35 @@ import org.onosproject.net.intent.IntentStoreDelegate;
 import org.onosproject.net.intent.Key;
 import org.onosproject.net.intent.impl.phase.FinalIntentProcessPhase;
 import org.onosproject.net.intent.impl.phase.IntentProcessPhase;
-import org.onosproject.net.intent.impl.phase.IntentWorker;
 import org.slf4j.Logger;
 
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static org.onlab.util.Tools.groupedThreads;
-import static org.onosproject.net.intent.IntentState.*;
+import static org.onosproject.net.intent.IntentState.CORRUPT;
+import static org.onosproject.net.intent.IntentState.FAILED;
+import static org.onosproject.net.intent.IntentState.INSTALLED;
+import static org.onosproject.net.intent.IntentState.INSTALL_REQ;
+import static org.onosproject.net.intent.IntentState.WITHDRAWING;
+import static org.onosproject.net.intent.IntentState.WITHDRAWN;
+import static org.onosproject.net.intent.IntentState.WITHDRAW_REQ;
 import static org.onosproject.net.intent.constraint.PartialFailureConstraint.intentAllowsPartialFailure;
 import static org.onosproject.net.intent.impl.phase.IntentProcessPhase.newInitialPhase;
 import static org.onosproject.security.AppGuard.checkPermission;
+import static org.onosproject.security.AppPermission.Type.INTENT_READ;
+import static org.onosproject.security.AppPermission.Type.INTENT_WRITE;
 import static org.slf4j.LoggerFactory.getLogger;
-import static org.onosproject.security.AppPermission.Type.*;
 
 
 /**
@@ -269,13 +275,6 @@ public class IntentManager
                 }
             }
         }
-
-        //FIXME
-//        for (ApplicationId appId : batches.keySet()) {
-//            if (batchService.isLocalLeader(appId)) {
-//                execute(batches.get(appId).build());
-//            }
-//        }
     }
 
     // Topology change delegate
@@ -287,70 +286,6 @@ public class IntentManager
         }
     }
 
-    private Future<FinalIntentProcessPhase> submitIntentData(IntentData data) {
-        IntentData current = store.getIntentData(data.key());
-        IntentProcessPhase initial = newInitialPhase(processor, data, current);
-        return workerExecutor.submit(new IntentWorker(initial));
-    }
-
-    private class IntentBatchProcess implements Runnable {
-
-        protected final Collection<IntentData> data;
-
-        IntentBatchProcess(Collection<IntentData> data) {
-            this.data = checkNotNull(data);
-        }
-
-        @Override
-        public void run() {
-            try {
-                /*
-                 1. wrap each intentdata in a runnable and submit
-                 2. wait for completion of all the work
-                 3. accumulate results and submit batch write of IntentData to store
-                    (we can also try to update these individually)
-                 */
-                submitUpdates(waitForFutures(createIntentUpdates()));
-            } catch (Exception e) {
-                log.error("Error submitting batches:", e);
-                // FIXME incomplete Intents should be cleaned up
-                //       (transition to FAILED, etc.)
-
-                // the batch has failed
-                // TODO: maybe we should do more?
-                log.error("Walk the plank, matey...");
-                //FIXME
-//            batchService.removeIntentOperations(data);
-            }
-            accumulator.ready();
-        }
-
-        private List<Future<FinalIntentProcessPhase>> createIntentUpdates() {
-            return data.stream()
-                    .map(IntentManager.this::submitIntentData)
-                    .collect(Collectors.toList());
-        }
-
-        private List<FinalIntentProcessPhase> waitForFutures(List<Future<FinalIntentProcessPhase>> futures) {
-            ImmutableList.Builder<FinalIntentProcessPhase> updateBuilder = ImmutableList.builder();
-            for (Future<FinalIntentProcessPhase> future : futures) {
-                try {
-                    updateBuilder.add(future.get());
-                } catch (InterruptedException | ExecutionException e) {
-                    //FIXME
-                    log.warn("Future failed: {}", e);
-                }
-            }
-            return updateBuilder.build();
-        }
-
-        private void submitUpdates(List<FinalIntentProcessPhase> updates) {
-            store.batchWrite(updates.stream()
-                                     .map(FinalIntentProcessPhase::data)
-                                     .collect(Collectors.toList()));
-        }
-    }
-
     private class InternalBatchDelegate implements IntentBatchDelegate {
         @Override
         public void execute(Collection<IntentData> operations) {
@@ -358,8 +293,40 @@ public class IntentManager
             log.trace("Execute operations: {}", operations);
 
             // batchExecutor is single-threaded, so only one batch is in flight at a time
-            batchExecutor.execute(new IntentBatchProcess(operations));
+            CompletableFuture.runAsync(() -> {
+                // process intent until the phase reaches one of the final phases
+                List<CompletableFuture<IntentData>> futures = operations.stream()
+                        .map(x -> CompletableFuture.completedFuture(x)
+                                .thenApply(IntentManager.this::createInitialPhase)
+                                .thenApplyAsync(IntentProcessPhase::process, workerExecutor)
+                                .thenApply(FinalIntentProcessPhase::data)
+                                .exceptionally(e -> {
+                                    //FIXME
+                                    log.warn("Future failed: {}", e);
+                                    return null;
+                                })).collect(Collectors.toList());
+
+                // write multiple data to store in order
+                store.batchWrite(Tools.allOf(futures).join().stream()
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList()));
+            }, batchExecutor).exceptionally(e -> {
+                log.error("Error submitting batches:", e);
+                // FIXME incomplete Intents should be cleaned up
+                //       (transition to FAILED, etc.)
+
+                // the batch has failed
+                // TODO: maybe we should do more?
+                log.error("Walk the plank, matey...");
+                return null;
+            }).thenRun(accumulator::ready);
+
         }
+    }
+
+    private IntentProcessPhase createInitialPhase(IntentData data) {
+        IntentData current = store.getIntentData(data.key());
+        return newInitialPhase(processor, data, current);
     }
 
     private class InternalIntentProcessor implements IntentProcessor {
@@ -477,10 +444,10 @@ public class IntentManager
 
         if (log.isTraceEnabled()) {
             log.trace("applying intent {} -> {} with {} rules: {}",
-                      toUninstall.isPresent() ? toUninstall.get().key() : "<empty>",
-                      toInstall.isPresent() ? toInstall.get().key() : "<empty>",
-                      operations.stages().stream().mapToLong(i -> i.size()).sum(),
-                      operations.stages());
+                    toUninstall.map(x -> x.key().toString()).orElse("<empty>"),
+                    toInstall.map(x -> x.key().toString()).orElse("<empty>"),
+                    operations.stages().stream().mapToLong(i -> i.size()).sum(),
+                    operations.stages());
         }
 
         flowRuleService.apply(operations);

@@ -95,15 +95,15 @@ public abstract class Config<S> {
      * <p>
      * Default implementation returns true.
      * Subclasses are expected to override this with their own validation.
-     * </p>
+     * Implementations are free to throw a RuntimeException if data is invalid.
+     * * </p>
      *
      * @return true if the data is valid; false otherwise
+     * @throws RuntimeException if configuration is invalid or completely foobar
      */
     public boolean isValid() {
-        // TODO: figure out what assertions could be made in the base class
-        // NOTE: The thought is to have none, but instead to provide a set
-        // of predicates to allow configs to test validity of present fields,
-        // e.g.:
+        // Derivatives should use the provided set of predicates to test
+        // validity of their fields, e.g.:
         //      isString(path)
         //      isBoolean(path)
         //      isNumber(path, [min, max])
@@ -188,6 +188,17 @@ public abstract class Config<S> {
      */
     protected boolean get(String name, boolean defaultValue) {
         return object.path(name).asBoolean(defaultValue);
+    }
+
+    /**
+     * Clears the specified property.
+     *
+     * @param name  property name
+     * @return self
+     */
+    protected Config<S> clear(String name) {
+        object.remove(name);
+        return this;
     }
 
     /**
@@ -437,7 +448,38 @@ public abstract class Config<S> {
      */
     protected boolean isNumber(String field, FieldPresence presence, long... minMax) {
         JsonNode node = object.path(field);
-        return isValid(node, presence, (node.isLong() || node.isInt()) &&
+        return isValid(node, presence, node.isNumber() &&
+                (minMax.length > 0 && minMax[0] <= node.asLong() || minMax.length < 1) &&
+                (minMax.length > 1 && minMax[1] > node.asLong() || minMax.length < 2));
+    }
+    /**
+     * Indicates whether the specified field holds a valid number.
+     *
+     * @param field    JSON field name
+     * @param presence specifies if field is optional or mandatory
+     * @param minMax   optional min/max values
+     * @return true if valid; false otherwise
+     * @throws IllegalArgumentException if field is present, but not valid
+     */
+    protected boolean isNumber(String field, FieldPresence presence, double... minMax) {
+        JsonNode node = object.path(field);
+        return isValid(node, presence, node.isNumber() &&
+                (minMax.length > 0 && minMax[0] <= node.asDouble() || minMax.length < 1) &&
+                (minMax.length > 1 && minMax[1] > node.asDouble() || minMax.length < 2));
+    }
+
+    /**
+     * Indicates whether the specified field holds a valid integer.
+     *
+     * @param field    JSON field name
+     * @param presence specifies if field is optional or mandatory
+     * @param minMax   optional min/max values
+     * @return true if valid; false otherwise
+     * @throws IllegalArgumentException if field is present, but not valid
+     */
+    protected boolean isIntegralNumber(String field, FieldPresence presence, long... minMax) {
+        JsonNode node = object.path(field);
+        return isValid(node, presence, node.isIntegralNumber() &&
                 (minMax.length > 0 && minMax[0] <= node.asLong() || minMax.length < 1) &&
                 (minMax.length > 1 && minMax[1] > node.asLong() || minMax.length < 2));
     }
@@ -459,6 +501,19 @@ public abstract class Config<S> {
     }
 
     /**
+     * Indicates whether the specified field holds a valid boolean value.
+     *
+     * @param field    JSON field name
+     * @param presence specifies if field is optional or mandatory
+     * @return true if valid; false otherwise
+     * @throws IllegalArgumentException if field is present, but not valid
+     */
+    protected boolean isBoolean(String field, FieldPresence presence) {
+        JsonNode node = object.path(field);
+        return isValid(node, presence, node.isBoolean());
+    }
+
+    /**
      * Indicates whether the node is present and of correct value or not
      * mandatory and absent.
      *
@@ -471,5 +526,4 @@ public abstract class Config<S> {
         boolean isMandatory = presence == FieldPresence.MANDATORY;
         return isMandatory && correctValue || !isMandatory && !node.isNull() || correctValue;
     }
-
 }

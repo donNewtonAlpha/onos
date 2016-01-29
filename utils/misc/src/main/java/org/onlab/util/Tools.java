@@ -49,11 +49,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import org.slf4j.Logger;
 
+import com.google.common.base.Charsets;
 import com.google.common.base.Strings;
 import com.google.common.primitives.UnsignedLongs;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -207,6 +209,24 @@ public abstract class Tools {
      */
     public static String toHex(long value, int width) {
         return Strings.padStart(UnsignedLongs.toString(value, 16), width, '0');
+    }
+
+    /**
+     * Returns the UTF-8 encoded byte[] representation of a String.
+     * @param input input string
+     * @return UTF-8 encoded byte array
+     */
+    public static byte[] getBytesUtf8(String input) {
+        return input.getBytes(Charsets.UTF_8);
+    }
+
+    /**
+     * Returns the String representation of UTF-8 encoded byte[].
+     * @param input input byte array
+     * @return UTF-8 encoded string
+     */
+    public static String toStringUtf8(byte[] input) {
+        return new String(input, Charsets.UTF_8);
     }
 
     /**
@@ -514,6 +534,22 @@ public abstract class Tools {
         CompletableFuture<T> future = new CompletableFuture<>();
         future.completeExceptionally(t);
         return future;
+    }
+
+    /**
+     * Returns a new CompletableFuture completed with a list of computed values
+     * when all of the given CompletableFuture complete.
+     *
+     * @param futures the CompletableFutures
+     * @param <T> value type of CompletableFuture
+     * @return a new CompletableFuture that is completed when all of the given CompletableFutures complete
+     */
+    public static <T> CompletableFuture<List<T>> allOf(List<CompletableFuture<T>> futures) {
+        return CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()]))
+                .thenApply(v -> futures.stream()
+                                .map(CompletableFuture::join)
+                                .collect(Collectors.toList())
+                );
     }
 
     /**

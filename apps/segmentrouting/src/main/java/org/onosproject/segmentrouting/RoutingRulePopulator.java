@@ -23,6 +23,7 @@ import org.onlab.packet.IpPrefix;
 import org.onlab.packet.MacAddress;
 import org.onlab.packet.MplsLabel;
 import org.onlab.packet.VlanId;
+import org.onosproject.net.ConnectPoint;
 import org.onosproject.segmentrouting.config.DeviceConfigNotFoundException;
 import org.onosproject.segmentrouting.config.DeviceConfiguration;
 import org.onosproject.segmentrouting.grouphandler.NeighborSet;
@@ -49,11 +50,15 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+/**
+ * Populator of segment routing flow rules.
+ */
 public class RoutingRulePopulator {
     private static final Logger log = LoggerFactory
             .getLogger(RoutingRulePopulator.class);
@@ -63,6 +68,10 @@ public class RoutingRulePopulator {
     private DeviceConfiguration config;
 
     private static final int HIGHEST_PRIORITY = 0xffff;
+    //
+    private static final int XCONNECT_PRIORITY = 1000;
+    private static final int DEFAULT_PRIORITY = 100;
+    private static final int FLOOD_PRIORITY = 5;
     private static final long OFPP_MAX = 0xffffff00L;
 
 
@@ -120,6 +129,14 @@ public class RoutingRulePopulator {
         rulePopulationCounter.incrementAndGet();
     }
 
+    /**
+     * Removes IP rules for host when the host is gone.
+     *
+     * @param deviceId device ID of the device that host attaches to
+     * @param hostIp IP address of the host
+     * @param hostMac MAC address of the host
+     * @param outPort port that host attaches to
+     */
     public void revokeIpRuleForHost(DeviceId deviceId, Ip4Address hostIp,
             MacAddress hostMac, PortNumber outPort) {
         log.debug("Revoke IP table entry for host {} at {}:{}",
@@ -147,21 +164,35 @@ public class RoutingRulePopulator {
         TrafficSelector.Builder sbuilder = DefaultTrafficSelector.builder();
         TrafficTreatment.Builder tbuilder = DefaultTrafficTreatment.builder();
 
-        sbuilder.matchIPDst(IpPrefix.valueOf(hostIp, IpPrefix.MAX_INET_MASK_LENGTH));
         sbuilder.matchEthType(Ethernet.TYPE_IPV4);
+        sbuilder.matchIPDst(IpPrefix.valueOf(hostIp, IpPrefix.MAX_INET_MASK_LENGTH));
+        TrafficSelector selector = sbuilder.build();
 
         tbuilder.deferred()
                 .setEthDst(hostMac)
                 .setEthSrc(deviceMac)
                 .setOutput(outPort);
-
         TrafficTreatment treatment = tbuilder.build();
-        TrafficSelector selector = sbuilder.build();
+
+        // All forwarding is via Groups. Drivers can re-purpose to flow-actions if needed.
+        // for switch pipelines that need it, provide outgoing vlan as metadata
+        VlanId outvlan = null;
+        Ip4Prefix subnet = srManager.deviceConfiguration.getPortSubnet(deviceId, outPort);
+        if (subnet == null) {
+            outvlan = VlanId.vlanId(SegmentRoutingManager.ASSIGNED_VLAN_NO_SUBNET);
+        } else {
+            outvlan = srManager.getSubnetAssignedVlanId(deviceId, subnet);
+        }
+        TrafficSelector meta = DefaultTrafficSelector.builder()
+                                    .matchVlanId(outvlan).build();
+        int portNextObjId = srManager.getPortNextObjectiveId(deviceId, outPort,
+                                                             treatment, meta);
 
         return DefaultForwardingObjective.builder()
+                .withSelector(selector)
+                .nextStep(portNextObjId)
                 .fromApp(srManager.appId).makePermanent()
-                .withSelector(selector).withTreatment(treatment)
-                .withPriority(100).withFlag(ForwardingObjective.Flag.SPECIFIC);
+                .withPriority(DEFAULT_PRIORITY).withFlag(ForwardingObjective.Flag.SPECIFIC);
     }
 
     /**
@@ -199,6 +230,13 @@ public class RoutingRulePopulator {
     public boolean populateIpRuleForRouter(DeviceId deviceId,
                                            IpPrefix ipPrefix, DeviceId destSw,
                                            Set<DeviceId> nextHops) {
+        // TODO: OFDPA does not support /32 with ECMP group at this moment.
+        //       Use /31 instead
+        IpPrefix effectivePrefix =
+                (ipPrefix.prefixLength() == IpPrefix.MAX_INET_MASK_LENGTH) ?
+                        IpPrefix.valueOf(ipPrefix.getIp4Prefix().address(), 31) :
+                        ipPrefix;
+
         int segmentId;
         try {
             segmentId = config.getSegmentId(destSw);
@@ -208,7 +246,7 @@ public class RoutingRulePopulator {
         }
 
         TrafficSelector.Builder sbuilder = DefaultTrafficSelector.builder();
-        sbuilder.matchIPDst(ipPrefix);
+        sbuilder.matchIPDst(effectivePrefix);
         sbuilder.matchEthType(Ethernet.TYPE_IPV4);
         TrafficSelector selector = sbuilder.build();
 
@@ -246,7 +284,7 @@ public class RoutingRulePopulator {
                 .makePermanent()
                 .nextStep(nextId)
                 .withSelector(selector)
-                .withPriority(100)
+                .withPriority(2000 * effectivePrefix.prefixLength())
                 .withFlag(ForwardingObjective.Flag.SPECIFIC);
         if (treatment != null) {
             fwdBuilder.withTreatment(treatment);
@@ -289,6 +327,7 @@ public class RoutingRulePopulator {
         // TODO Handle the case of Bos == false
         sbuilder.matchEthType(Ethernet.MPLS_UNICAST);
         sbuilder.matchMplsLabel(MplsLabel.mplsLabel(segmentId));
+        sbuilder.matchMplsBos(true);
         TrafficSelector selector = sbuilder.build();
 
         // setup metadata to pass to nextObjective - indicate the vlan on egress
@@ -354,7 +393,7 @@ public class RoutingRulePopulator {
         for (ForwardingObjective.Builder fwdObjBuilder : fwdObjBuilders) {
             ((Builder) ((Builder) fwdObjBuilder.fromApp(srManager.appId)
                     .makePermanent()).withSelector(selector)
-                    .withPriority(100))
+                    .withPriority(DEFAULT_PRIORITY))
                     .withFlag(ForwardingObjective.Flag.SPECIFIC);
             srManager.flowObjectiveService.
                 forward(deviceId,
@@ -449,12 +488,13 @@ public class RoutingRulePopulator {
                 FilteringObjective.Builder fob = DefaultFilteringObjective.builder();
                 fob.withKey(Criteria.matchInPort(port.number()))
                 .addCondition(Criteria.matchEthDst(deviceMac))
-                .addCondition(Criteria.matchVlanId(VlanId.NONE));
+                .addCondition(Criteria.matchVlanId(VlanId.NONE))
+                .withPriority(DEFAULT_PRIORITY);
                 // vlan assignment is valid only if this instance is master
                 if (srManager.mastershipService.isLocalMaster(deviceId)) {
                     TrafficTreatment tt = DefaultTrafficTreatment.builder()
                             .pushVlan().setVlanId(assignedVlan).build();
-                    fob.setMeta(tt);
+                    fob.withMeta(tt);
                 }
                 fob.permit().fromApp(srManager.appId);
                 srManager.flowObjectiveService.
@@ -526,6 +566,12 @@ public class RoutingRulePopulator {
             int nextId = srManager.getSubnetNextObjectiveId(deviceId, subnet);
             VlanId vlanId = srManager.getSubnetAssignedVlanId(deviceId, subnet);
 
+            if (nextId < 0 || vlanId == null) {
+                log.error("Cannot install subnet broadcast rule in dev:{} due"
+                        + "to vlanId:{} or nextId:{}", vlanId, nextId);
+                return;
+            }
+
             /* Driver should treat objective with MacAddress.NONE as the
              * subnet broadcast rule
              */
@@ -537,7 +583,7 @@ public class RoutingRulePopulator {
             fob.withFlag(Flag.SPECIFIC)
                     .withSelector(sbuilder.build())
                     .nextStep(nextId)
-                    .withPriority(5)
+                    .withPriority(FLOOD_PRIORITY)
                     .fromApp(srManager.appId)
                     .makePermanent();
 
@@ -551,6 +597,86 @@ public class RoutingRulePopulator {
         });
     }
 
+    /**
+     * Creates a filtering objective to permit VLAN cross-connect traffic.
+     *
+     * @param deviceId the DPID of the switch
+     */
+    public void populateXConnectVlanFilters(DeviceId deviceId) {
+        Map<VlanId, List<ConnectPoint>> xConnectsForDevice =
+                config.getXConnects();
+        xConnectsForDevice.forEach((vlanId, connectPoints) -> {
+            // Only proceed  the xConnect for given device
+            for (ConnectPoint connectPoint : connectPoints) {
+                if (!connectPoint.deviceId().equals(deviceId)) {
+                    return;
+                }
+            }
+
+            connectPoints.forEach(connectPoint -> {
+                FilteringObjective.Builder fob = DefaultFilteringObjective.builder();
+                fob.withKey(Criteria.matchInPort(connectPoint.port()))
+                        .addCondition(Criteria.matchVlanId(vlanId))
+                        .addCondition(Criteria.matchEthDst(MacAddress.NONE))
+                        .withPriority(XCONNECT_PRIORITY);
+
+                fob.permit().fromApp(srManager.appId);
+                srManager.flowObjectiveService
+                        .filter(deviceId, fob.add(new SRObjectiveContext(deviceId,
+                                SRObjectiveContext.ObjectiveType.FILTER)));
+            });
+        });
+    }
+
+    /**
+     * Populates a forwarding objective that points the VLAN cross-connect
+     * packets to a broadcast group.
+     *
+     * @param deviceId switch ID to set the rules
+     */
+    public void populateXConnectBroadcastRule(DeviceId deviceId) {
+        Map<VlanId, List<ConnectPoint>> xConnects =
+                config.getXConnects();
+        xConnects.forEach((vlanId, connectPoints) -> {
+            // Only proceed  the xConnect for given device
+            for (ConnectPoint connectPoint : connectPoints) {
+                if (!connectPoint.deviceId().equals(deviceId)) {
+                    return;
+                }
+            }
+
+            int nextId = srManager.getXConnectNextObjectiveId(deviceId, vlanId);
+            if (nextId < 0) {
+                log.error("Cannot install cross-connect broadcast rule in dev:{} " +
+                        "due to missing nextId:{}", deviceId, nextId);
+                return;
+            }
+
+            /*
+             * Driver should treat objectives with MacAddress.NONE and !VlanId.NONE
+             * as the VLAN cross-connect broadcast rules
+             */
+            TrafficSelector.Builder sbuilder = DefaultTrafficSelector.builder();
+            sbuilder.matchVlanId(vlanId);
+            sbuilder.matchEthDst(MacAddress.NONE);
+
+            ForwardingObjective.Builder fob = DefaultForwardingObjective.builder();
+            fob.withFlag(Flag.SPECIFIC)
+                    .withSelector(sbuilder.build())
+                    .nextStep(nextId)
+                    .withPriority(DEFAULT_PRIORITY)
+                    .fromApp(srManager.appId)
+                    .makePermanent();
+
+            srManager.flowObjectiveService.forward(
+                    deviceId,
+                    fob.add(new SRObjectiveContext(
+                            deviceId,
+                            SRObjectiveContext.ObjectiveType.FORWARDING)
+                    )
+            );
+        });
+    }
 
     private static class SRObjectiveContext implements ObjectiveContext {
         enum ObjectiveType {

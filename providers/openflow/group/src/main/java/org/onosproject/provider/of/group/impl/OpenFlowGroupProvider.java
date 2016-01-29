@@ -128,7 +128,8 @@ public class OpenFlowGroupProvider extends AbstractProvider implements GroupProv
     public void deactivate() {
         providerRegistry.unregister(this);
         providerService = null;
-
+        collectors.values().forEach(GroupStatsCollector::stop);
+        collectors.clear();
         log.info("Stopped");
     }
 
@@ -224,14 +225,14 @@ public class OpenFlowGroupProvider extends AbstractProvider implements GroupProv
                                    OFGroupDescStatsReply groupDescStatsReply) {
 
         Map<Integer, Group> groups = Maps.newHashMap();
-
+        Dpid dpid = Dpid.dpid(deviceId.uri());
 
         for (OFGroupDescStatsEntry entry: groupDescStatsReply.getEntries()) {
             int id = entry.getGroup().getGroupNumber();
             GroupId groupId = new DefaultGroupId(id);
             GroupDescription.Type type = getGroupType(entry.getGroupType());
-            GroupBuckets buckets = new GroupBucketEntryBuilder(entry.getBuckets(),
-                    entry.getGroupType()).build();
+            GroupBuckets buckets = new GroupBucketEntryBuilder(dpid, entry.getBuckets(),
+                    entry.getGroupType(), driverService).build();
             DefaultGroup group = new DefaultGroup(groupId, deviceId, type, buckets);
             groups.put(id, group);
         }
@@ -352,10 +353,12 @@ public class OpenFlowGroupProvider extends AbstractProvider implements GroupProv
                 return;
             }
             if (isGroupSupported(sw)) {
-                GroupStatsCollector gsc = new GroupStatsCollector(
-                        controller.getSwitch(dpid), POLL_INTERVAL);
+                GroupStatsCollector gsc = new GroupStatsCollector(sw, POLL_INTERVAL);
                 gsc.start();
-                collectors.put(dpid, gsc);
+                GroupStatsCollector prevGsc = collectors.put(dpid, gsc);
+                if (prevGsc != null) {
+                    prevGsc.stop();
+                }
             }
 
             //figure out race condition

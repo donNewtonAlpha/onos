@@ -15,6 +15,7 @@
  */
 package org.onosproject.rest;
 
+import com.eclipsesource.json.Json;
 import com.eclipsesource.json.JsonArray;
 import com.eclipsesource.json.JsonObject;
 import com.google.common.collect.ImmutableList;
@@ -84,19 +85,27 @@ public class ApplicationsResourceTest extends ResourceTest {
 
     private Application app1 =
             new DefaultApplication(id1, VER,
-                                   "app1", "origin1", ApplicationRole.ADMIN, ImmutableSet.of(), Optional.of(FURL),
+                                   "app1", "origin1", "category1", "url1",
+                                   "readme1", new byte[0], ApplicationRole.ADMIN,
+                                   ImmutableSet.of(), Optional.of(FURL),
                                    ImmutableList.of("My Feature"), ImmutableList.of());
     private Application app2 =
             new DefaultApplication(id2, VER,
-                                   "app2", "origin2", ApplicationRole.ADMIN, ImmutableSet.of(), Optional.of(FURL),
+                                   "app2", "origin2", "category2", "url2",
+                                   "readme2", new byte[0], ApplicationRole.ADMIN,
+                                   ImmutableSet.of(), Optional.of(FURL),
                                    ImmutableList.of("My Feature"), ImmutableList.of());
     private Application app3 =
             new DefaultApplication(id3, VER,
-                                   "app3", "origin3", ApplicationRole.ADMIN, ImmutableSet.of(), Optional.of(FURL),
+                                   "app3", "origin3", "category3", "url3",
+                                   "readme3", new byte[0], ApplicationRole.ADMIN,
+                                   ImmutableSet.of(), Optional.of(FURL),
                                    ImmutableList.of("My Feature"), ImmutableList.of());
     private Application app4 =
             new DefaultApplication(id4, VER,
-                                   "app4", "origin4", ApplicationRole.ADMIN, ImmutableSet.of(), Optional.of(FURL),
+                                   "app4", "origin4", "category4", "url4",
+                                   "readme4", new byte[0], ApplicationRole.ADMIN,
+                                   ImmutableSet.of(), Optional.of(FURL),
                                    ImmutableList.of("My Feature"), ImmutableList.of());
 
     /**
@@ -227,7 +236,7 @@ public class ApplicationsResourceTest extends ResourceTest {
         String response = rs.path("applications").get(String.class);
         assertThat(response, containsString("{\"applications\":["));
 
-        JsonObject result = JsonObject.readFrom(response);
+        JsonObject result = Json.parse(response).asObject();
         assertThat(result, notNullValue());
 
         assertThat(result.names(), hasSize(1));
@@ -253,7 +262,7 @@ public class ApplicationsResourceTest extends ResourceTest {
         WebResource rs = resource();
         String response = rs.path("applications/three").get(String.class);
 
-        JsonObject result = JsonObject.readFrom(response);
+        JsonObject result = Json.parse(response).asObject();
         assertThat(result, notNullValue());
 
         assertThat(result, matchesApp(app3));
@@ -324,7 +333,7 @@ public class ApplicationsResourceTest extends ResourceTest {
         WebResource rs = resource();
         String response = rs.path("applications").post(String.class, app4Json);
 
-        JsonObject result = JsonObject.readFrom(response);
+        JsonObject result = Json.parse(response).asObject();
         assertThat(result, notNullValue());
 
         assertThat(result, matchesApp(app4));

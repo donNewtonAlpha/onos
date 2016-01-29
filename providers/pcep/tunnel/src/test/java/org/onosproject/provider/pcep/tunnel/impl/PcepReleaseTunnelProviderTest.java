@@ -58,7 +58,7 @@ public class PcepReleaseTunnelProviderTest {
         tunnelProvider.pcepClientController = controller;
         tunnelProvider.controller = ctl;
         tunnelProvider.tunnelService = tunnelService;
-        tunnelProvider.pcepTunnelAPIMapper = pcepTunnelAPIMapper;
+        tunnelProvider.pcepTunnelApiMapper = pcepTunnelAPIMapper;
         tunnelProvider.cfgService = new ComponentConfigAdapter();
         tunnelProvider.activate();
 
@@ -84,7 +84,8 @@ public class PcepReleaseTunnelProviderTest {
 
         ConnectPoint dst = new ConnectPoint(dstElementId, PortNumber.portNumber(10023));
 
-        Link link = new DefaultLink(pid, src, dst, Link.Type.DIRECT, EMPTY);
+        Link link = DefaultLink.builder().providerId(pid).src(src).dst(dst)
+                .type(Link.Type.DIRECT).build();
         links.add(link);
 
         path = new DefaultPath(pid, links, 20, EMPTY);
@@ -98,9 +99,9 @@ public class PcepReleaseTunnelProviderTest {
         pcepTunnelData.setPlspId(1);
         StatefulIPv4LspIdentidiersTlv tlv = new StatefulIPv4LspIdentidiersTlv(0, (short) 1, (short) 2, 3, 4);
         pcepTunnelData.setStatefulIpv4IndentifierTlv(tlv);
-        tunnelProvider.pcepTunnelAPIMapper.addToTunnelIdMap(pcepTunnelData);
+        tunnelProvider.pcepTunnelApiMapper.addToTunnelIdMap(pcepTunnelData);
 
-        tunnelProvider.pcepTunnelAPIMapper.handleCreateTunnelRequestQueue(1, pcepTunnelData);
+        tunnelProvider.pcepTunnelApiMapper.handleCreateTunnelRequestQueue(1, pcepTunnelData);
 
         tunnelProvider.releaseTunnel(tunnel);
     }

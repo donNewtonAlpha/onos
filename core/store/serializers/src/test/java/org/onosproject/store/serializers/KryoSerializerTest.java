@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2014-2016 Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ import org.onosproject.core.DefaultGroupId;
 import org.onosproject.mastership.MastershipTerm;
 import org.onosproject.net.Annotations;
 import org.onosproject.net.ChannelSpacing;
+import org.onosproject.net.CltSignalType;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.DefaultAnnotations;
 import org.onosproject.net.DefaultDevice;
@@ -61,7 +62,7 @@ import org.onosproject.net.flow.FlowId;
 import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.flow.FlowRuleBatchEntry;
 import org.onosproject.net.intent.IntentId;
-import org.onosproject.net.newresource.ResourcePath;
+import org.onosproject.net.newresource.Resources;
 import org.onosproject.net.provider.ProviderId;
 import org.onosproject.net.resource.link.BandwidthResource;
 import org.onosproject.net.resource.link.BandwidthResourceAllocation;
@@ -182,8 +183,19 @@ public class KryoSerializerTest {
 
     @Test
     public void testDefaultLink() {
-        testSerializedEquals(new DefaultLink(PID, CP1, CP2, Link.Type.DIRECT));
-        testSerializedEquals(new DefaultLink(PID, CP1, CP2, Link.Type.DIRECT, A1));
+        testSerializedEquals(DefaultLink.builder()
+                                     .providerId(PID)
+                                     .src(CP1)
+                                     .dst(CP2)
+                                     .type(Link.Type.DIRECT)
+                                     .build());
+        testSerializedEquals(DefaultLink.builder()
+                                     .providerId(PID)
+                                     .src(CP1)
+                                     .dst(CP2)
+                                     .type(Link.Type.DIRECT)
+                                     .annotations(A1)
+                                     .build());
     }
 
     @Test
@@ -208,8 +220,8 @@ public class KryoSerializerTest {
 
     @Test
     public void testOduCltPort() {
-        testSerializedEquals(new OduCltPort(DEV1, P1, true, OduCltPort.SignalType.CLT_10GBE));
-        testSerializedEquals(new OduCltPort(DEV1, P1, true, OduCltPort.SignalType.CLT_10GBE, A1_2));
+        testSerializedEquals(new OduCltPort(DEV1, P1, true, CltSignalType.CLT_10GBE));
+        testSerializedEquals(new OduCltPort(DEV1, P1, true, CltSignalType.CLT_10GBE, A1_2));
     }
 
     @Test
@@ -366,21 +378,28 @@ public class KryoSerializerTest {
                         .addBandwidthRequest(32.195)
                         .build();
         Map<Link, Set<ResourceAllocation>> allocations = new HashMap<>();
-        allocations.put(new DefaultLink(PID, CP1, CP2, Type.DIRECT),
+        allocations.put(DefaultLink.builder()
+                                .providerId(PID)
+                                .src(CP1).dst(CP2).type(Type.DIRECT).build(),
                         ImmutableSet.of(new BandwidthResourceAllocation(new BandwidthResource(Bandwidth.bps(10.0))),
                                         new LambdaResourceAllocation(LambdaResource.valueOf(1))));
         testSerializable(new DefaultLinkResourceAllocations(request, allocations));
     }
 
     @Test
-    public void testResourcePath() {
-        testSerializedEquals(ResourcePath.discrete(LinkKey.linkKey(CP1, CP2), VLAN1));
+    public void testResource() {
+        testSerializedEquals(Resources.discrete(DID1, P1, VLAN1).resource());
+    }
+
+    @Test
+    public void testResourceId() {
+        testSerializedEquals(Resources.discrete(DID1, P1).id());
     }
 
     @Test
     public void testResourceAllocation() {
         testSerializedEquals(new org.onosproject.net.newresource.ResourceAllocation(
-                ResourcePath.discrete(LinkKey.linkKey(CP1, CP2), VLAN1),
+                Resources.discrete(DID1, P1, VLAN1).resource(),
                 IntentId.valueOf(30)));
     }
 
@@ -391,6 +410,7 @@ public class KryoSerializerTest {
 
     @Test
     public void testBandwidth() {
+        testSerializedEquals(Bandwidth.mbps(1000));
         testSerializedEquals(Bandwidth.mbps(1000.0));
     }
 

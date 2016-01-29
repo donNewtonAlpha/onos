@@ -27,6 +27,7 @@ import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.apache.felix.scr.annotations.Service;
 import org.onosproject.cfg.ComponentConfigService;
+import org.onosproject.core.CoreService;
 import org.onosproject.net.driver.DefaultDriverProviderService;
 import org.onosproject.net.driver.DriverService;
 import org.onosproject.openflow.controller.DefaultOpenFlowPacketContext;
@@ -72,22 +73,26 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-
 import static org.onlab.util.Tools.groupedThreads;
 
 @Component(immediate = true)
 @Service
 public class OpenFlowControllerImpl implements OpenFlowController {
+    private static final String APP_ID = "org.onosproject.openflow-base";
     private static final String DEFAULT_OFPORT = "6633,6653";
     private static final int DEFAULT_WORKER_THREADS = 16;
 
     private static final Logger log =
             LoggerFactory.getLogger(OpenFlowControllerImpl.class);
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected CoreService coreService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected DriverService driverService;
@@ -110,14 +115,20 @@ public class OpenFlowControllerImpl implements OpenFlowController {
     protected ExecutorService executorMsgs =
         Executors.newFixedThreadPool(32, groupedThreads("onos/of", "event-stats-%d"));
 
+    protected ExecutorService executorPacketIn =
+        Executors.newCachedThreadPool(groupedThreads("onos/of", "event-pkt-in-stats-%d"));
+
+    protected ExecutorService executorFlowRemoved =
+        Executors.newCachedThreadPool(groupedThreads("onos/of", "event-flow-removed-stats-%d"));
+
     private final ExecutorService executorBarrier =
         Executors.newFixedThreadPool(4, groupedThreads("onos/of", "event-barrier-%d"));
 
-    protected ConcurrentHashMap<Dpid, OpenFlowSwitch> connectedSwitches =
+    protected ConcurrentMap<Dpid, OpenFlowSwitch> connectedSwitches =
             new ConcurrentHashMap<>();
-    protected ConcurrentHashMap<Dpid, OpenFlowSwitch> activeMasterSwitches =
+    protected ConcurrentMap<Dpid, OpenFlowSwitch> activeMasterSwitches =
             new ConcurrentHashMap<>();
-    protected ConcurrentHashMap<Dpid, OpenFlowSwitch> activeEqualSwitches =
+    protected ConcurrentMap<Dpid, OpenFlowSwitch> activeEqualSwitches =
             new ConcurrentHashMap<>();
 
     protected OpenFlowSwitchAgent agent = new OpenFlowSwitchAgent();
@@ -127,6 +138,8 @@ public class OpenFlowControllerImpl implements OpenFlowController {
             ArrayListMultimap.create();
 
     protected Set<OpenFlowEventListener> ofEventListener = new CopyOnWriteArraySet<>();
+
+    protected boolean monitorAllEvents = false;
 
     protected Multimap<Dpid, OFFlowStatsEntry> fullFlowStats =
             ArrayListMultimap.create();
@@ -147,15 +160,24 @@ public class OpenFlowControllerImpl implements OpenFlowController {
 
     @Activate
     public void activate(ComponentContext context) {
+        coreService.registerApplication(APP_ID, this::preDeactivate);
         cfgService.registerProperties(getClass());
         ctrl.setConfigParams(context.getProperties());
         ctrl.start(agent, driverService);
     }
 
+    private void preDeactivate() {
+        // Close listening channel and all OF channels before deactivating
+        ctrl.stop();
+        connectedSwitches.values().forEach(OpenFlowSwitch::disconnectSwitch);
+    }
+
     @Deactivate
     public void deactivate() {
         cfgService.unregisterProperties(getClass(), false);
-        ctrl.stop();
+        connectedSwitches.clear();
+        activeMasterSwitches.clear();
+        activeEqualSwitches.clear();
     }
 
     @Modified
@@ -193,6 +215,11 @@ public class OpenFlowControllerImpl implements OpenFlowController {
     @Override
     public OpenFlowSwitch getEqualSwitch(Dpid dpid) {
         return activeEqualSwitches.get(dpid);
+    }
+
+    @Override
+    public void monitorAllEvents(boolean monitor) {
+        this.monitorAllEvents = monitor;
     }
 
     @Override
@@ -258,11 +285,19 @@ public class OpenFlowControllerImpl implements OpenFlowController {
             for (PacketListener p : ofPacketListener.values()) {
                 p.handlePacket(pktCtx);
             }
+            if (monitorAllEvents) {
+                executorPacketIn.submit(new OFMessageHandler(dpid, msg));
+            }
             break;
         // TODO: Consider using separate threadpool for sensitive messages.
         //    ie. Back to back error could cause us to starve.
         case FLOW_REMOVED:
+            if (monitorAllEvents) {
+                executorFlowRemoved.submit(new OFMessageHandler(dpid, msg));
+                break;
+            }
         case ERROR:
+            log.debug("Received error message from {}: {}", dpid, msg);
             executorMsgs.submit(new OFMessageHandler(dpid, msg));
             break;
         case STATS_REPLY:
@@ -611,6 +646,9 @@ public class OpenFlowControllerImpl implements OpenFlowController {
         }
     }
 
+    /**
+     * OpenFlow message handler for incoming control messages.
+     */
     protected final class OFMessageHandler implements Runnable {
 
         protected final OFMessage msg;
@@ -627,7 +665,5 @@ public class OpenFlowControllerImpl implements OpenFlowController {
                 listener.handleMessage(dpid, msg);
             }
         }
-
     }
-
 }

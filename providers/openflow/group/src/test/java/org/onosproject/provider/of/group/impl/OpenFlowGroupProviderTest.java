@@ -289,6 +289,10 @@ public class OpenFlowGroupProviderTest {
             return null;
         }
 
+        @Override
+        public void monitorAllEvents(boolean monitor) {
+        }
+
     }
 
     private class TestGroupProviderRegistry implements GroupProviderRegistry {
@@ -406,6 +410,14 @@ public class OpenFlowGroupProviderTest {
         @Override
         public String channelId() {
             return null;
+        }
+
+        @Override
+        public void addEventListener(OpenFlowEventListener listener) {
+        }
+
+        @Override
+        public void removeEventListener(OpenFlowEventListener listener) {
         }
 
     }

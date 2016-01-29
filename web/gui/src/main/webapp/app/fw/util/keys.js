@@ -21,7 +21,11 @@
     'use strict';
 
     // references to injected services
-    var $log, fs, ts, ns, qhs;
+    var $log, $timeout, fs, ts, ns, qhs;
+
+    // constants
+    var eeggMin = 'shiftO',
+        eeggMax = 'shiftONOS';
 
     // internal state
     var enabled = true,
@@ -32,10 +36,30 @@
             viewKeys: {},
             viewFn: null,
             viewGestures: []
-        };
+        },
+        eegg = '';
+
+    function layEgg(key) {
+        eegg += key;
+        if (eeggMax.indexOf(eegg) === 0) {
+            if (eegg === eeggMax) {
+                d3.select('body').append('div').attr('id', 'eegg')
+                    .append('img').attr('src', 'data/img/eegg.png');
+                $timeout(function () { d3.select('#eegg').remove(); }, 3000);
+                eegg = '';
+            }
+            return true;
+        }
+        if (eegg !== eeggMin) {
+            eegg = '';
+        }
+        return false;
+    }
 
     function whatKey(code) {
         switch (code) {
+            case 8: return 'delete';
+            case 9: return 'tab';
             case 13: return 'enter';
             case 16: return 'shift';
             case 17: return 'ctrl';
@@ -48,13 +72,17 @@
             case 40: return 'downArrow';
             case 91: return 'cmdLeft';
             case 93: return 'cmdRight';
+            case 186: return 'semicolon';
             case 187: return 'equals';
             case 188: return 'comma';
             case 189: return 'dash';
             case 190: return 'dot';
             case 191: return 'slash';
             case 192: return 'backQuote';
+            case 219: return 'openBracket';
             case 220: return 'backSlash';
+            case 221: return 'closeBracket';
+            case 222: return 'quote';
             default:
                 if ((code >= 48 && code <= 57) ||
                     (code >= 65 && code <= 90)) {
@@ -81,6 +109,8 @@
         d3.event.stopPropagation();
 
         if (enabled) {
+            if (layEgg(key)) return;
+
             // global callback?
             if (gcb && gcb(token, key, keyCode, event)) {
                 // if the event was 'handled', we are done
@@ -199,10 +229,11 @@
 
     angular.module('onosUtil')
     .factory('KeyService',
-        ['$log', 'FnService', 'ThemeService', 'NavService',
+        ['$log', '$timeout', 'FnService', 'ThemeService', 'NavService',
 
-        function (_$log_, _fs_, _ts_, _ns_) {
+        function (_$log_, _$timeout_, _fs_, _ts_, _ns_) {
             $log = _$log_;
+            $timeout = _$timeout_;
             fs = _fs_;
             ts = _ts_;
             ns = _ns_;

@@ -34,7 +34,7 @@ import static org.onlab.packet.PacketUtils.checkHeaderLength;
 import static org.onlab.packet.PacketUtils.checkInput;
 
 /**
- *
+ * Ethernet Packet.
  */
 public class Ethernet extends BasePacket {
     private static final String HEXES = "0123456789ABCDEF";
@@ -888,5 +888,4 @@ public class Ethernet extends BasePacket {
             return eth;
         };
     }
-
 }

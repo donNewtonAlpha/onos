@@ -88,7 +88,7 @@ public class OpenFlowPacketProviderTest {
     private static final TrafficTreatment TR = treatment(INST1, INST2);
     private static final TrafficTreatment TR_MISSING = treatment(INST1, INST3);
 
-    private static final byte[] ANY = new byte [] {0, 0, 0, 0};
+    private static final byte[] ANY = new byte[] {0, 0, 0, 0};
 
     private final OpenFlowPacketProvider provider = new OpenFlowPacketProvider();
     private final TestPacketRegistry registry = new TestPacketRegistry();
@@ -287,6 +287,10 @@ public class OpenFlowPacketProviderTest {
         }
 
         @Override
+        public void monitorAllEvents(boolean monitor) {
+        }
+
+        @Override
         public void addListener(OpenFlowSwitchListener listener) {
         }
 
@@ -423,6 +427,14 @@ public class OpenFlowPacketProviderTest {
         @Override
         public String channelId() {
             return "1.2.3.4:1";
+        }
+
+        @Override
+        public void addEventListener(OpenFlowEventListener listener) {
+        }
+
+        @Override
+        public void removeEventListener(OpenFlowEventListener listener) {
         }
 
 

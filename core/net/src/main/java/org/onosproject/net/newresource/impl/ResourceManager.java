@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-2016 Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import org.apache.felix.scr.annotations.Deactivate;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.apache.felix.scr.annotations.Service;
+import org.onlab.util.GuavaCollectors;
 import org.onosproject.event.AbstractListenerManager;
 import org.onosproject.net.newresource.ResourceAdminService;
 import org.onosproject.net.newresource.ResourceAllocation;
@@ -30,17 +31,17 @@ import org.onosproject.net.newresource.ResourceConsumer;
 import org.onosproject.net.newresource.ResourceEvent;
 import org.onosproject.net.newresource.ResourceListener;
 import org.onosproject.net.newresource.ResourceService;
-import org.onosproject.net.newresource.ResourcePath;
+import org.onosproject.net.newresource.Resource;
 import org.onosproject.net.newresource.ResourceStore;
 import org.onosproject.net.newresource.ResourceStoreDelegate;
+import org.slf4j.Logger;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static org.slf4j.LoggerFactory.getLogger;
 
 /**
  * An implementation of ResourceService.
@@ -54,23 +55,29 @@ public final class ResourceManager extends AbstractListenerManager<ResourceEvent
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected ResourceStore store;
 
+    private final Logger log = getLogger(getClass());
+
     private final ResourceStoreDelegate delegate = new InternalStoreDelegate();
 
     @Activate
     public void activate() {
         store.setDelegate(delegate);
         eventDispatcher.addSink(ResourceEvent.class, listenerRegistry);
+
+        log.info("Started");
     }
 
     @Deactivate
     public void deactivate() {
         store.unsetDelegate(delegate);
         eventDispatcher.removeSink(ResourceEvent.class);
+
+        log.info("Stopped");
     }
 
     @Override
     public List<ResourceAllocation> allocate(ResourceConsumer consumer,
-                                             List<ResourcePath> resources) {
+                                             List<Resource> resources) {
         checkNotNull(consumer);
         checkNotNull(resources);
 
@@ -88,7 +95,7 @@ public final class ResourceManager extends AbstractListenerManager<ResourceEvent
     public boolean release(List<ResourceAllocation> allocations) {
         checkNotNull(allocations);
 
-        List<ResourcePath> resources = allocations.stream()
+        List<Resource> resources = allocations.stream()
                 .map(ResourceAllocation::resource)
                 .collect(Collectors.toList());
         List<ResourceConsumer> consumers = allocations.stream()
@@ -107,72 +114,75 @@ public final class ResourceManager extends AbstractListenerManager<ResourceEvent
     }
 
     @Override
-    public Optional<ResourceAllocation> getResourceAllocation(ResourcePath resource) {
+    public List<ResourceAllocation> getResourceAllocations(Resource resource) {
         checkNotNull(resource);
 
-        Optional<ResourceConsumer> consumer = store.getConsumer(resource);
-        return consumer.map(x -> new ResourceAllocation(resource, x));
+        List<ResourceConsumer> consumers = store.getConsumers(resource);
+        return consumers.stream()
+                .map(x -> new ResourceAllocation(resource, x))
+                .collect(GuavaCollectors.toImmutableList());
     }
 
     @Override
-    public <T> Collection<ResourceAllocation> getResourceAllocations(ResourcePath parent, Class<T> cls) {
+    public <T> Collection<ResourceAllocation> getResourceAllocations(Resource parent, Class<T> cls) {
         checkNotNull(parent);
         checkNotNull(cls);
 
-        Collection<ResourcePath> resources = store.getAllocatedResources(parent, cls);
-        List<ResourceAllocation> allocations = new ArrayList<>(resources.size());
-        for (ResourcePath resource: resources) {
-            // We access store twice in this method, then the store may be updated by others
-            Optional<ResourceConsumer> consumer = store.getConsumer(resource);
-            if (consumer.isPresent()) {
-                allocations.add(new ResourceAllocation(resource, consumer.get()));
-            }
-        }
-
-        return allocations;
+        // We access store twice in this method, then the store may be updated by others
+        Collection<Resource> resources = store.getAllocatedResources(parent, cls);
+        return resources.stream()
+                .flatMap(resource -> store.getConsumers(resource).stream()
+                        .map(consumer -> new ResourceAllocation(resource, consumer)))
+                .collect(GuavaCollectors.toImmutableList());
     }
 
     @Override
     public Collection<ResourceAllocation> getResourceAllocations(ResourceConsumer consumer) {
         checkNotNull(consumer);
 
-        Collection<ResourcePath> resources = store.getResources(consumer);
+        Collection<Resource> resources = store.getResources(consumer);
         return resources.stream()
                 .map(x -> new ResourceAllocation(x, consumer))
                 .collect(Collectors.toList());
     }
 
     @Override
-    public Collection<ResourcePath> getAvailableResources(ResourcePath parent) {
+    public Collection<Resource> getAvailableResources(Resource parent) {
         checkNotNull(parent);
 
-        Collection<ResourcePath> children = store.getChildResources(parent);
+        Collection<Resource> children = store.getChildResources(parent);
         return children.stream()
                 // We access store twice in this method, then the store may be updated by others
-                .filter(x -> !store.getConsumer(x).isPresent())
+                .filter(store::isAvailable)
                 .collect(Collectors.toList());
     }
 
     @Override
-    public boolean isAvailable(ResourcePath resource) {
+    public Collection<Resource> getRegisteredResources(Resource parent) {
+        checkNotNull(parent);
+
+        return store.getChildResources(parent);
+    }
+
+    @Override
+    public boolean isAvailable(Resource resource) {
         checkNotNull(resource);
 
-        Optional<ResourceConsumer> consumer = store.getConsumer(resource);
-        return !consumer.isPresent();
+        return store.isAvailable(resource);
     }
 
     @Override
-    public boolean registerResources(List<ResourcePath> resources) {
+    public boolean registerResources(List<Resource> resources) {
         checkNotNull(resources);
 
         return store.register(resources);
     }
 
     @Override
-    public boolean unregisterResources(List<ResourcePath> resources) {
+    public boolean unregisterResources(List<Resource> resources) {
         checkNotNull(resources);
 
-        return store.register(resources);
+        return store.unregister(resources);
     }
 
     private class InternalStoreDelegate implements ResourceStoreDelegate {

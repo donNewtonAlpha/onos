@@ -15,13 +15,14 @@
  */
 package org.onosproject.vtnrsc.portpairgroup;
 
+import org.onosproject.event.ListenerService;
 import org.onosproject.vtnrsc.PortPairGroup;
 import org.onosproject.vtnrsc.PortPairGroupId;
 
 /**
  * Service for interacting with the inventory of port pair groups.
  */
-public interface PortPairGroupService {
+public interface PortPairGroupService extends ListenerService<PortPairGroupEvent, PortPairGroupListener> {
 
     /**
      * Returns if the port pair group is existed.

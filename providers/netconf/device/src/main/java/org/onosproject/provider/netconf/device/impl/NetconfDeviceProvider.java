@@ -40,7 +40,6 @@ import org.onosproject.net.device.DeviceDescription;
 import org.onosproject.net.device.DeviceProvider;
 import org.onosproject.net.device.DeviceProviderRegistry;
 import org.onosproject.net.device.DeviceProviderService;
-import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.provider.AbstractProvider;
 import org.onosproject.net.provider.ProviderId;
 import org.onosproject.netconf.NetconfController;
@@ -49,7 +48,7 @@ import org.onosproject.netconf.NetconfDeviceInfo;
 import org.onosproject.netconf.NetconfDeviceListener;
 import org.slf4j.Logger;
 
-import java.util.Map;
+import java.io.IOException;
 
 import static org.onosproject.net.config.basics.SubjectFactories.APP_SUBJECT_FACTORY;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -66,9 +65,7 @@ public class NetconfDeviceProvider extends AbstractProvider
     protected DeviceProviderRegistry providerRegistry;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected DeviceService deviceService;
-    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected NetconfController controller; //where is initiated ?
+    protected NetconfController controller;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected NetworkConfigRegistry cfgService;
@@ -76,11 +73,13 @@ public class NetconfDeviceProvider extends AbstractProvider
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected CoreService coreService;
 
+    private static final String APP_NAME = "org.onosproject.netconf";
+    private static final String SCHEME_NAME = "netconf";
+    private static final String DEVICE_PROVIDER_PACKAGE = "org.onosproject.netconf.provider.device";
+    private static final String UNKNOWN = "unknown";
 
     private DeviceProviderService providerService;
     private NetconfDeviceListener innerNodeListener = new InnerNetconfDeviceListener();
-    protected static final String ISNOTNULL = "NetconfDeviceInfo is not null";
-    private static final String UNKNOWN = "unknown";
 
     private final ConfigFactory factory =
             new ConfigFactory<ApplicationId, NetconfProviderConfig>(APP_SUBJECT_FACTORY,
@@ -99,10 +98,11 @@ public class NetconfDeviceProvider extends AbstractProvider
     @Activate
     public void activate() {
         providerService = providerRegistry.register(this);
+        appId = coreService.registerApplication(APP_NAME);
         cfgService.registerConfigFactory(factory);
         cfgService.addListener(cfgLister);
         controller.addDeviceListener(innerNodeListener);
-        connectExistingDevices();
+        connectDevices();
         log.info("Started");
     }
 
@@ -112,11 +112,12 @@ public class NetconfDeviceProvider extends AbstractProvider
         providerRegistry.unregister(this);
         providerService = null;
         cfgService.unregisterConfigFactory(factory);
+        controller.removeDeviceListener(innerNodeListener);
         log.info("Stopped");
     }
 
     public NetconfDeviceProvider() {
-        super(new ProviderId("netconf", "org.onosproject.netconf.provider.device"));
+        super(new ProviderId(SCHEME_NAME, DEVICE_PROVIDER_PACKAGE));
     }
 
     @Override
@@ -132,14 +133,7 @@ public class NetconfDeviceProvider extends AbstractProvider
 
     @Override
     public boolean isReachable(DeviceId deviceId) {
-        Map<DeviceId, NetconfDevice> devices = controller.getDevicesMap();
-
-        NetconfDevice netconfDevice = null;
-        for (DeviceId key : devices.keySet()) {
-            if (key.equals(deviceId)) {
-                netconfDevice = controller.getDevicesMap().get(key);
-            }
-        }
+        NetconfDevice netconfDevice = controller.getNetconfDevice(deviceId);
         if (netconfDevice == null) {
             log.warn("BAD REQUEST: the requested device id: "
                              + deviceId.toString()
@@ -151,16 +145,18 @@ public class NetconfDeviceProvider extends AbstractProvider
 
     private class InnerNetconfDeviceListener implements NetconfDeviceListener {
 
+        private static final String IPADDRESS = "ipaddress";
+        protected static final String ISNULL = "NetconfDeviceInfo is null";
+
         @Override
         public void deviceAdded(NetconfDeviceInfo nodeId) {
-            Preconditions.checkNotNull(nodeId, ISNOTNULL);
+            Preconditions.checkNotNull(nodeId, ISNULL);
             DeviceId deviceId = nodeId.getDeviceId();
-            //TODO filter for not netconf devices
             //Netconf configuration object
             ChassisId cid = new ChassisId();
             String ipAddress = nodeId.ip().toString();
             SparseAnnotations annotations = DefaultAnnotations.builder()
-                    .set("ipaddress", ipAddress).build();
+                    .set(IPADDRESS, ipAddress).build();
             DeviceDescription deviceDescription = new DefaultDeviceDescription(
                     deviceId.uri(),
                     Device.Type.SWITCH,
@@ -174,29 +170,34 @@ public class NetconfDeviceProvider extends AbstractProvider
 
         @Override
         public void deviceRemoved(NetconfDeviceInfo nodeId) {
-            Preconditions.checkNotNull(nodeId, ISNOTNULL);
+            Preconditions.checkNotNull(nodeId, ISNULL);
             DeviceId deviceId = nodeId.getDeviceId();
             providerService.deviceDisconnected(deviceId);
 
         }
     }
 
-    private void connectExistingDevices() {
-        //TODO consolidate
-        appId = coreService.registerApplication("org.onosproject.netconf");
-        connectDevices();
-    }
-
     private void connectDevices() {
         NetconfProviderConfig cfg = cfgService.getConfig(appId, NetconfProviderConfig.class);
         if (cfg != null) {
-            log.info("cfg {}", cfg);
             try {
-                cfg.getDevicesAddresses().stream().forEach(addr -> controller
-                        .connectDevice(new NetconfDeviceInfo(addr.name(),
-                                                             addr.password(),
-                                                             addr.ip(),
-                                                             addr.port())));
+                cfg.getDevicesAddresses().stream()
+                        .forEach(addr -> {
+                                     try {
+                                         controller.connectDevice(
+                                                 new NetconfDeviceInfo(addr.name(),
+                                                                       addr.password(),
+                                                                       addr.ip(),
+                                                                       addr.port()));
+                                     } catch (IOException e) {
+                                         log.info("Can't connect to NETCONF " +
+                                                          "device on {}:{}",
+                                                  addr.ip(),
+                                                  addr.port());
+                                     }
+                                 }
+                        );
+
             } catch (ConfigException e) {
                 log.error("Cannot read config error " + e);
             }

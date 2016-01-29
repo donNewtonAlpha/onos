@@ -1,19 +1,3 @@
-<!--
-  ~ Copyright 2015 Open Networking Laboratory
-  ~
-  ~ Licensed under the Apache License, Version 2.0 (the "License");
-  ~ you may not use this file except in compliance with the License.
-  ~ You may obtain a copy of the License at
-  ~
-  ~     http://www.apache.org/licenses/LICENSE-2.0
-  ~
-  ~ Unless required by applicable law or agreed to in writing, software
-  ~ distributed under the License is distributed on an "AS IS" BASIS,
-  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  ~ See the License for the specific language governing permissions and
-  ~ limitations under the License.
-  -->
-
 <!-- Group partial HTML -->
 <div id="ov-group">
     <div class="tabular-header">
@@ -46,13 +30,15 @@
 
             <div class="current-view"
                  icon icon-id="groupTable" icon-size="36"></div>
+
+            <div class="active"
+                 icon icon-id="meterTable" icon-size="36"
+                 tooltip tt-msg="meterTip"
+                 ng-click="nav('meter')"></div>
         </div>
     </div>
 
     <div class="summary-list" onos-table-resize>
-        <div ng-show="loading" class="loading-wheel"
-             icon icon-id="loading" icon-size="75"></div>
-
         <div class="table-header" onos-sortable-header>
             <table>
                 <tr>
@@ -60,8 +46,8 @@
                     <td colId="app_id" sortable>App ID </td>
                     <td colId="state" sortable>State </td>
                     <td colId="type" sortable>Type </td>
-                    <td colId="packets" sortable>Packets </td>
-                    <td colId="bytes" sortable>Bytes </td>
+                    <td class="right" colId="packets" sortable>Packets </td>
+                    <td class="right" colId="bytes" sortable>Bytes </td>
                 </tr>
             </table>
         </div>
@@ -70,7 +56,7 @@
             <table onos-flash-changes id-prop="id">
                 <tr ng-if="!tableData.length" class="no-data">
                     <td colspan="6">
-                        No Groups found
+                        {{annots.no_rows_msg}}
                     </td>
                 </tr>
 
@@ -80,8 +66,8 @@
                     <td>{{group.app_id}}</td>
                     <td>{{group.state}}</td>
                     <td>{{group.type}}</td>
-                    <td>{{group.packets}}</td>
-                    <td>{{group.bytes}}</td>
+                    <td class="right">{{group.packets}}</td>
+                    <td class="right">{{group.bytes}}</td>
                 </tr>
                 <tr row-id="{{group.id}}" ng-repeat-end>
                     <td class="buckets" colspan="6"

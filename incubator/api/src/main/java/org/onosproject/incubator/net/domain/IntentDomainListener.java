@@ -16,12 +16,12 @@
 package org.onosproject.incubator.net.domain;
 
 import com.google.common.annotations.Beta;
+import org.onosproject.event.EventListener;
 
 /**
  * Listener for intent domain events.
  */
 @Beta
-public interface IntentDomainListener {
-    //TODO create event types
-    //extends EventListener<IntentDomainEvent>
+public interface IntentDomainListener
+    extends EventListener<IntentDomainEvent> {
 }

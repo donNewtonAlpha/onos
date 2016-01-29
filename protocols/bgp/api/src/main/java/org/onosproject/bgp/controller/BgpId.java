@@ -34,9 +34,11 @@ public final class BgpId {
     private final IpAddress ipAddress;
 
     /**
-     * Private constructor.
+     * Constructor to initialize ipAddress.
+     *
+     * @param ipAddress Ip address
      */
-    private BgpId(IpAddress ipAddress) {
+    public BgpId(IpAddress ipAddress) {
         this.ipAddress = ipAddress;
     }
 

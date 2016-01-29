@@ -222,8 +222,9 @@ public class BgpConfig implements BgpCfg {
             if (disconnPeer != null) {
                 // TODO: send notification peer deconfigured
                 disconnPeer.disconnectPeer();
+            } else {
+                lspeer.connectPeer().disconnectPeer();
             }
-            lspeer.connectPeer().disconnectPeer();
             lspeer.setState(BgpPeerCfg.State.IDLE);
             lspeer.setSelfInnitConnection(false);
             log.debug("Disconnected : " + routerid + " successfully");

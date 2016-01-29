@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-2016 Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import com.google.common.io.Files;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.HierarchicalConfiguration;
 import org.apache.commons.configuration.XMLConfiguration;
+import org.apache.commons.lang.StringUtils;
 import org.onlab.util.Tools;
 import org.onosproject.app.ApplicationDescription;
 import org.onosproject.app.ApplicationEvent;
@@ -37,14 +38,16 @@ import org.onosproject.store.AbstractStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.imageio.ImageIO;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.NoSuchFileException;
 import java.util.List;
 import java.util.Locale;
@@ -81,13 +84,20 @@ public class ApplicationArchive
     private static final String APPS = "[@apps]";
     private static final String DESCRIPTION = "description";
 
+    private static final String UTILITY = "utility";
+
+    private static final String CATEGORY = "[@category]";
+    private static final String URL = "[@url]";
+
     private static final String ROLE = "security.role";
     private static final String APP_PERMISSIONS = "security.permissions.app-perm";
     private static final String NET_PERMISSIONS = "security.permissions.net-perm";
     private static final String JAVA_PERMISSIONS = "security.permissions.java-perm";
 
     private static final String OAR = ".oar";
+    private static final String PNG = "png";
     private static final String APP_XML = "app.xml";
+    private static final String APP_PNG = "app.png";
     private static final String M2_PREFIX = "m2";
 
     private static final String ROOT = "../";
@@ -186,7 +196,7 @@ public class ApplicationArchive
             ApplicationDescription desc = plainXml ?
                     parsePlainAppDescription(bis) : parseZippedAppDescription(bis);
             checkState(!appFile(desc.name(), APP_XML).exists(),
-                       "Application %s already installed", desc.name());
+                    "Application %s already installed", desc.name());
 
             if (plainXml) {
                 expandPlainApplication(cache, desc);
@@ -213,7 +223,7 @@ public class ApplicationArchive
 
     // Returns the substring of maximum possible length from the specified bytes.
     private String substring(byte[] bytes, int length) {
-        return new String(bytes, 0, Math.min(bytes.length, length), Charset.forName("UTF-8"));
+        return new String(bytes, 0, Math.min(bytes.length, length), StandardCharsets.UTF_8);
     }
 
     /**
@@ -283,8 +293,10 @@ public class ApplicationArchive
     private ApplicationDescription loadAppDescription(XMLConfiguration cfg) {
         String name = cfg.getString(NAME);
         Version version = Version.version(cfg.getString(VERSION));
-        String desc = cfg.getString(DESCRIPTION);
         String origin = cfg.getString(ORIGIN);
+        String category = cfg.getString(CATEGORY, UTILITY);
+        String url = cfg.getString(URL);
+        byte[] icon = getApplicationIcon(name);
         ApplicationRole role = getRole(cfg.getString(ROLE));
         Set<Permission> perms = getPermissions(cfg);
         String featRepo = cfg.getString(FEATURES_REPO);
@@ -295,9 +307,16 @@ public class ApplicationArchive
         List<String> requiredApps = apps.isEmpty() ?
                 ImmutableList.of() : ImmutableList.copyOf(apps.split(","));
 
-        return new DefaultApplicationDescription(name, version, desc, origin, role,
-                                                 perms, featuresRepo, features,
-                                                 requiredApps);
+        // put full description to readme field
+        String readme = cfg.getString(DESCRIPTION);
+
+        // put short description to description field
+        String desc = compactDescription(readme);
+
+        return new DefaultApplicationDescription(name, version, desc, origin,
+                                                 category, url, readme, icon,
+                                                 role, perms, featuresRepo,
+                                                 features, requiredApps);
     }
 
     // Expands the specified ZIP stream into app-specific directory.
@@ -387,9 +406,13 @@ public class ApplicationArchive
         return appFile(appName, "active").exists();
     }
 
-
     // Returns the name of the file located under the specified app directory.
     private File appFile(String appName, String fileName) {
+        return new File(new File(appsDir, appName), fileName);
+    }
+
+    // Returns the icon file located under the specified app directory.
+    private File iconFile(String appName, String fileName) {
         return new File(new File(appsDir, appName), fileName);
     }
 
@@ -420,7 +443,29 @@ public class ApplicationArchive
         return ImmutableSet.copyOf(permissionList);
     }
 
-    //
+    // Returns the byte stream from icon.png file in oar application archive.
+    private byte[] getApplicationIcon(String appName) {
+
+        byte[] icon = new byte[0];
+        File iconFile = iconFile(appName, APP_PNG);
+
+        if (!iconFile.exists()) {
+            // assume that we can always fallback to default icon
+            iconFile = new File(appsDir, APP_PNG);
+        }
+
+        try {
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            ImageIO.write(ImageIO.read(iconFile), PNG, bos);
+            icon = bos.toByteArray();
+            bos.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return icon;
+    }
+
     // Returns application role type
     public ApplicationRole getRole(String value) {
         if (value == null) {
@@ -433,5 +478,17 @@ public class ApplicationArchive
                 return ApplicationRole.UNSPECIFIED;
             }
         }
+    }
+
+    // Returns the first sentence of the given sentence
+    private String compactDescription(String sentence) {
+        if (StringUtils.isNotEmpty(sentence)) {
+            if (StringUtils.contains(sentence, ".")) {
+                return StringUtils.substringBefore(sentence, ".") + ".";
+            } else {
+                return sentence;
+            }
+        }
+        return sentence;
     }
 }

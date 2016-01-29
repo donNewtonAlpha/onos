@@ -330,6 +330,11 @@ public class GossipDeviceStore
             }
 
         } else {
+            // Only forward for ConfigProvider
+            // Forwarding was added as a workaround for ONOS-490
+            if (!providerId.scheme().equals("cfg")) {
+                return null;
+            }
             // FIXME Temporary hack for NPE (ONOS-1171).
             // Proper fix is to implement forwarding to master on ConfigProvider
             // redo ONOS-490
@@ -434,8 +439,7 @@ public class GossipDeviceStore
             if (!replaced) {
                 verify(replaced,
                        "Replacing devices cache failed. PID:%s [expected:%s, found:%s, new=%s]",
-                       providerId, oldDevice, devices.get(newDevice.id())
-                        , newDevice);
+                       providerId, oldDevice, devices.get(newDevice.id()), newDevice);
             }
 
             event = new DeviceEvent(DeviceEvent.Type.DEVICE_UPDATED, newDevice, null);
@@ -579,6 +583,11 @@ public class GossipDeviceStore
             }
 
         } else {
+            // Only forward for ConfigProvider
+            // Forwarding was added as a workaround for ONOS-490
+            if (!providerId.scheme().equals("cfg")) {
+                return Collections.emptyList();
+            }
             // FIXME Temporary hack for NPE (ONOS-1171).
             // Proper fix is to implement forwarding to master on ConfigProvider
             // redo ONOS-490

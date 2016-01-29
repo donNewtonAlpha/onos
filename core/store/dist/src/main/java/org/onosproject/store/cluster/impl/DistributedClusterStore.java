@@ -15,6 +15,7 @@
  */
 package org.onosproject.store.cluster.impl;
 
+import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 
@@ -48,7 +49,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -163,7 +164,7 @@ public class DistributedClusterStore
     @Override
     public State getState(NodeId nodeId) {
         checkNotNull(nodeId, INSTANCE_ID_NULL);
-        return nodeStates.get(nodeId);
+        return MoreObjects.firstNonNull(nodeStates.get(nodeId), State.INACTIVE);
     }
 
     @Override
@@ -240,9 +241,9 @@ public class DistributedClusterStore
         });
     }
 
-    private class HeartbeatMessageHandler implements Consumer<byte[]> {
+    private class HeartbeatMessageHandler implements BiConsumer<Endpoint, byte[]> {
         @Override
-        public void accept(byte[] message) {
+        public void accept(Endpoint sender, byte[] message) {
             HeartbeatMessage hb = SERIALIZER.decode(message);
             failureDetector.report(hb.source().id());
             hb.knownPeers().forEach(node -> {

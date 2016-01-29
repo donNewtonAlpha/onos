@@ -15,6 +15,8 @@
  */
 package org.onosproject.openstackswitching;
 
+import java.util.Collection;
+
 import static com.google.common.base.Preconditions.checkNotNull;
 
 
@@ -28,15 +30,13 @@ public final class OpenstackNetwork {
     private String segmentId;
     private String id;
     private NetworkType networkType;
+    private Collection<OpenstackSubnet> subnets;
 
     public enum NetworkType {
         /**
          * Currently only VXLAN moded is supported.
          */
-        VXLAN,
-        VLAN,
-        STT,
-        LOCAL
+        VXLAN
     }
 
     /**
@@ -49,12 +49,13 @@ public final class OpenstackNetwork {
     }
 
     private OpenstackNetwork(String name, String tenantId, String id, String sid,
-                             NetworkType type) {
+                             NetworkType type, Collection<OpenstackSubnet> subnets) {
         this.name = checkNotNull(name);
         this.tenantId = checkNotNull(tenantId);
         this.segmentId = checkNotNull(sid);
         this.id = checkNotNull(id);
         this.networkType = type;
+        this.subnets = subnets;
     }
 
     public String name() {
@@ -77,6 +78,10 @@ public final class OpenstackNetwork {
         return this.networkType;
     }
 
+    public Collection<OpenstackSubnet> subnets() {
+        return this.subnets;
+    }
+
     @Override
     protected Object clone() throws CloneNotSupportedException {
        return super.clone();
@@ -88,6 +93,7 @@ public final class OpenstackNetwork {
         private String id;
         private String sid;
         private NetworkType networkType;
+        private Collection<OpenstackSubnet> subnets;
 
         public Builder name(String name) {
             this.name = name;
@@ -119,9 +125,14 @@ public final class OpenstackNetwork {
             return this;
         }
 
-        public OpenstackNetwork build() {
-            return new OpenstackNetwork(name, tenantId, id, sid, networkType);
+        public Builder subnets(Collection<OpenstackSubnet> subnets) {
+            this.subnets = subnets;
+
+            return this;
         }
 
+        public OpenstackNetwork build() {
+            return new OpenstackNetwork(name, tenantId, id, sid, networkType, subnets);
+        }
     }
 }

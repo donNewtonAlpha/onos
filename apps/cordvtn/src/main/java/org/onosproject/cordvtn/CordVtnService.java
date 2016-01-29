@@ -15,7 +15,7 @@
  */
 package org.onosproject.cordvtn;
 
-import java.util.List;
+import org.onosproject.net.ConnectPoint;
 
 /**
  * Service for provisioning overlay virtual networks on compute nodes.
@@ -23,46 +23,35 @@ import java.util.List;
 public interface CordVtnService {
 
     String CORDVTN_APP_ID = "org.onosproject.cordvtn";
+
     /**
-     * Adds a new node to the service.
+     * Adds a new VM on a given node and connect point.
      *
      * @param node cordvtn node
+     * @param connectPoint connect point
      */
-    void addNode(CordVtnNode node);
+    void addServiceVm(CordVtnNode node, ConnectPoint connectPoint);
 
     /**
-     * Deletes a node from the service.
+     * Removes a VM from a given node and connect point.
      *
-     * @param node cordvtn node
+     * @param connectPoint connect point
      */
-    void deleteNode(CordVtnNode node);
+    void removeServiceVm(ConnectPoint connectPoint);
 
     /**
-     * Initiates node to serve virtual tenant network.
+     * Creates dependencies for a given tenant service.
      *
-     * @param node cordvtn node
+     * @param tServiceId id of the service which has a dependency
+     * @param pServiceId id of the service which provide dependency
      */
-    void initNode(CordVtnNode node);
+    void createServiceDependency(CordServiceId tServiceId, CordServiceId pServiceId);
 
     /**
-     * Returns the number of the nodes known to the service.
+     * Removes all dependencies from a given tenant service.
      *
-     * @return number of nodes
+     * @param tServiceId id of the service which has a dependency
+     * @param pServiceId id of the service which provide dependency
      */
-    int getNodeCount();
-
-    /**
-     * Returns node initialization state.
-     *
-     * @param node cordvtn node
-     * @return true if initial node setup is completed, otherwise false
-     */
-    boolean getNodeInitState(CordVtnNode node);
-
-    /**
-     * Returns all nodes known to the service.
-     *
-     * @return list of nodes
-     */
-    List<CordVtnNode> getNodes();
+    void removeServiceDependency(CordServiceId tServiceId, CordServiceId pServiceId);
 }

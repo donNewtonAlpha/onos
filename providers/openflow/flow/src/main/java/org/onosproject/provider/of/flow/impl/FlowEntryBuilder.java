@@ -27,6 +27,7 @@ import org.onlab.packet.VlanId;
 import org.onosproject.core.DefaultGroupId;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.Lambda;
+import org.onosproject.net.OduSignalId;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.driver.DefaultDriverData;
 import org.onosproject.net.driver.DefaultDriverHandler;
@@ -42,12 +43,17 @@ import org.onosproject.net.flow.FlowEntry.FlowEntryState;
 import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.flow.TrafficSelector;
 import org.onosproject.net.flow.TrafficTreatment;
+import org.onosproject.net.flow.criteria.ExtensionSelectorType.ExtensionSelectorTypes;
+import org.onosproject.net.flow.instructions.ExtensionTreatmentType.ExtensionTreatmentTypes;
 import org.onosproject.net.flow.instructions.Instructions;
 import org.onosproject.openflow.controller.Dpid;
+import org.onosproject.openflow.controller.ExtensionSelectorInterpreter;
 import org.onosproject.openflow.controller.ExtensionTreatmentInterpreter;
 import org.projectfloodlight.openflow.protocol.OFFlowMod;
 import org.projectfloodlight.openflow.protocol.OFFlowRemoved;
 import org.projectfloodlight.openflow.protocol.OFFlowStatsEntry;
+import org.projectfloodlight.openflow.protocol.OFMatchV3;
+import org.projectfloodlight.openflow.protocol.OFVersion;
 import org.projectfloodlight.openflow.protocol.action.OFAction;
 import org.projectfloodlight.openflow.protocol.action.OFActionCircuit;
 import org.projectfloodlight.openflow.protocol.action.OFActionEnqueue;
@@ -83,15 +89,21 @@ import org.projectfloodlight.openflow.types.U32;
 import org.projectfloodlight.openflow.types.U64;
 import org.projectfloodlight.openflow.types.U8;
 import org.projectfloodlight.openflow.types.VlanPcp;
+import org.projectfloodlight.openflow.types.OduSignalID;
 import org.slf4j.Logger;
 
 import java.util.List;
 
 import static org.onosproject.net.flow.criteria.Criteria.matchLambda;
 import static org.onosproject.net.flow.criteria.Criteria.matchOchSignalType;
+import static org.onosproject.net.flow.criteria.Criteria.matchOduSignalType;
+import static org.onosproject.net.flow.criteria.Criteria.matchOduSignalId;
+import static org.onosproject.net.flow.instructions.Instructions.modL0Lambda;
+import static org.onosproject.net.flow.instructions.Instructions.modL1OduSignalId;
 import static org.onosproject.provider.of.flow.impl.OpenFlowValueMapper.lookupChannelSpacing;
 import static org.onosproject.provider.of.flow.impl.OpenFlowValueMapper.lookupGridType;
 import static org.onosproject.provider.of.flow.impl.OpenFlowValueMapper.lookupOchSignalType;
+import static org.onosproject.provider.of.flow.impl.OpenFlowValueMapper.lookupOduSignalType;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class FlowEntryBuilder {
@@ -129,7 +141,6 @@ public class FlowEntryBuilder {
     public FlowEntryBuilder(Dpid dpid, OFFlowRemoved removed, DriverService driverService) {
         this.match = removed.getMatch();
         this.removed = removed;
-
         this.dpid = dpid;
         this.instructions = null;
         this.stat = null;
@@ -150,50 +161,61 @@ public class FlowEntryBuilder {
     }
 
     public FlowEntry build(FlowEntryState... state) {
-        FlowRule rule;
-        switch (this.type) {
-            case STAT:
-                rule = DefaultFlowRule.builder()
-                        .forDevice(DeviceId.deviceId(Dpid.uri(dpid)))
-                        .withSelector(buildSelector())
-                        .withTreatment(buildTreatment())
-                        .withPriority(stat.getPriority())
-                        .makeTemporary(stat.getIdleTimeout())
-                        .withCookie(stat.getCookie().getValue())
-                        .forTable(stat.getTableId().getValue())
-                        .build();
+        FlowRule.Builder builder;
+        try {
+            switch (this.type) {
+                case STAT:
+                    builder = DefaultFlowRule.builder()
+                            .forDevice(DeviceId.deviceId(Dpid.uri(dpid)))
+                            .withSelector(buildSelector())
+                            .withTreatment(buildTreatment())
+                            .withPriority(stat.getPriority())
+                            .makeTemporary(stat.getIdleTimeout())
+                            .withCookie(stat.getCookie().getValue());
+                    if (stat.getVersion() != OFVersion.OF_10) {
+                        builder.forTable(stat.getTableId().getValue());
+                    }
 
-                return new DefaultFlowEntry(rule, FlowEntryState.ADDED,
-                                      stat.getDurationSec(), stat.getPacketCount().getValue(),
-                                      stat.getByteCount().getValue());
-            case REMOVED:
-                rule = DefaultFlowRule.builder()
-                        .forDevice(DeviceId.deviceId(Dpid.uri(dpid)))
-                        .withSelector(buildSelector())
-                        .withPriority(removed.getPriority())
-                        .makeTemporary(removed.getIdleTimeout())
-                        .withCookie(removed.getCookie().getValue())
-                        .forTable(removed.getTableId().getValue())
-                        .build();
+                    return new DefaultFlowEntry(builder.build(), FlowEntryState.ADDED,
+                                                stat.getDurationSec(),
+                                                stat.getPacketCount().getValue(),
+                                                stat.getByteCount().getValue());
+                case REMOVED:
+                    builder = DefaultFlowRule.builder()
+                            .forDevice(DeviceId.deviceId(Dpid.uri(dpid)))
+                            .withSelector(buildSelector())
+                            .withPriority(removed.getPriority())
+                            .makeTemporary(removed.getIdleTimeout())
+                            .withCookie(removed.getCookie().getValue());
+                    if (removed.getVersion() != OFVersion.OF_10) {
+                        builder.forTable(removed.getTableId().getValue());
+                    }
 
-                return new DefaultFlowEntry(rule, FlowEntryState.REMOVED, removed.getDurationSec(),
-                                      removed.getPacketCount().getValue(), removed.getByteCount().getValue());
-            case MOD:
-                FlowEntryState flowState = state.length > 0 ? state[0] : FlowEntryState.FAILED;
-                rule = DefaultFlowRule.builder()
-                        .forDevice(DeviceId.deviceId(Dpid.uri(dpid)))
-                        .withSelector(buildSelector())
-                        .withTreatment(buildTreatment())
-                        .withPriority(flowMod.getPriority())
-                        .makeTemporary(flowMod.getIdleTimeout())
-                        .withCookie(flowMod.getCookie().getValue())
-                        .forTable(flowMod.getTableId().getValue())
-                        .build();
+                    return new DefaultFlowEntry(builder.build(), FlowEntryState.REMOVED,
+                                                removed.getDurationSec(),
+                                                removed.getPacketCount().getValue(),
+                                                removed.getByteCount().getValue());
+                case MOD:
+                    FlowEntryState flowState = state.length > 0 ? state[0] : FlowEntryState.FAILED;
+                    builder = DefaultFlowRule.builder()
+                            .forDevice(DeviceId.deviceId(Dpid.uri(dpid)))
+                            .withSelector(buildSelector())
+                            .withTreatment(buildTreatment())
+                            .withPriority(flowMod.getPriority())
+                            .makeTemporary(flowMod.getIdleTimeout())
+                            .withCookie(flowMod.getCookie().getValue());
+                    if (flowMod.getVersion() != OFVersion.OF_10) {
+                        builder.forTable(flowMod.getTableId().getValue());
+                    }
 
-                return new DefaultFlowEntry(rule, flowState, 0, 0, 0);
-            default:
-                log.error("Unknown flow type : {}", this.type);
-                return null;
+                    return new DefaultFlowEntry(builder.build(), flowState, 0, 0, 0);
+                default:
+                    log.error("Unknown flow type : {}", this.type);
+                    return null;
+            }
+        } catch (UnsupportedOperationException e) {
+            log.warn("Error building flow entry", e);
+            return null;
         }
 
     }
@@ -269,6 +291,14 @@ public class FlowEntryBuilder {
 
     private TrafficTreatment.Builder buildActions(List<OFAction> actions,
                                                   TrafficTreatment.Builder builder) {
+        DriverHandler driverHandler = getDriver(dpid);
+        ExtensionTreatmentInterpreter treatmentInterpreter;
+        if (driverHandler.hasBehaviour(ExtensionTreatmentInterpreter.class)) {
+            treatmentInterpreter = driverHandler.behaviour(ExtensionTreatmentInterpreter.class);
+        } else {
+            treatmentInterpreter = null;
+        }
+
         for (OFAction act : actions) {
             switch (act.getType()) {
                 case OUTPUT:
@@ -293,7 +323,6 @@ public class FlowEntryBuilder {
                     OFActionSetDlSrc dlsrc = (OFActionSetDlSrc) act;
                     builder.setEthSrc(
                             MacAddress.valueOf(dlsrc.getDlAddr().getLong()));
-
                     break;
                 case SET_NW_DST:
                     OFActionSetNwDst nwdst = (OFActionSetNwDst) act;
@@ -312,6 +341,11 @@ public class FlowEntryBuilder {
                         OFActionCircuit ct = (OFActionCircuit) exp;
                         short lambda = ((OFOxmOchSigidBasic) ct.getField()).getValue().getChannelNumber();
                         builder.add(Instructions.modL0Lambda(Lambda.indexedLambda(lambda)));
+                    }  else if (exp.getExperimenter() == 0x2320) {
+                        if (treatmentInterpreter != null) {
+                            builder.extension(treatmentInterpreter.mapAction(exp),
+                                              DeviceId.deviceId(Dpid.uri(dpid)));
+                        }
                     } else {
                         log.warn("Unsupported OFActionExperimenter {}", exp.getExperimenter());
                     }
@@ -378,6 +412,14 @@ public class FlowEntryBuilder {
 
 
     private void handleSetField(TrafficTreatment.Builder builder, OFActionSetField action) {
+        DriverHandler driverHandler = getDriver(dpid);
+        ExtensionTreatmentInterpreter treatmentInterpreter;
+        if (driverHandler.hasBehaviour(ExtensionTreatmentInterpreter.class)) {
+            treatmentInterpreter = driverHandler.behaviour(ExtensionTreatmentInterpreter.class);
+        } else {
+            treatmentInterpreter = null;
+        }
+
         OFOxm<?> oxm = action.getField();
         switch (oxm.getMatchField().id) {
         case VLAN_PCP:
@@ -386,9 +428,15 @@ public class FlowEntryBuilder {
             builder.setVlanPcp(vlanpcp.getValue().getValue());
             break;
         case VLAN_VID:
-            @SuppressWarnings("unchecked")
-            OFOxm<OFVlanVidMatch> vlanvid = (OFOxm<OFVlanVidMatch>) oxm;
-            builder.setVlanId(VlanId.vlanId(vlanvid.getValue().getVlan()));
+            if (treatmentInterpreter != null &&
+                    treatmentInterpreter.supported(ExtensionTreatmentTypes.OFDPA_SET_VLAN_ID.type())) {
+                builder.extension(treatmentInterpreter.mapAction(action),
+                        DeviceId.deviceId(Dpid.uri(dpid)));
+            } else {
+                @SuppressWarnings("unchecked")
+                OFOxm<OFVlanVidMatch> vlanvid = (OFOxm<OFVlanVidMatch>) oxm;
+                builder.setVlanId(VlanId.vlanId(vlanvid.getValue().getVlan()));
+            }
             break;
         case ETH_DST:
             @SuppressWarnings("unchecked")
@@ -448,10 +496,32 @@ public class FlowEntryBuilder {
             builder.setUdpSrc(TpPort.tpPort(udpsrc.getValue().getPort()));
             break;
         case TUNNEL_IPV4_DST:
-            DriverHandler driver = getDriver(dpid);
-            ExtensionTreatmentInterpreter interpreter = driver.behaviour(ExtensionTreatmentInterpreter.class);
-            if (interpreter != null) {
-                builder.extension(interpreter.mapAction(action), DeviceId.deviceId(Dpid.uri(dpid)));
+            if (treatmentInterpreter != null &&
+                    treatmentInterpreter.supported(ExtensionTreatmentTypes.NICIRA_SET_TUNNEL_DST.type())) {
+                builder.extension(treatmentInterpreter.mapAction(action), DeviceId.deviceId(Dpid.uri(dpid)));
+            }
+            break;
+       case EXP_ODU_SIG_ID:
+            @SuppressWarnings("unchecked")
+            OFOxm<OduSignalID> oduID = (OFOxm<OduSignalID>) oxm;
+            OduSignalID oduSignalID = oduID.getValue();
+            OduSignalId oduSignalId = OduSignalId.oduSignalId(oduSignalID.getTpn(),
+                    oduSignalID.getTslen(),
+                    oduSignalID.getTsmap());
+            builder.add(modL1OduSignalId(oduSignalId));
+            break;
+        case EXP_OCH_SIG_ID:
+            try {
+                @SuppressWarnings("unchecked")
+                OFOxm<CircuitSignalID> ochId = (OFOxm<CircuitSignalID>) oxm;
+                CircuitSignalID circuitSignalID = ochId.getValue();
+                builder.add(modL0Lambda(Lambda.ochSignal(
+                        lookupGridType(circuitSignalID.getGridType()),
+                        lookupChannelSpacing(circuitSignalID.getChannelSpacing()),
+                        circuitSignalID.getChannelNumber(), circuitSignalID.getSpectralWidth())));
+            } catch (NoMappingFoundException e) {
+                log.warn(e.getMessage());
+                break;
             }
             break;
         case ARP_OP:
@@ -501,6 +571,8 @@ public class FlowEntryBuilder {
         case OCH_SIGTYPE_BASIC:
         case SCTP_DST:
         case SCTP_SRC:
+        case EXP_ODU_SIGTYPE:
+        case EXP_OCH_SIGTYPE:
         default:
             log.warn("Set field type {} not yet implemented.", oxm.getMatchField().id);
             break;
@@ -514,6 +586,14 @@ public class FlowEntryBuilder {
         Ip6Address ip6Address;
         Ip6Prefix ip6Prefix;
         Ip4Address ip;
+
+        DriverHandler driverHandler = getDriver(dpid);
+        ExtensionSelectorInterpreter selectorInterpreter;
+        if (driverHandler.hasBehaviour(ExtensionSelectorInterpreter.class)) {
+            selectorInterpreter = driverHandler.behaviour(ExtensionSelectorInterpreter.class);
+        } else {
+            selectorInterpreter = null;
+        }
 
         TrafficSelector.Builder builder = DefaultTrafficSelector.builder();
         for (MatchField<?> field : match.getMatchFields()) {
@@ -544,22 +624,33 @@ public class FlowEntryBuilder {
                 builder.matchEthType((short) ethType);
                 break;
             case VLAN_VID:
-                VlanId vlanId = null;
-                if (match.isPartiallyMasked(MatchField.VLAN_VID)) {
-                    Masked<OFVlanVidMatch> masked = match.getMasked(MatchField.VLAN_VID);
-                    if (masked.getValue().equals(OFVlanVidMatch.PRESENT)
-                            && masked.getMask().equals(OFVlanVidMatch.PRESENT)) {
-                        vlanId = VlanId.ANY;
+                if (selectorInterpreter != null &&
+                        selectorInterpreter.supported(ExtensionSelectorTypes.OFDPA_MATCH_VLAN_VID.type())) {
+                    if (match.getVersion().equals(OFVersion.OF_13)) {
+                        OFOxm oxm = ((OFMatchV3) match).getOxmList().get(MatchField.VLAN_VID);
+                        builder.extension(selectorInterpreter.mapOxm(oxm),
+                                DeviceId.deviceId(Dpid.uri(dpid)));
+                    } else {
+                        break;
                     }
                 } else {
-                    if (!match.get(MatchField.VLAN_VID).isPresentBitSet()) {
-                        vlanId = VlanId.NONE;
+                    VlanId vlanId = null;
+                    if (match.isPartiallyMasked(MatchField.VLAN_VID)) {
+                        Masked<OFVlanVidMatch> masked = match.getMasked(MatchField.VLAN_VID);
+                        if (masked.getValue().equals(OFVlanVidMatch.PRESENT)
+                                && masked.getMask().equals(OFVlanVidMatch.PRESENT)) {
+                            vlanId = VlanId.ANY;
+                        }
                     } else {
-                        vlanId = VlanId.vlanId(match.get(MatchField.VLAN_VID).getVlan());
+                        if (!match.get(MatchField.VLAN_VID).isPresentBitSet()) {
+                            vlanId = VlanId.NONE;
+                        } else {
+                            vlanId = VlanId.vlanId(match.get(MatchField.VLAN_VID).getVlan());
+                        }
                     }
-                }
-                if (vlanId != null) {
-                    builder.matchVlanId(vlanId);
+                    if (vlanId != null) {
+                        builder.matchVlanId(vlanId);
+                    }
                 }
                 break;
             case VLAN_PCP:
@@ -703,6 +794,41 @@ public class FlowEntryBuilder {
             case OCH_SIGTYPE:
                 U8 sigType = match.get(MatchField.OCH_SIGTYPE);
                 builder.add(matchOchSignalType(lookupOchSignalType((byte) sigType.getValue())));
+                break;
+            case EXP_OCH_SIG_ID:
+                try {
+                    CircuitSignalID expSigId = match.get(MatchField.EXP_OCH_SIG_ID);
+                    builder.add(matchLambda(Lambda.ochSignal(
+                            lookupGridType(expSigId.getGridType()), lookupChannelSpacing(expSigId.getChannelSpacing()),
+                            expSigId.getChannelNumber(), expSigId.getSpectralWidth())));
+                } catch (NoMappingFoundException e) {
+                    log.warn(e.getMessage());
+                    break;
+                }
+                break;
+            case EXP_OCH_SIGTYPE:
+                try {
+                    U8 expOchSigType = match.get(MatchField.EXP_OCH_SIGTYPE);
+                    builder.add(matchOchSignalType(lookupOchSignalType((byte) expOchSigType.getValue())));
+                } catch (NoMappingFoundException e) {
+                    log.warn(e.getMessage());
+                    break;
+                }
+                break;
+            case EXP_ODU_SIG_ID:
+                OduSignalId oduSignalId = OduSignalId.oduSignalId(match.get(MatchField.EXP_ODU_SIG_ID).getTpn(),
+                        match.get(MatchField.EXP_ODU_SIG_ID).getTslen(),
+                        match.get(MatchField.EXP_ODU_SIG_ID).getTsmap());
+                builder.add(matchOduSignalId(oduSignalId));
+            break;
+            case EXP_ODU_SIGTYPE:
+                try {
+                    U8 oduSigType = match.get(MatchField.EXP_ODU_SIGTYPE);
+                    builder.add(matchOduSignalType(lookupOduSignalType((byte) oduSigType.getValue())));
+                } catch (NoMappingFoundException e) {
+                    log.warn(e.getMessage());
+                    break;
+                }
                 break;
             case TUNNEL_ID:
                 long tunnelId = match.get(MatchField.TUNNEL_ID).getValue();

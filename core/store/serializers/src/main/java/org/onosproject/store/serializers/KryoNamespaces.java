@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2014-2016 Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+
 import org.onlab.packet.ChassisId;
 import org.onlab.packet.EthType;
 import org.onlab.packet.Ip4Address;
@@ -33,6 +34,7 @@ import org.onlab.packet.VlanId;
 import org.onlab.util.Bandwidth;
 import org.onlab.util.Frequency;
 import org.onlab.util.KryoNamespace;
+import org.onlab.util.Match;
 import org.onosproject.app.ApplicationState;
 import org.onosproject.cluster.ControllerNode;
 import org.onosproject.cluster.DefaultControllerNode;
@@ -49,6 +51,7 @@ import org.onosproject.incubator.net.domain.IntentDomainId;
 import org.onosproject.mastership.MastershipTerm;
 import org.onosproject.net.Annotations;
 import org.onosproject.net.ChannelSpacing;
+import org.onosproject.net.CltSignalType;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.DefaultAnnotations;
 import org.onosproject.net.DefaultDevice;
@@ -99,9 +102,14 @@ import org.onosproject.net.flow.FlowRuleEvent;
 import org.onosproject.net.flow.FlowRuleExtPayLoad;
 import org.onosproject.net.flow.StoredFlowEntry;
 import org.onosproject.net.flow.TableStatisticsEntry;
+import org.onosproject.net.flow.criteria.ArpHaCriterion;
+import org.onosproject.net.flow.criteria.ArpOpCriterion;
+import org.onosproject.net.flow.criteria.ArpPaCriterion;
 import org.onosproject.net.flow.criteria.Criterion;
 import org.onosproject.net.flow.criteria.EthCriterion;
 import org.onosproject.net.flow.criteria.EthTypeCriterion;
+import org.onosproject.net.flow.criteria.ExtensionCriterion;
+import org.onosproject.net.flow.criteria.ExtensionSelectorType;
 import org.onosproject.net.flow.criteria.IPCriterion;
 import org.onosproject.net.flow.criteria.IPDscpCriterion;
 import org.onosproject.net.flow.criteria.IPEcnCriterion;
@@ -117,6 +125,7 @@ import org.onosproject.net.flow.criteria.Icmpv6TypeCriterion;
 import org.onosproject.net.flow.criteria.IndexedLambdaCriterion;
 import org.onosproject.net.flow.criteria.LambdaCriterion;
 import org.onosproject.net.flow.criteria.MetadataCriterion;
+import org.onosproject.net.flow.criteria.MplsBosCriterion;
 import org.onosproject.net.flow.criteria.MplsCriterion;
 import org.onosproject.net.flow.criteria.OchSignalCriterion;
 import org.onosproject.net.flow.criteria.OchSignalTypeCriterion;
@@ -167,8 +176,11 @@ import org.onosproject.net.intent.constraint.PartialFailureConstraint;
 import org.onosproject.net.intent.constraint.WaypointConstraint;
 import org.onosproject.net.link.DefaultLinkDescription;
 import org.onosproject.net.meter.MeterId;
+import org.onosproject.net.newresource.ContinuousResource;
+import org.onosproject.net.newresource.ContinuousResourceId;
+import org.onosproject.net.newresource.DiscreteResource;
+import org.onosproject.net.newresource.DiscreteResourceId;
 import org.onosproject.net.newresource.ResourceAllocation;
-import org.onosproject.net.newresource.ResourcePath;
 import org.onosproject.net.packet.DefaultOutboundPacket;
 import org.onosproject.net.packet.DefaultPacketRequest;
 import org.onosproject.net.packet.PacketPriority;
@@ -185,6 +197,7 @@ import org.onosproject.net.resource.link.LinkResourceRequest;
 import org.onosproject.net.resource.link.MplsLabel;
 import org.onosproject.net.resource.link.MplsLabelResourceAllocation;
 import org.onosproject.net.resource.link.MplsLabelResourceRequest;
+import org.onosproject.security.Permission;
 import org.onosproject.store.Timestamp;
 import org.onosproject.store.service.MapEvent;
 import org.onosproject.store.service.SetEvent;
@@ -197,6 +210,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -232,7 +246,8 @@ public final class KryoNamespaces {
             .register(CopyOnWriteArraySet.class)
             .register(ArrayList.class,
                       LinkedList.class,
-                      HashSet.class
+                      HashSet.class,
+                      LinkedHashSet.class
                       )
             .register(Maps.immutableEntry("a", "b").getClass())
             .register(new ArraysAsListSerializer(), Arrays.asList().getClass())
@@ -257,9 +272,12 @@ public final class KryoNamespaces {
             .register(new Ip4AddressSerializer(), Ip4Address.class)
             .register(new Ip6AddressSerializer(), Ip6Address.class)
             .register(new MacAddressSerializer(), MacAddress.class)
+            .register(Match.class)
             .register(VlanId.class)
             .register(Frequency.class)
             .register(Bandwidth.class)
+            .register(Bandwidth.bps(1L).getClass())
+            .register(Bandwidth.bps(1.0).getClass())
             .build();
 
     /**
@@ -276,7 +294,7 @@ public final class KryoNamespaces {
             .register(BASIC)
             .nextId(KryoNamespace.INITIAL_ID + 30)
             .register(MISC)
-            .nextId(KryoNamespace.INITIAL_ID + 30 + 10)
+            .nextId(KryoNamespace.INITIAL_ID + 30 + 20)
             .register(
                     Instructions.MeterInstruction.class,
                     MeterId.class,
@@ -285,6 +303,7 @@ public final class KryoNamespaces {
                     ApplicationState.class,
                     ApplicationRole.class,
                     DefaultApplication.class,
+                    Permission.class,
                     Device.Type.class,
                     Port.Type.class,
                     ChassisId.class,
@@ -337,6 +356,7 @@ public final class KryoNamespaces {
                     IPv6NDTargetAddressCriterion.class,
                     IPv6NDLinkLayerAddressCriterion.class,
                     MplsCriterion.class,
+                    MplsBosCriterion.class,
                     TunnelIdCriterion.class,
                     IPv6ExthdrFlagsCriterion.class,
                     LambdaCriterion.class,
@@ -345,6 +365,9 @@ public final class KryoNamespaces {
                     OchSignalTypeCriterion.class,
                     OduSignalIdCriterion.class,
                     OduSignalTypeCriterion.class,
+                    ArpOpCriterion.class,
+                    ArpHaCriterion.class,
+                    ArpPaCriterion.class,
                     Criterion.class,
                     Criterion.Type.class,
                     DefaultTrafficTreatment.class,
@@ -417,9 +440,10 @@ public final class KryoNamespaces {
                     DefaultLinkResourceAllocations.class,
                     BandwidthResourceAllocation.class,
                     LambdaResourceAllocation.class,
-                    ResourcePath.class,
-                    ResourcePath.Discrete.class,
-                    ResourcePath.Continuous.class,
+                    DiscreteResource.class,
+                    ContinuousResource.class,
+                    DiscreteResourceId.class,
+                    ContinuousResourceId.class,
                     ResourceAllocation.class,
                     // Constraints
                     LambdaConstraint.class,
@@ -456,6 +480,8 @@ public final class KryoNamespaces {
             .register(new DefaultOutboundPacketSerializer(), DefaultOutboundPacket.class)
             .register(new AnnotationsSerializer(), DefaultAnnotations.class)
             .register(new ExtensionInstructionSerializer(), Instructions.ExtensionInstructionWrapper.class)
+            .register(new ExtensionCriterionSerializer(), ExtensionCriterion.class)
+            .register(ExtensionSelectorType.class)
             .register(ExtensionTreatmentType.class)
             .register(Versioned.class)
             .register(MapEvent.class)
@@ -471,7 +497,7 @@ public final class KryoNamespaces {
             .register(GridType.class)
             .register(ChannelSpacing.class)
             .register(OduCltPort.class)
-            .register(OduCltPort.SignalType.class)
+            .register(CltSignalType.class)
             .register(IndexedLambda.class)
             .register(OchSignal.class)
             .register(OduSignalId.class)

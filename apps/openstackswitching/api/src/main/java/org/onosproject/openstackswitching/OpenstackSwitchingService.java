@@ -34,14 +34,16 @@ public interface OpenstackSwitchingService {
     /**
      * Removes flow rules corresponding to the port removed by Openstack.
      *
+     * @param uuid UUID
      */
-    void deletePorts();
+    void deletePort(String uuid);
 
     /**
      * Updates flow rules corresponding to the port information updated by Openstack.
      *
+     * @param openstackPort OpenStack port
      */
-    void updatePorts();
+    void updatePort(OpenstackPort openstackPort);
 
     /**
      * Stores the network information created by openstack.
@@ -85,8 +87,16 @@ public interface OpenstackSwitchingService {
      * Returns network information list for the network ID given.
      *
      * @param networkId Network ID
-     * @return network information list
+     * @return network information list, or null if not present
      */
     OpenstackNetwork network(String networkId);
 
+
+    /**
+     * Returns subnet information for the subnet ID give.
+     *
+     * @param subnetId Subnet ID
+     * @return subnet information, or null if not present
+     */
+    OpenstackSubnet subnet(String subnetId);
 }

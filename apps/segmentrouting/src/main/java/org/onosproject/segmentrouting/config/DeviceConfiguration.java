@@ -16,17 +16,16 @@
 package org.onosproject.segmentrouting.config;
 
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
 import org.onlab.packet.Ip4Address;
 import org.onlab.packet.Ip4Prefix;
 import org.onlab.packet.MacAddress;
+import org.onlab.packet.VlanId;
 import org.onosproject.incubator.net.config.basics.ConfigException;
 import org.onosproject.incubator.net.config.basics.InterfaceConfig;
 import org.onosproject.incubator.net.intf.Interface;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.config.NetworkConfigRegistry;
 import org.onosproject.net.host.InterfaceIpAddress;
-import org.onosproject.segmentrouting.config.SegmentRoutingConfig.AdjacencySid;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
 import org.slf4j.Logger;
@@ -34,6 +33,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -49,8 +50,8 @@ public class DeviceConfiguration implements DeviceProperties {
     private static final Logger log = LoggerFactory
             .getLogger(DeviceConfiguration.class);
     private final List<Integer> allSegmentIds = new ArrayList<>();
-    private final ConcurrentHashMap<DeviceId, SegmentRouterInfo> deviceConfigMap
-        = new ConcurrentHashMap<>();
+    private final Map<DeviceId, SegmentRouterInfo> deviceConfigMap = new ConcurrentHashMap<>();
+    private final Map<VlanId, List<ConnectPoint>> xConnects = new ConcurrentHashMap<>();
 
     private class SegmentRouterInfo {
         int nodeSid;
@@ -60,17 +61,17 @@ public class DeviceConfiguration implements DeviceProperties {
         boolean isEdge;
         HashMap<PortNumber, Ip4Address> gatewayIps;
         HashMap<PortNumber, Ip4Prefix> subnets;
-        List<AdjacencySid> adjacencySids;
+        Map<Integer, Set<Integer>> adjacencySids;
 
         public SegmentRouterInfo() {
-            this.gatewayIps = new HashMap<>();
-            this.subnets = new HashMap<>();
+            gatewayIps = new HashMap<>();
+            subnets = new HashMap<>();
         }
     }
 
     /**
-     * Constructor. Reads all the configuration for all devices of type
-     * Segment Router and organizes into various maps for easier access.
+     * Constructs device configuration for all Segment Router devices,
+     * organizing the data into various maps for easier access.
      *
      * @param cfgService config service
      */
@@ -83,14 +84,14 @@ public class DeviceConfiguration implements DeviceProperties {
                 cfgService.getConfig(subject, SegmentRoutingConfig.class);
             SegmentRouterInfo info = new SegmentRouterInfo();
             info.deviceId = subject;
-            info.nodeSid = config.getSid();
-            info.ip = config.getIp();
-            info.mac = config.getMac();
+            info.nodeSid = config.nodeSid();
+            info.ip = config.routerIp();
+            info.mac = config.routerMac();
             info.isEdge = config.isEdgeRouter();
-            info.adjacencySids = config.getAdjacencySids();
+            info.adjacencySids = config.adjacencySids();
 
-            this.deviceConfigMap.put(info.deviceId, info);
-            this.allSegmentIds.add(info.nodeSid);
+            deviceConfigMap.put(info.deviceId, info);
+            allSegmentIds.add(info.nodeSid);
         });
 
         // Read gatewayIps and subnets from port subject.
@@ -107,17 +108,42 @@ public class DeviceConfiguration implements DeviceProperties {
                 return;
             }
             networkInterfaces.forEach(networkInterface -> {
-                DeviceId dpid = networkInterface.connectPoint().deviceId();
-                PortNumber port = networkInterface.connectPoint().port();
-                SegmentRouterInfo info = this.deviceConfigMap.get(dpid);
+                VlanId vlanId = networkInterface.vlan();
+                ConnectPoint connectPoint = networkInterface.connectPoint();
+                DeviceId dpid = connectPoint.deviceId();
+                PortNumber port = connectPoint.port();
+                SegmentRouterInfo info = deviceConfigMap.get(dpid);
 
                 // skip if there is no corresponding device for this ConenctPoint
                 if (info != null) {
+                    // Extract subnet information
                     Set<InterfaceIpAddress> interfaceAddresses = networkInterface.ipAddresses();
                     interfaceAddresses.forEach(interfaceAddress -> {
                         info.gatewayIps.put(port, interfaceAddress.ipAddress().getIp4Address());
                         info.subnets.put(port, interfaceAddress.subnetAddress().getIp4Prefix());
                     });
+
+                    // Extract VLAN cross-connect information
+                    // Do not setup cross-connect if VLAN is NONE
+                    if (vlanId.equals(VlanId.NONE)) {
+                        return;
+                    }
+                    List<ConnectPoint> connectPoints = xConnects.get(vlanId);
+                    if (connectPoints != null) {
+                        if (connectPoints.size() != 1) {
+                            log.warn("Cross-connect should only have two endpoints. Aborting.");
+                            return;
+                        }
+                        if (!connectPoints.get(0).deviceId().equals(connectPoint.deviceId())) {
+                            log.warn("Cross-connect endpoints must be on the same switch. Aborting.");
+                            return;
+                        }
+                        connectPoints.add(connectPoint);
+                    } else {
+                        connectPoints = new LinkedList<>();
+                        connectPoints.add(connectPoint);
+                        xConnects.put(vlanId, connectPoints);
+                    }
                 }
             });
 
@@ -234,6 +260,11 @@ public class DeviceConfiguration implements DeviceProperties {
         });
 
         return subnetPortMap;
+    }
+
+    @Override
+    public Map<VlanId, List<ConnectPoint>> getXConnects() {
+        return xConnects;
     }
 
     /**
@@ -410,19 +441,13 @@ public class DeviceConfiguration implements DeviceProperties {
      *
      * @param deviceId device identification of the router
      * @param sid adjacency Sid
-     * @return list of port numbers
+     * @return set of port numbers
      */
-    public List<Integer> getPortsForAdjacencySid(DeviceId deviceId, int sid) {
+    public Set<Integer> getPortsForAdjacencySid(DeviceId deviceId, int sid) {
         SegmentRouterInfo srinfo = deviceConfigMap.get(deviceId);
-        if (srinfo != null) {
-            for (AdjacencySid asid : srinfo.adjacencySids) {
-                if (asid.getAsid() == sid) {
-                    return asid.getPorts();
-                }
-            }
-        }
-
-        return Lists.newArrayList();
+        return srinfo != null ?
+                ImmutableSet.copyOf(srinfo.adjacencySids.get(sid)) :
+                ImmutableSet.copyOf(new HashSet<>());
     }
 
     /**
@@ -435,20 +460,6 @@ public class DeviceConfiguration implements DeviceProperties {
      */
     public boolean isAdjacencySid(DeviceId deviceId, int sid) {
         SegmentRouterInfo srinfo = deviceConfigMap.get(deviceId);
-        if (srinfo != null) {
-            if (srinfo.adjacencySids.isEmpty()) {
-                return false;
-            } else {
-                for (AdjacencySid asid:
-                        srinfo.adjacencySids) {
-                    if (asid.getAsid() == sid) {
-                        return true;
-                    }
-                }
-                return false;
-            }
-        }
-
-        return false;
+        return srinfo != null && srinfo.adjacencySids.containsKey(sid);
     }
 }

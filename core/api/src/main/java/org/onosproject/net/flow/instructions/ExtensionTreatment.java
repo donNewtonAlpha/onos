@@ -16,63 +16,18 @@
 
 package org.onosproject.net.flow.instructions;
 
-import java.util.List;
+import org.onosproject.net.flow.Extension;
 
 /**
- * An extensible instruction type.
+ * An extension for the treatment API.
  */
-public interface ExtensionTreatment {
+public interface ExtensionTreatment extends Extension {
 
     /**
-     * Gets the type of the extension instruction.
+     * Gets the type of the treatment extension.
      *
      * @return type
      */
     ExtensionTreatmentType type();
-
-    /**
-     * Sets a property on the extension instruction.
-     *
-     * @param key property key
-     * @param value value to set for the given key
-     * @param <T> class of the value
-     * @throws ExtensionPropertyException if the given key is not a valid
-     * property on this extension instruction
-     */
-    <T> void setPropertyValue(String key, T value) throws ExtensionPropertyException;
-
-    /**
-     * Gets a property value of an extension instruction.
-     *
-     * @param key property key
-     * @param <T> class of the value
-     * @return value of the property
-     * @throws ExtensionPropertyException if the given key is not a valid
-     * property on this extension instruction
-     */
-    <T> T getPropertyValue(String key) throws ExtensionPropertyException;
-
-    /**
-     * Gets a list of all properties on the extension instruction.
-     *
-     * @return list of properties
-     */
-    List<String> getProperties();
-
-    /**
-     * Serialize the extension instruction to a byte array.
-     *
-     * @return byte array
-     */
-    byte[] serialize();
-
-    /**
-     * Deserialize the extension instruction from a byte array. The properties
-     * of this object will be overwritten with the data in the byte array.
-     *
-     * @param data input byte array
-     */
-    void deserialize(byte[] data);
-
 
 }

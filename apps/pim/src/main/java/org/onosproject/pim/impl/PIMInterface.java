@@ -24,81 +24,106 @@ import org.onlab.packet.PIM;
 import org.onlab.packet.pim.PIMHello;
 import org.onlab.packet.pim.PIMHelloOption;
 import org.onosproject.incubator.net.intf.Interface;
-import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.host.InterfaceIpAddress;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static org.slf4j.LoggerFactory.getLogger;
 
 /**
- * The PIM Interface is a wrapper around a ConnectPoint and used to provide
- * hello options values when "talking" with PIM other PIM routers.
+ * PIM Interface represents an ONOS Interface with IP and MAC addresses for
+ * a given ConnectPoint.
  */
 public class PIMInterface {
-    private static Logger log = LoggerFactory.getLogger("PIMInterfaces");
 
-    // Interface from the interface subsystem
-    private Interface theInterface;
+    private final Logger log = getLogger(getClass());
 
-    // The list of PIM neighbors adjacent to this interface
-    private Map<IpAddress, PIMNeighbor> neighbors = new HashMap<>();
+    private Interface onosInterface;
 
-    // The designatedRouter for this LAN
-    private PIMNeighbor designatedRouter;
+    // Our hello opt holdtime
+    private short holdtime = PIMHelloOption.DEFAULT_HOLDTIME;
 
-    // The priority we use on this ConnectPoint.
-    private int priority = PIMHelloOption.DEFAULT_PRIORITY;
+    // Our hello opt prune delay
+    private int pruneDelay = PIMHelloOption.DEFAULT_PRUNEDELAY;
 
-    // The holdtime we are sending out.
-    private int holdtime = PIMHelloOption.DEFAULT_HOLDTIME;
+    // Neighbor priority
+    private int priority   = PIMHelloOption.DEFAULT_PRIORITY;
 
-    // Then generation ID we are sending out. 0 means we need to generate a new random ID
-    private int genid = PIMHelloOption.DEFAULT_GENID;
+    // Our current genid
+    private int genid      = PIMHelloOption.DEFAULT_GENID;   // Needs to be assigned.
 
-    // Our default prune delay
-    private int prunedelay = PIMHelloOption.DEFAULT_PRUNEDELAY;
+    // The IP address of the DR
+    IpAddress drIpaddress;
+
+    // A map of all our PIM neighbors keyed on our neighbors IP address
+    private Map<IpAddress, PIMNeighbor> pimNeighbors = new HashMap<>();
 
     /**
-     * Create a PIMInterface.
+     * Create a PIMInterface from an ONOS Interface.
      *
-     * @param intf the network interface configuration
+     * @param intf the ONOS Interface.
      */
     public PIMInterface(Interface intf) {
+        onosInterface = intf;
+        IpAddress ourIp = getIpAddress();
+        MacAddress mac = intf.mac();
 
-        log.debug("Adding an interface: " + intf.toString() + "\n");
-        this.theInterface = intf;
+        // Create a PIM Neighbor to represent ourselves for DR election.
+        PIMNeighbor us = new PIMNeighbor(ourIp, mac);
 
-        // Send a hello to let our neighbors know we are alive
-        sendHello();
+        // Priority and IP address are all we need to DR election.
+        us.setPriority(priority);
+
+        pimNeighbors.put(ourIp, us);
+        drIpaddress = ourIp;
     }
 
     /**
-     * Get the PIM Interface.
+     * Return the ONOS Interface.
      *
-     * @return the PIM Interface
+     * @return ONOS Interface.
      */
     public Interface getInterface() {
-        return theInterface;
+        return onosInterface;
+
     }
 
     /**
-     * Getter for our IP address.
+     * Set the ONOS Interface, it will override a previous value.
      *
-     * @return our IP address.
+     * @param intf ONOS Interface
+     * @return PIM interface instance
+     */
+    public PIMInterface setInterface(Interface intf) {
+        onosInterface = intf;
+        return this;
+    }
+
+    /**
+     * Get the set of IP Addresses associated with this interface.
+     *
+     * @return a set of Ip Addresses on this interface
+     */
+    public Set<InterfaceIpAddress> getIpAddresses() {
+        return onosInterface.ipAddresses();
+    }
+
+    /**
+     * Return a single "best" IP address.
+     *
+     * @return the choosen IP address or null if none
      */
     public IpAddress getIpAddress() {
-        if (theInterface.ipAddresses().isEmpty()) {
+        if (onosInterface.ipAddresses().isEmpty()) {
             return null;
         }
 
-        // We will just assume the first interface on the list
         IpAddress ipaddr = null;
-        for (InterfaceIpAddress ifipaddr : theInterface.ipAddresses()) {
+        for (InterfaceIpAddress ifipaddr : onosInterface.ipAddresses()) {
             ipaddr = ifipaddr.ipAddress();
             break;
         }
@@ -106,236 +131,155 @@ public class PIMInterface {
     }
 
     /**
-     * Get our priority.
+     * Get the holdtime.
      *
-     * @return our priority.
+     * @return the holdtime
+     */
+    public short getHoldtime() {
+        return holdtime;
+    }
+
+    /**
+     * Get the prune delay.
+     *
+     * @return The prune delay
+     */
+    public int getPruneDelay() {
+        return pruneDelay;
+    }
+
+    /**
+     * Get our hello priority.
+     *
+     * @return our priority
      */
     public int getPriority() {
-        return this.priority;
+        return priority;
     }
 
     /**
-     * Get the designated router on this connection.
+     * Get our generation ID.
      *
-     * @return the PIMNeighbor representing the DR
+     * @return our generation ID
      */
-    public PIMNeighbor getDesignatedRouter() {
-        return designatedRouter;
+    public int getGenid() {
+        return genid;
     }
 
     /**
-     * Are we the DR on this CP?
-     *
-     * @return true if we are, false if not
-     */
-    public boolean areWeDr() {
-        return (designatedRouter != null &&
-                designatedRouter.getPrimaryAddr().equals(this.getIpAddress()));
-    }
-
-    /**
-     * Return a collection of PIM Neighbors.
-     *
-     * @return the collection of PIM Neighbors
-     */
-    public Collection<PIMNeighbor> getNeighbors() {
-        return this.neighbors.values();
-    }
-
-    /**
-     * Find the neighbor with the given IP address on this CP.
-     *
-     * @param ipaddr the IP address of the neighbor we are interested in
-     * @return the pim neighbor if it exists
-     */
-    public PIMNeighbor findNeighbor(IpAddress ipaddr) {
-        PIMNeighbor nbr = neighbors.get(ipaddr);
-        return nbr;
-    }
-
-    /**
-     * Add a new PIM neighbor to this list.
-     *
-     * @param nbr the neighbor to be added.
-     */
-    public void addNeighbor(PIMNeighbor nbr) {
-        if (neighbors.containsKey(nbr.getPrimaryAddr())) {
-
-            log.debug("We are adding a neighbor that already exists: {}", nbr.toString());
-            neighbors.remove(nbr.getPrimaryAddr());
-        }
-        neighbors.put(nbr.getPrimaryAddr(), nbr);
-    }
-
-    /**
-     * Remove the neighbor from our neighbor list.
-     *
-     * @param ipaddr the IP address of the neighbor to remove
-     */
-    public void removeNeighbor(IpAddress ipaddr) {
-
-        if (neighbors.containsKey(ipaddr)) {
-            neighbors.remove(ipaddr);
-        }
-        this.electDR();
-    }
-
-    /**
-     * Remove the given neighbor from the neighbor list.
-     *
-     * @param nbr the nbr to be removed.
-     */
-    public void removeNeighbor(PIMNeighbor nbr) {
-
-        neighbors.remove(nbr.getPrimaryAddr(), nbr);
-        this.electDR();
-    }
-
-    /**
-     * Elect a new DR on this ConnectPoint.
-     *
-     * @return the PIM Neighbor that wins
-     */
-    public PIMNeighbor electDR() {
-
-        for (PIMNeighbor nbr : this.neighbors.values()) {
-            if (this.designatedRouter == null) {
-                this.designatedRouter = nbr;
-                continue;
-            }
-
-            if (nbr.getPriority() > this.designatedRouter.getPriority()) {
-                this.designatedRouter = nbr;
-                continue;
-            }
-
-            // We could sort in ascending order
-            if (this.designatedRouter.getPrimaryAddr().compareTo(nbr.getPrimaryAddr()) > 0) {
-                this.designatedRouter = nbr;
-                continue;
-            }
-        }
-
-        return this.designatedRouter;
-    }
-
-    /**
-     * Elect a new DR given the new neighbor.
-     *
-     * @param nbr the new neighbor to use in DR election.
-     * @return the PIM Neighbor that wins DR election
-     */
-    public PIMNeighbor electDR(PIMNeighbor nbr) {
-
-        // Make sure I have
-        if (this.designatedRouter == null ||
-                this.designatedRouter.getPriority() < nbr.getPriority() ||
-                this.designatedRouter.getPrimaryAddr().compareTo(nbr.getPrimaryAddr()) > 0) {
-            this.designatedRouter = nbr;
-        }
-        return this.designatedRouter;
-    }
-
-    /**
-     * Find or create a pim neighbor with a given ip address and connect point.
-     *
-     * @param ipaddr of the pim neighbor
-     * @param mac The mac address of our sending neighbor
-     * @return an existing or new PIM neighbor
-     */
-    public PIMNeighbor findOrCreate(IpAddress ipaddr, MacAddress mac) {
-        PIMNeighbor nbr = this.findNeighbor(ipaddr);
-        if (nbr == null) {
-            nbr = new PIMNeighbor(ipaddr, mac, this);
-            this.addNeighbor(nbr);
-            this.electDR(nbr);
-        }
-        return nbr;
-    }
-
-    /**
-     * Process a hello packet received on this Interface.
-     *
-     * @param ethPkt the ethernet packet containing the hello message
-     * @param cp the ConnectPoint of this interface
-     */
-    public void processHello(Ethernet ethPkt, ConnectPoint cp) {
-        checkNotNull(ethPkt);
-        checkNotNull(cp);
-
-        MacAddress srcmac = ethPkt.getSourceMAC();
-        IPv4 ip = (IPv4) ethPkt.getPayload();
-        Ip4Address srcip = Ip4Address.valueOf(ip.getSourceAddress());
-
-        PIM pim = (PIM) ip.getPayload();
-        checkNotNull(pim);
-
-        PIMHello hello = (PIMHello) pim.getPayload();
-        checkNotNull(hello);
-
-        PIMNeighbor nbr = this.findOrCreate(srcip, srcmac);
-        if (nbr == null) {
-            log.error("Could not create a neighbor for: {1}", srcip.toString());
-            return;
-        }
-
-        ConnectPoint icp = theInterface.connectPoint();
-        checkNotNull(icp);
-        if (!cp.equals(icp)) {
-            log.error("PIM Hello message received from {} on incorrect interface {}",
-                    nbr.getPrimaryAddr(), this.toString());
-            return;
-        }
-        nbr.refresh(hello);
-    }
-
-    /**
-     * Send a hello packet from this interface.
+     * Multicast a hello message out our interface.  This hello message is sent
+     * periodically during the normal PIM Neighbor refresh time, as well as a
+     * result of a newly created interface.
      */
     public void sendHello() {
-        PIM pim = new PIM();
+
+        // Create the base PIM Packet and mark it a hello packet
+        PIMPacket pimPacket = new PIMPacket(PIM.TYPE_HELLO);
+
+        // We need to set the source MAC and IPv4 addresses
+        pimPacket.setSrcMacAddr(onosInterface.mac());
+        pimPacket.setSrcIpAddress(Ip4Address.valueOf(getIpAddress().toOctets()));
+
+        // Create the hello message with options
         PIMHello hello = new PIMHello();
-
-        // Create a PIM Hello
-        pim = new PIM();
-        pim.setVersion((byte) 2);
-        pim.setPIMType((byte) PIM.TYPE_HELLO);
-        pim.setChecksum((short) 0);
-
-        hello = new PIMHello();
         hello.createDefaultOptions();
-        pim.setPayload(hello);
-        hello.setParent(pim);
 
-        log.debug("Sending hello: \n");
-        PIMPacketHandler.getInstance().sendPacket(pim, this);
+        // Now set the hello option payload
+        pimPacket.setPIMPayload(hello);
+
+        // TODO: How to send the packet.?.
     }
 
     /**
-     * prints the connectPointNeighbors list with each neighbor list.
+     * Process an incoming PIM Hello message.  There are a few things going on in
+     * this method:
+     * <ul>
+     *     <li>We <em>may</em> have to create a new neighbor if one does not already exist</li>
+     *     <li>We <em>may</em> need to re-elect a new DR if new information is received</li>
+     *     <li>We <em>may</em> need to send an existing neighbor all joins if the genid changed</li>
+     *     <li>We will refresh the neighbors timestamp</li>
+     * </ul>
      *
-     * @return string of neighbors.
+     * @param ethPkt the Ethernet packet header
      */
-    public String printNeighbors() {
-        String out = "PIM Neighbors Table: \n";
-        for (PIMNeighbor nbr : this.neighbors.values()) {
-            out += "\t" + nbr.toString();
-        }
-        return out;
-    }
+    public void processHello(Ethernet ethPkt) {
 
-    @Override
-    public String toString() {
-        IpAddress ipaddr = this.getIpAddress();
-        String out = "PIM Neighbors: ";
-        if (ipaddr != null) {
-            out += "IP: " + ipaddr.toString();
+        // We'll need to save our neighbors MAC address
+        MacAddress nbrmac = ethPkt.getSourceMAC();
+
+        // And we'll need to save neighbors IP Address.
+        IPv4 iphdr = (IPv4) ethPkt.getPayload();
+        IpAddress srcip = IpAddress.valueOf(iphdr.getSourceAddress());
+
+        PIM pimhdr = (PIM) iphdr.getPayload();
+        if (pimhdr.getPimMsgType() != PIM.TYPE_HELLO) {
+            log.error("process Hello has received a non hello packet type: " + pimhdr.getPimMsgType());
+            return;
+        }
+
+        // get the DR values for later calculation
+        PIMNeighbor dr = pimNeighbors.get(drIpaddress);
+        checkNotNull(dr);
+
+        IpAddress drip = drIpaddress;
+        int drpri = dr.getPriority();
+
+        // Assume we do not need to run a DR election
+        boolean reElectDr = false;
+        boolean genidChanged = false;
+
+        PIMHello hello = (PIMHello) pimhdr.getPayload();
+
+        // Determine if we already have a PIMNeighbor
+        PIMNeighbor nbr = pimNeighbors.getOrDefault(srcip, null);
+        if (nbr == null) {
+            nbr = new PIMNeighbor(srcip, hello.getOptions());
+            checkNotNull(nbr);
         } else {
-            out += "IP: *Null*";
+            Integer previousGenid = nbr.getGenid();
+            nbr.addOptions(hello.getOptions());
+            if (previousGenid != nbr.getGenid()) {
+                genidChanged = true;
+            }
         }
-        out += "\tPR: " + String.valueOf(this.priority) + "\n";
-        return out;
+
+        // Refresh this neighbors timestamp
+        nbr.refreshTimestamp();
+
+        /*
+         * the election method will frist determine if an election
+         * needs to be run, if so it will run the election.  The
+         * IP address of the DR will be returned.  If the IP address
+         * of the DR is different from what we already have we know a
+         * new DR has been elected.
+         */
+        IpAddress electedIp = election(nbr, drip, drpri);
+        if (!drip.equals(electedIp)) {
+            // we have a new DR.
+            drIpaddress = electedIp;
+        }
     }
 
-}
+    // Run an election if we need to.  Return the elected IP address.
+    private IpAddress election(PIMNeighbor nbr, IpAddress drip, int drpri) {
 
+        IpAddress nbrip = nbr.getIpaddr();
+        if (nbr.getPriority() > drpri) {
+            return nbrip;
+        }
+
+        if (nbrip.compareTo(drip) > 0) {
+            return nbrip;
+        }
+        return drip;
+    }
+
+    /**
+     * Process an incoming PIM JoinPrune message.
+     *
+     * @param ethPkt the Ethernet packet header.
+     */
+    public void processJoinPrune(Ethernet ethPkt) {
+        // TODO: add Join/Prune processing code.
+    }
+}

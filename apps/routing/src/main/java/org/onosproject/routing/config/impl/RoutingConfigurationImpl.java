@@ -41,6 +41,7 @@ import org.onosproject.net.config.basics.SubjectFactories;
 import org.onosproject.routing.config.BgpConfig;
 import org.onosproject.routing.config.BgpPeer;
 import org.onosproject.routing.config.BgpSpeaker;
+import org.onosproject.routing.config.RouterConfig;
 import org.onosproject.routing.config.Interface;
 import org.onosproject.routing.config.LocalIpPrefixEntry;
 import org.onosproject.routing.config.RoutingConfigurationService;
@@ -54,6 +55,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -100,24 +102,36 @@ public class RoutingConfigurationImpl implements RoutingConfigurationService {
 
     private MacAddress virtualGatewayMacAddress;
 
-    private ConfigFactory configFactory =
-            new ConfigFactory(SubjectFactories.APP_SUBJECT_FACTORY, BgpConfig.class, "bgp") {
+    private ConfigFactory<ApplicationId, BgpConfig> bgpConfigFactory =
+            new ConfigFactory<ApplicationId, BgpConfig>(
+                    SubjectFactories.APP_SUBJECT_FACTORY, BgpConfig.class, "bgp") {
         @Override
         public BgpConfig createConfig() {
             return new BgpConfig();
         }
     };
 
+    private ConfigFactory<ApplicationId, RouterConfig> routerConfigFactory =
+            new ConfigFactory<ApplicationId, RouterConfig>(
+                    SubjectFactories.APP_SUBJECT_FACTORY, RouterConfig.class, "router") {
+                @Override
+                public RouterConfig createConfig() {
+                    return new RouterConfig();
+                }
+            };
+
     @Activate
     public void activate() {
-        registry.registerConfigFactory(configFactory);
+        registry.registerConfigFactory(bgpConfigFactory);
+        registry.registerConfigFactory(routerConfigFactory);
         readConfiguration();
         log.info("Routing configuration service started");
     }
 
     @Deactivate
     public void deactivate() {
-        registry.unregisterConfigFactory(configFactory);
+        registry.unregisterConfigFactory(bgpConfigFactory);
+        registry.registerConfigFactory(routerConfigFactory);
         log.info("Routing configuration service stopped");
     }
 
@@ -201,7 +215,7 @@ public class RoutingConfigurationImpl implements RoutingConfigurationService {
             return bgpConfig.bgpSpeakers().stream()
                     .flatMap(speaker -> speaker.peers().stream())
                     .map(peer -> interfaceService.getMatchingInterface(peer))
-                    .filter(intf -> intf != null)
+                    .filter(Objects::nonNull)
                     .map(intf -> intf.connectPoint())
                     .collect(Collectors.toSet());
         }

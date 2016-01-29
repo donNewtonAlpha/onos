@@ -16,15 +16,17 @@
 package org.onosproject.net.mcast;
 
 import com.google.common.annotations.Beta;
+import org.onosproject.event.ListenerService;
 import org.onosproject.net.ConnectPoint;
 
-import java.util.List;
+import java.util.Set;
 
 /**
  * A service interface for maintaining multicast information.
  */
 @Beta
-public interface MulticastRouteService {
+public interface MulticastRouteService
+        extends ListenerService<McastEvent, McastListener> {
 
     /**
      * Adds a route to the information base.
@@ -80,5 +82,5 @@ public interface MulticastRouteService {
      * @param route a multicast route
      * @return a list of connect points
      */
-    List<ConnectPoint> fetchSinks(McastRoute route);
+    Set<ConnectPoint> fetchSinks(McastRoute route);
 }

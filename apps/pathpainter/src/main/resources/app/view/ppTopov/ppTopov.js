@@ -31,6 +31,7 @@
         swapMessage = 'ppTopovSwapSrcDst',
         modeMessage = 'ppTopovSetMode',
         nextPathMessage = 'ppTopovNextPath',
+        clearMessage = 'ppTopovClear',
         prevPathMessage = 'ppTopovPrevPath';
 
     // internal state
@@ -44,17 +45,23 @@
     // === ---------------------------
     // === Main API functions
 
+    function clear() {
+        wss.sendEvent(clearMessage);
+        flash.flash('Source node: ' + node.id);
+    }
 
     function setSrc(node) {
         wss.sendEvent(srcMessage, {
-            id: node.id
+            id: node.id,
+            type: node.type
         });
         flash.flash('Source node: ' + node.id);
     }
 
     function setDst(node) {
         wss.sendEvent(dstMessage, {
-            id: node.id
+            id: node.id,
+            type: node.type
         });
         flash.flash('Destination node: ' + node.id);
     }
@@ -76,6 +83,7 @@
     function setMode(mode) {
         if (currentMode === mode) {
             $log.debug('(in mode', mode, 'already)');
+            flash.flash('Already in ' + mode + ' mode');
         } else {
             currentMode = mode;
             wss.sendEvent(modeMessage, {
@@ -104,7 +112,8 @@
                 setMode: setMode,
                 nextPath: nextPath,
                 prevPath: prevPath,
-                swapSrcDst: swapSrcDst
+                swapSrcDst: swapSrcDst,
+                clear: clear
             };
         }]);
 }());

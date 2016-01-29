@@ -23,6 +23,7 @@ import org.onlab.packet.MacAddress;
 import org.onlab.packet.MplsLabel;
 import org.onlab.packet.TpPort;
 import org.onlab.packet.VlanId;
+import org.onosproject.net.DeviceId;
 import org.onosproject.net.IndexedLambda;
 import org.onosproject.net.Lambda;
 import org.onosproject.net.OchSignal;
@@ -126,6 +127,16 @@ public final class Criteria {
     }
 
     /**
+     * Creates a match on the inner VLAN ID field using the specified value.
+     *
+     * @param vlanId vlan id value
+     * @return match criterion
+     */
+    public static Criterion matchInnerVlanId(VlanId vlanId) {
+        return new VlanIdCriterion(vlanId, Type.INNER_VLAN_VID);
+    }
+
+    /**
      * Creates a match on VLAN PCP field using the specified value.
      *
      * @param vlanPcp vlan pcp value (3 bits)
@@ -133,6 +144,16 @@ public final class Criteria {
      */
     public static Criterion matchVlanPcp(byte vlanPcp) {
         return new VlanPcpCriterion(vlanPcp);
+    }
+
+    /**
+     * Creates a match on the inner VLAN PCP field using the specified value.
+     *
+     * @param vlanPcp vlan pcp value (3 bits)
+     * @return match criterion
+     */
+    public static Criterion matchInnerVlanPcp(byte vlanPcp) {
+        return new VlanPcpCriterion(vlanPcp, Type.INNER_VLAN_PCP);
     }
 
     /**
@@ -579,6 +600,33 @@ public final class Criteria {
         return new ArpOpCriterion(arpOp, Type.ARP_OP);
     }
 
+    /**
+     * Creates a match on PBB I-SID field using the specific value.
+     *
+     * @param pbbIsid PBB I-SID
+     * @return match criterion
+     */
+    public static Criterion matchPbbIsid(int pbbIsid) {
+        return new PbbIsidCriterion(pbbIsid);
+    }
+
+    /**
+     * Creates an extension criterion for the specified extension selector.
+     *
+     * @param extensionSelector extension selector
+     * @param deviceId device ID
+     * @return match extension criterion
+     */
+    public static ExtensionCriterion extension(ExtensionSelector extensionSelector,
+                                      DeviceId deviceId) {
+        return new ExtensionCriterion(extensionSelector, deviceId);
+    }
+
+    /**
+     * Creates a dummy criterion.
+     *
+     * @return match criterion
+     */
     public static Criterion dummy() {
         return new DummyCriterion();
     }

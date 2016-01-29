@@ -22,7 +22,7 @@ import com.google.common.base.MoreObjects;
 import java.util.Objects;
 
 /**
- * Type of extension instructions.
+ * Type of treatment extensions.
  */
 @Beta
 public final class ExtensionTreatmentType {
@@ -32,16 +32,25 @@ public final class ExtensionTreatmentType {
      * These numbers have no impact on the actual OF type id.
      */
     public enum ExtensionTreatmentTypes {
-        // TODO fix type numbers to include experimenter id
         NICIRA_SET_TUNNEL_DST(0),
         NICIRA_RESUBMIT(1),
+        NICIRA_MOV_ARP_SHA_TO_THA(2),
+        NICIRA_MOV_ARP_SPA_TO_TPA(3),
+        NICIRA_MOV_ETH_SRC_TO_DST(4),
+        NICIRA_MOV_IP_SRC_TO_DST(5),
+        NICIRA_RESUBMIT_TABLE(14),
         NICIRA_SET_NSH_SPI(32),
-        NICIRA_RESUBMIT_TABLE(14);
+        NICIRA_SET_NSH_SI(33),
+        NICIRA_SET_NSH_CH1(34),
+        NICIRA_SET_NSH_CH2(35),
+        NICIRA_SET_NSH_CH3(36),
+        NICIRA_SET_NSH_CH4(37),
+        OFDPA_SET_VLAN_ID(64);
 
         private ExtensionTreatmentType type;
 
         /**
-         * Creates a new named extension instruction type.
+         * Creates a new named extension treatment type.
          *
          * @param type type code
          */

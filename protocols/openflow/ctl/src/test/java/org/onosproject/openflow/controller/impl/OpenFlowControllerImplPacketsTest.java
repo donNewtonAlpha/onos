@@ -24,12 +24,12 @@ import java.util.concurrent.Future;
 import org.junit.Before;
 import org.junit.Test;
 import org.onosproject.openflow.ExecutorServiceAdapter;
-import org.onosproject.openflow.MockOfFeaturesReply;
-import org.onosproject.openflow.MockOfPacketIn;
 import org.onosproject.openflow.MockOfPortStatus;
-import org.onosproject.openflow.OfMessageAdapter;
 import org.onosproject.openflow.OpenFlowSwitchListenerAdapter;
 import org.onosproject.openflow.OpenflowSwitchDriverAdapter;
+import org.onosproject.openflow.MockOfFeaturesReply;
+import org.onosproject.openflow.MockOfPacketIn;
+import org.onosproject.openflow.OfMessageAdapter;
 import org.onosproject.openflow.controller.Dpid;
 import org.onosproject.openflow.controller.OpenFlowPacketContext;
 import org.onosproject.openflow.controller.OpenFlowSwitch;
@@ -53,7 +53,9 @@ public class OpenFlowControllerImplPacketsTest {
     OpenFlowSwitch switch1;
     OpenFlowSwitchListenerAdapter switchListener;
     TestPacketListener packetListener;
-    TestExecutorService executorService;
+    TestExecutorService statsExecutorService;
+    TestExecutorService pktInExecutorService;
+    TestExecutorService flowRmvExecutorService;
 
     /**
      * Mock packet listener that accumulates packets.
@@ -108,12 +110,19 @@ public class OpenFlowControllerImplPacketsTest {
         agent = controller.agent;
         switchListener = new OpenFlowSwitchListenerAdapter();
         controller.addListener(switchListener);
+        controller.monitorAllEvents(true);
 
         packetListener = new TestPacketListener();
         controller.addPacketListener(100, packetListener);
 
-        executorService = new TestExecutorService();
-        controller.executorMsgs = executorService;
+        statsExecutorService = new TestExecutorService();
+        pktInExecutorService = new TestExecutorService();
+        flowRmvExecutorService = new TestExecutorService();
+
+        controller.executorMsgs = statsExecutorService;
+        controller.executorPacketIn = pktInExecutorService;
+        controller.executorFlowRemoved = flowRmvExecutorService;
+
     }
 
     /**
@@ -143,14 +152,16 @@ public class OpenFlowControllerImplPacketsTest {
     }
 
     /**
-     * Tests a packet in operation.
+     * Tests a packet in listen operation.
      */
     @Test
-    public void testPacketIn() {
+    public void testPacketInListen() {
         agent.addConnectedSwitch(dpid1, switch1);
         OFMessage packetInPacket = new MockOfPacketIn();
         controller.processPacket(dpid1, packetInPacket);
         assertThat(packetListener.contexts(), hasSize(1));
+        assertThat(pktInExecutorService.submittedMessages(), hasSize(1));
+        assertThat(pktInExecutorService.submittedMessages().get(0), is(packetInPacket));
     }
 
     /**
@@ -161,7 +172,19 @@ public class OpenFlowControllerImplPacketsTest {
         agent.addConnectedSwitch(dpid1, switch1);
         OfMessageAdapter errorPacket = new OfMessageAdapter(OFType.ERROR);
         controller.processPacket(dpid1, errorPacket);
-        assertThat(executorService.submittedMessages(), hasSize(1));
-        assertThat(executorService.submittedMessages().get(0), is(errorPacket));
+        assertThat(statsExecutorService.submittedMessages(), hasSize(1));
+        assertThat(statsExecutorService.submittedMessages().get(0), is(errorPacket));
+    }
+
+    /**
+     * Tests a packet in operation.
+     */
+    @Test
+    public void testFlowRemoved() {
+        agent.addConnectedSwitch(dpid1, switch1);
+        OFMessage flowRemovedPacket = new MockOfFlowRemoved();
+        controller.processPacket(dpid1, flowRemovedPacket);
+        assertThat(flowRmvExecutorService.submittedMessages(), hasSize(1));
+        assertThat(flowRmvExecutorService.submittedMessages().get(0), is(flowRemovedPacket));
     }
 }

@@ -47,7 +47,6 @@ import static org.slf4j.LoggerFactory.getLogger;
 public class PersistenceManager implements PersistenceService {
 
     private static final String DATABASE_PATH = "../data/localDB";
-
     private static final String ENCLOSING_FOLDER = "../data";
 
     static final String MAP_PREFIX = "map:";
