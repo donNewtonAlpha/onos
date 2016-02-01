@@ -23,9 +23,9 @@ public interface ParentalControlService {
     public boolean disconnectCustomer(int clientId);
 
     // @return true if the request is processed correctly, false otherwise
-    public boolean generalDNS(int clientId);
+    public boolean generalDns(int clientId);
 
     // @return true if the request is processed correctly, false otherwise
-    public boolean personalDNS(int clientId);
+    public boolean personalDns(int clientId);
 
 }

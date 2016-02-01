@@ -28,7 +28,7 @@ public class VcpeNoDnsCommand extends AbstractShellCommand {
                 print("client is not real");
                 return;
             }
-            service.noDNS(clientId);
+            service.noDns(clientId);
         } catch (Exception e) {
             print("exception occured", e);
         }

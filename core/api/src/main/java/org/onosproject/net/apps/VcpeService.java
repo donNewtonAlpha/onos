@@ -24,11 +24,11 @@ public interface VcpeService {
 
     public void disableInternet(int clientId);
 
-    public void generalDNS(int clientId);
+    public void generalDns(int clientId);
 
-    public void personalDNS(int clientId);
+    public void personalDns(int clientId);
 
-    public void noDNS(int clientId);
+    public void noDns(int clientId);
 
     public void enableUverse(int clientId);
 
