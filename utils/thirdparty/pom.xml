@@ -101,16 +101,27 @@
 
             <filter>
               <artifact>org.onosproject:copycat*</artifact>
-              <includes>
-                <include>**</include>
-              </includes>
+                <includes>
+                  <include>**</include>
+                </includes>
+                <excludes>
+                  <exclude>net/kuujo/copycat/**</exclude>
+                </excludes>
+            </filter>
+
+            <filter>
+              <artifact>org.onosproject</artifact>
+                <excludes>
+                  <exclude>org/apache/commons/io/**</exclude>
+                  <exclude>com/googlecode/concurrenttrees/**</exclude>
+                </excludes>
             </filter>
 
             <filter>
               <artifact>io.atomix:atomix-all</artifact>
-              <includes>
-                <include>**</include>
-              </includes>
+                <includes>
+                  <include>**</include>
+                </includes>
             </filter>
 
           </filters>

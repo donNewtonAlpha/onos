@@ -17,6 +17,7 @@ package org.onosproject.store.newresource.impl;
 
 import com.google.common.annotations.Beta;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
@@ -214,10 +215,13 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
                 }
             });
             if (allocated) {
+                log.warn("Failed to unregister {}: allocation exists", entry.getKey());
                 return abortTransaction(tx);
             }
 
             if (!removeValues(childTxMap, entry.getKey(), entry.getValue())) {
+                log.warn("Failed to unregister {}: Failed to remove values: {}",
+                         entry.getKey(), entry.getValue());
                 return abortTransaction(tx);
             }
         }
@@ -229,6 +233,8 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
                     .map(x -> new ResourceEvent(RESOURCE_REMOVED, x))
                     .collect(Collectors.toList());
             notifyDelegate(events);
+        } else {
+            log.warn("Failed to unregister {}: Commit failed.", resources);
         }
         return success;
     }
@@ -384,16 +390,16 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
     }
 
     @Override
-    public Collection<Resource> getChildResources(Resource parent) {
+    public Set<Resource> getChildResources(Resource parent) {
         checkNotNull(parent);
         if (!(parent instanceof DiscreteResource)) {
             // only Discrete resource can have child resource
-            return ImmutableList.of();
+            return ImmutableSet.of();
         }
 
         Versioned<Set<Resource>> children = childMap.get((DiscreteResource) parent);
         if (children == null) {
-            return ImmutableList.of();
+            return ImmutableSet.of();
         }
 
         return children.value();
@@ -466,12 +472,11 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
      * @param map map holding multiple values for a key
      * @param key key specifying values
      * @param values values to be appended
-     * @param <K> type of the key
-     * @param <V> type of the element of the list
      * @return true if the operation succeeds, false otherwise.
      */
-    private <K, V> boolean appendValues(TransactionalMap<K, Set<V>> map, K key, List<V> values) {
-        Set<V> oldValues = map.putIfAbsent(key, new LinkedHashSet<>(values));
+    private boolean appendValues(TransactionalMap<DiscreteResource, Set<Resource>> map,
+                                 DiscreteResource key, List<Resource> values) {
+        Set<Resource> oldValues = map.putIfAbsent(key, new LinkedHashSet<>(values));
         if (oldValues == null) {
             return true;
         }
@@ -481,7 +486,7 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
             return true;
         }
 
-        LinkedHashSet<V> newValues = new LinkedHashSet<>(oldValues);
+        LinkedHashSet<Resource> newValues = new LinkedHashSet<>(oldValues);
         newValues.addAll(values);
         return map.replace(key, oldValues, newValues);
     }
@@ -493,22 +498,23 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
      * @param map map holding multiple values for a key
      * @param key key specifying values
      * @param values values to be removed
-     * @param <K> type of the key
-     * @param <V> type of the element of the list
      * @return true if the operation succeeds, false otherwise
      */
-    private <K, V> boolean removeValues(TransactionalMap<K, Set<V>> map, K key, List<? extends V> values) {
-        Set<V> oldValues = map.putIfAbsent(key, new LinkedHashSet<>());
+    private boolean removeValues(TransactionalMap<DiscreteResource, Set<Resource>> map,
+                                 DiscreteResource key, List<Resource> values) {
+        Set<Resource> oldValues = map.putIfAbsent(key, new LinkedHashSet<>());
         if (oldValues == null) {
+            log.trace("No-Op removing values. key {} did not exist", key);
             return true;
         }
 
         if (values.stream().allMatch(x -> !oldValues.contains(x))) {
             // don't write map because none of the values are stored
+            log.trace("No-Op removing values. key {} did not contain {}", key, values);
             return true;
         }
 
-        LinkedHashSet<V> newValues = new LinkedHashSet<>(oldValues);
+        LinkedHashSet<Resource> newValues = new LinkedHashSet<>(oldValues);
         newValues.removeAll(values);
         return map.replace(key, oldValues, newValues);
     }

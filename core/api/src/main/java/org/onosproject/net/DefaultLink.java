@@ -24,11 +24,10 @@ import static org.onosproject.net.Link.State.ACTIVE;
 import static org.onosproject.net.DefaultAnnotations.EMPTY;
 import static com.google.common.base.Preconditions.checkNotNull;
 
-
 /**
  * Default infrastructure link model implementation.
  */
-public class DefaultLink extends AbstractModel implements Link {
+public class DefaultLink extends AbstractProjectableModel implements Link {
 
     private final ConnectPoint src;
     private final ConnectPoint dst;
@@ -60,7 +59,7 @@ public class DefaultLink extends AbstractModel implements Link {
      * @param dst         link destination
      * @param type        link type
      * @param state       link state
-     * @param isExpected   indicates if the link is preconfigured
+     * @param isExpected  indicates if the link is preconfigured
      * @param annotations optional key/value annotations
      */
     private DefaultLink(ProviderId providerId, ConnectPoint src, ConnectPoint dst,
@@ -120,7 +119,8 @@ public class DefaultLink extends AbstractModel implements Link {
             final DefaultLink other = (DefaultLink) obj;
             return Objects.equals(this.src, other.src) &&
                     Objects.equals(this.dst, other.dst) &&
-                    Objects.equals(this.type, other.type);
+                    Objects.equals(this.type, other.type) &&
+                    Objects.equals(this.isExpected, other.isExpected);
         }
         return false;
     }

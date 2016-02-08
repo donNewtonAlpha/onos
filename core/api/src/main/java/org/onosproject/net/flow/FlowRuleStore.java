@@ -97,6 +97,23 @@ public interface FlowRuleStore extends Store<FlowRuleBatchEvent, FlowRuleStoreDe
     FlowRuleEvent removeFlowRule(FlowEntry rule);
 
     /**
+     * Marks a flow rule as PENDING_ADD during retry.
+     *
+     * Emits flow_update event if the state is changed
+     *
+     * @param rule the flow rule that is retrying
+     * @return flow_updated event, or null if nothing updated
+     */
+    FlowRuleEvent pendingFlowRule(FlowEntry rule);
+
+    /**
+     * Removes all flow entries of given device from store.
+     *
+     * @param deviceId device id
+     */
+    void purgeFlowRule(DeviceId deviceId);
+
+    /**
      * Updates the flow table statistics of the specified device using
      * the given statistics.
      *
