@@ -15,62 +15,31 @@
  */
 package org.onosproject.store.primitives.impl;
 
-import org.onosproject.store.serializers.KryoNamespaces;
+import java.util.function.Supplier;
+
 import org.onosproject.store.service.AsyncAtomicValue;
-import org.onosproject.store.service.AtomicValue;
 import org.onosproject.store.service.AtomicValueBuilder;
 import org.onosproject.store.service.ConsistentMapBuilder;
-import org.onosproject.store.service.Serializer;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Default implementation of AtomicValueBuilder.
  *
  * @param <V> value type
  */
-public class DefaultAtomicValueBuilder<V> implements AtomicValueBuilder<V> {
+public class DefaultAtomicValueBuilder<V> extends AtomicValueBuilder<V> {
 
-    private String name;
-    private ConsistentMapBuilder<String, V> mapBuilder;
-    private boolean metering = true;
+    private ConsistentMapBuilder<String, byte[]> mapBuilder;
 
-    public DefaultAtomicValueBuilder(DatabaseManager manager) {
-        mapBuilder = manager.<String, V>consistentMapBuilder()
-                            .withName("onos-atomic-values")
-                            .withMeteringDisabled()
-                            .withSerializer(Serializer.using(KryoNamespaces.BASIC));
+    public DefaultAtomicValueBuilder(Supplier<ConsistentMapBuilder<String, byte[]>> mapBuilderSupplier) {
+        mapBuilder = mapBuilderSupplier.get();
     }
 
     @Override
-    public AtomicValueBuilder<V> withName(String name) {
-        this.name = name;
-        return this;
-    }
-
-    @Override
-    public AtomicValueBuilder<V> withSerializer(Serializer serializer) {
-        mapBuilder.withSerializer(serializer);
-        return this;
-    }
-
-    @Override
-    public AtomicValueBuilder<V> withPartitionsDisabled() {
-        mapBuilder.withPartitionsDisabled();
-        return this;
-    }
-
-    @Override
-    public AtomicValueBuilder<V> withMeteringDisabled() {
-        metering = false;
-        return this;
-    }
-
-    @Override
-    public AsyncAtomicValue<V> buildAsyncValue() {
-        return new DefaultAsyncAtomicValue<>(mapBuilder.buildAsyncMap(), name, metering);
-    }
-
-    @Override
-    public AtomicValue<V> build() {
-        return new DefaultAtomicValue<>(buildAsyncValue());
+    public AsyncAtomicValue<V> build() {
+        return new DefaultAsyncAtomicValue<>(checkNotNull(name()),
+                                             checkNotNull(serializer()),
+                                             mapBuilder.buildAsyncMap());
     }
 }

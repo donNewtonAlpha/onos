@@ -526,6 +526,19 @@ public class NewDistributedFlowRuleStore
     }
 
     @Override
+    public FlowRuleEvent pendingFlowRule(FlowEntry rule) {
+        if (mastershipService.isLocalMaster(rule.deviceId())) {
+            StoredFlowEntry stored = flowTable.getFlowEntry(rule);
+            if (stored != null &&
+                    stored.state() != FlowEntryState.PENDING_ADD) {
+                stored.setState(FlowEntryState.PENDING_ADD);
+                return new FlowRuleEvent(Type.RULE_UPDATED, rule);
+            }
+        }
+        return null;
+    }
+
+    @Override
     public FlowRuleEvent addOrUpdateFlowRule(FlowEntry rule) {
         NodeId master = mastershipService.getMasterFor(rule.deviceId());
         if (Objects.equals(local, master)) {
@@ -595,6 +608,11 @@ public class NewDistributedFlowRuleStore
         final FlowEntry removed = flowTable.remove(deviceId, rule);
         // rule may be partial rule that is missing treatment, we should use rule from store instead
         return removed != null ? new FlowRuleEvent(RULE_REMOVED, removed) : null;
+    }
+
+    @Override
+    public void purgeFlowRule(DeviceId deviceId) {
+        flowTable.purgeFlowRule(deviceId);
     }
 
     @Override
@@ -812,6 +830,10 @@ public class NewDistributedFlowRuleStore
             } else {
                 return null;
             }
+        }
+
+        public void purgeFlowRule(DeviceId deviceId) {
+            flowEntries.remove(deviceId);
         }
 
         private NodeId getBackupNode(DeviceId deviceId) {

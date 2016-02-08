@@ -198,11 +198,16 @@
                     t = lnk.fromTarget;
                 return (s && s.type) || (t && t.type) || defaultLinkType;
             },
+            expected: function () {
+                var s = lnk.fromSource,
+                    t = lnk.fromTarget;
+                return (s && s.expected) && (t && t.expected);
+            },
             online: function () {
                 var s = lnk.fromSource,
                     t = lnk.fromTarget,
                     both = lnk.source.online && lnk.target.online;
-                return both && ((s && s.online) && (t && t.online));
+                return both && (s && s.online) && (t && t.online);
             },
             linkWidth: function () {
                 var s = lnk.fromSource,

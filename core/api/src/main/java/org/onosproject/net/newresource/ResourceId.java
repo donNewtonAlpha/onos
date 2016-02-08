@@ -16,6 +16,7 @@
 package org.onosproject.net.newresource;
 
 import com.google.common.annotations.Beta;
+import com.google.common.collect.ImmutableList;
 
 import java.util.Optional;
 
@@ -27,10 +28,12 @@ import java.util.Optional;
 public abstract class ResourceId {
     static final DiscreteResourceId ROOT = new DiscreteResourceId();
 
+    abstract ImmutableList<Object> components();
+
     /**
      * Returns the parent resource ID of this instance.
      *
-     * @return the parent resource path of this instance.
+     * @return the parent resource ID of this instance.
      * If there is no parent, empty instance will be returned.
      */
     public abstract Optional<DiscreteResourceId> parent();
