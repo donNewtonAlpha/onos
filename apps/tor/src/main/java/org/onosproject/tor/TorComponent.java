@@ -745,7 +745,7 @@ public class TorComponent implements TorService {
 
         serverWanGroup =  groupService.getGroup(torId, outputToServerWanGroupkey).id();
 
-        TrafficTreatment.Builder outputToServerRewrite = DefaultTrafficTreatment.builder();
+        /*TrafficTreatment.Builder outputToServerRewrite = DefaultTrafficTreatment.builder();
         outputToServerRewrite.setEthDst(VM_MAC);
         outputToServerRewrite.group(serverWanGroup);
 
@@ -762,7 +762,7 @@ public class TorComponent implements TorService {
                 appId);
         groupService.addGroup(outputToServerWanRewriteGroupDescription);
 
-        serverWanRewriteGroup =  groupService.getGroup(torId, outputToServerWanRewriteGroupkey).id();
+        serverWanRewriteGroup =  groupService.getGroup(torId, outputToServerWanRewriteGroupkey).id();*/
 
 
         Integer outputToServerUverseGroupId =   (((uverseVlan.toShort()) << 16 ) | ((short) serverPort.toLong()));
@@ -820,7 +820,7 @@ public class TorComponent implements TorService {
 
         serverLanGroup = groupService.getGroup(torId, outputToServerLanGroupkey).id();
 
-        TrafficTreatment.Builder outputToServerLanRewrite = DefaultTrafficTreatment.builder();
+       /* TrafficTreatment.Builder outputToServerLanRewrite = DefaultTrafficTreatment.builder();
         outputToServerLanRewrite.setEthDst(VM_MAC);
         outputToServerLanRewrite.group(serverLanGroup);
 
@@ -837,7 +837,7 @@ public class TorComponent implements TorService {
                 appId);
         groupService.addGroup(outputToServerLanRewriteGroupDescription);
 
-        serverLanRewriteGroup = groupService.getGroup(torId, outputToServerLanRewriteGroupkey).id();
+        serverLanRewriteGroup = groupService.getGroup(torId, outputToServerLanRewriteGroupkey).id();*/
 
         TrafficTreatment.Builder toOltTreatment = DefaultTrafficTreatment.builder();
         //toOltTreatment.popVlan();
