@@ -68,6 +68,7 @@
         <module>openstackrouting</module>
         <module>tor</module>
         <module>virtual-gigapower</module>
+        <module>phase1</module>
   </modules>
 
     <properties>
