@@ -136,7 +136,7 @@ public class TorComponent implements TorService {
     private static final VlanId oltMulticastVlan = VlanId.vlanId((short) 4001);
 
     //TODO
-    private final MacAddress VM_MAC = MacAddress.valueOf("");
+    private final MacAddress VM_MAC = MacAddress.valueOf("76:eb:27:f6:47:f1");
 
     private final byte NO_FRAGMENT = (byte) 2;
     private final short DEFAULT_ID = (short) 1111;
