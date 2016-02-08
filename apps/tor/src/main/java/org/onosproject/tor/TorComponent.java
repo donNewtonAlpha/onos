@@ -689,7 +689,7 @@ public class TorComponent implements TorService {
 
         //Output groups
 
-        TrafficTreatment.Builder outputToUverse = DefaultTrafficTreatment.builder();
+   /*     TrafficTreatment.Builder outputToUverse = DefaultTrafficTreatment.builder();
         outputToUverse.setOutput(uversePort);
 
         Integer outputToUverseGroupId =  (((uverseVlan.toShort()) <<  16) |((short) uversePort.toLong()));
@@ -745,7 +745,7 @@ public class TorComponent implements TorService {
 
         serverWanGroup =  groupService.getGroup(torId, outputToServerWanGroupkey).id();
 
-        /*TrafficTreatment.Builder outputToServerRewrite = DefaultTrafficTreatment.builder();
+        *//*TrafficTreatment.Builder outputToServerRewrite = DefaultTrafficTreatment.builder();
         outputToServerRewrite.setEthDst(VM_MAC);
         outputToServerRewrite.group(serverWanGroup);
 
@@ -762,7 +762,7 @@ public class TorComponent implements TorService {
                 appId);
         groupService.addGroup(outputToServerWanRewriteGroupDescription);
 
-        serverWanRewriteGroup =  groupService.getGroup(torId, outputToServerWanRewriteGroupkey).id();*/
+        serverWanRewriteGroup =  groupService.getGroup(torId, outputToServerWanRewriteGroupkey).id();*//*
 
 
         Integer outputToServerUverseGroupId =   (((uverseVlan.toShort()) << 16 ) | ((short) serverPort.toLong()));
@@ -798,7 +798,7 @@ public class TorComponent implements TorService {
         groupService.addGroup(outputToOltGroupDescription);
 
         multicastToOltGroup = groupService.getGroup(torId, outputToOltGroupkey).id();
-
+*/
 
 
 
@@ -840,7 +840,6 @@ public class TorComponent implements TorService {
         serverLanRewriteGroup = groupService.getGroup(torId, outputToServerLanRewriteGroupkey).id();*/
 
         TrafficTreatment.Builder toOltTreatment = DefaultTrafficTreatment.builder();
-        //toOltTreatment.popVlan();
         toOltTreatment.setOutput(oltPort);
 
 
@@ -861,6 +860,7 @@ public class TorComponent implements TorService {
 
         //Pop and output
 
+/*
 
         TrafficTreatment.Builder popToOltTreatment = DefaultTrafficTreatment.builder();
         popToOltTreatment.popVlan();
@@ -923,6 +923,7 @@ public class TorComponent implements TorService {
         groupService.addGroup(floodGroupDescription);
 
         floodGroup = groupService.getGroup(torId, floodGroupkey).id();
+*/
 
 
 
