@@ -159,7 +159,9 @@ public class TorComponent implements TorService {
         log.debug("trying to activate");
         appId = coreService.registerApplication("org.onosproject.tor");
 
-        packetService.addProcessor(new TorPacketProcessor(flowRuleService, packetService), 1);
+        //flowRuleService.addListener(new InternalListener);
+
+        //packetService.addProcessor(new TorPacketProcessor(flowRuleService, packetService), 1);
 
         //DNS for parental control
         //DnsProxy.initiate();
