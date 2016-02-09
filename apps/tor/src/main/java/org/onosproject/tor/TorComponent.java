@@ -167,6 +167,13 @@ public class TorComponent implements TorService {
         //Output groups
         initiateOutputGroups();
 
+        try {
+            Thread.sleep(1500);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+
         //Olt to vSGs server two way flow
         oltToServerBidirectionnal(outerTag);
 
@@ -363,6 +370,9 @@ public class TorComponent implements TorService {
 
 
         //untaggedPacketsTagging(oltPort, tunnelVlan);
+
+        vlanTableHackFlows(oltPort, vlanId);
+        vlanTableHackFlows(serverPort, vlanId);
 
         TrafficSelector.Builder OltToServerSelector = DefaultTrafficSelector.builder();
         OltToServerSelector.matchInPort(oltPort);
