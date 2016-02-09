@@ -159,7 +159,7 @@ public class TorComponent implements TorService {
         log.debug("trying to activate");
         appId = coreService.registerApplication("org.onosproject.tor");
 
-        //flowRuleService.addListener(new InternalListener);
+        flowRuleService.addListener(new InternalFlowListener());
 
         //packetService.addProcessor(new TorPacketProcessor(flowRuleService, packetService), 1);
 
@@ -203,6 +203,23 @@ public class TorComponent implements TorService {
 //        Testing.initiate(flowRuleService, groupService);
 //        Testing.connectPorts(30,31);
 
+    }
+    private class InternalFlowListener implements FlowRuleListener {
+        @Override
+        public void event(FlowRuleEvent event) {
+            FlowRule flowRule = event.subject();
+
+            if (event.type().equals(FlowRuleEvent.Type.RULE_ADD_REQUESTED)) {
+                DefaultFlowRule fl = (DefaultFlowRule) flowRule;
+                log.info("Flow Listen:  Type {} -- App {} -- selector {} -- treatment {} -- state {}",
+                        event.type(), fl.appId(), fl.selector(), fl.treatment(), "REQUEST");
+            }
+            else {
+                DefaultFlowEntry fl = (DefaultFlowEntry) flowRule;
+                log.info("Flow Listen:  Type {} -- App {} -- selector {} -- treatment {} -- state {}",
+                        event.type(), fl.appId(), fl.selector(), fl.treatment(), fl.state());
+            }
+        }
     }
 
     private void ipLearningCapture(PortNumber port){
