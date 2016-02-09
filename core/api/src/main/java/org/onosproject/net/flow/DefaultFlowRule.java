@@ -20,14 +20,18 @@ import org.onosproject.core.ApplicationId;
 import org.onosproject.core.DefaultGroupId;
 import org.onosproject.core.GroupId;
 import org.onosproject.net.DeviceId;
+import org.slf4j.Logger;
 
 import java.util.Objects;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static org.slf4j.LoggerFactory.getLogger;
 
 public class DefaultFlowRule implements FlowRule {
+
+    private final Logger log = getLogger(getClass());
 
     private final DeviceId deviceId;
     private final int priority;
@@ -251,6 +255,20 @@ public class DefaultFlowRule implements FlowRule {
 
     @Override
     public boolean exactMatch(FlowRule rule) {
+
+        log.debug("this.equals(rule) &&\n" +
+                "                Objects.equals(this.id, rule.id()) &&\n" +
+                "                Objects.equals(this.treatment, rule.treatment());"
+        + this.equals(rule) + ", " +
+                Objects.equals(this.id, rule.id()) + ", " +
+                Objects.equals(this.treatment, rule.treatment()) +
+                "this.id : " + this.id +
+                "rule.id() : " + rule.id() +
+                "this.treatment : " + this.treatment +
+                "rule.treatment : " + rule.treatment()
+
+        );
+
         return this.equals(rule) &&
                 Objects.equals(this.id, rule.id()) &&
                 Objects.equals(this.treatment, rule.treatment());
