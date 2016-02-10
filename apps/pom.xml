@@ -61,6 +61,7 @@
         <module>openstackswitching</module>
         <module>pathpainter</module>
         <module>cpman</module>
+        <module>phase1</module>
 
         <module>tor</module>
 

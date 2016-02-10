@@ -54,4 +54,8 @@ public class Olt {
     public void setPortNumber(PortNumber portNumber) {
         this.portNumber = portNumber;
     }
+
+    public String toString(){
+        return "port number : " + portNumber + ", contains " + vlanHandled.size() + " vlans !";
+    }
 }

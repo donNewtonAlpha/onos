@@ -14,40 +14,20 @@ import java.util.List;
 public class VsgServer {
 
     private List<VlanId> vlanHandled;
-    private Ip4Prefix ipPrefix;
+    //private Ip4Prefix ipPrefix;
     private PortNumber portNumber;
 
 
-    public VsgServer(PortNumber port, List<Integer> vlans, Ip4Prefix ip4Prefix){
-
-        vlanHandled = new LinkedList<>();
-        ipPrefix = ip4Prefix;
-        portNumber = port;
-        for(Integer i : vlans){
-            vlanHandled.add(VlanId.vlanId(i.shortValue()));
-        }
-
-    }
-
-    public VsgServer(PortNumber port, List<Integer> vlans, String ip4Prefix){
-        new VsgServer(port, vlans, Ip4Prefix.valueOf(ip4Prefix));
-    }
-
-    public VsgServer(PortNumber port, List<Integer> vlans, String ipPrefix, int prefixLength){
-        new VsgServer(port, vlans, Ip4Prefix.valueOf(Ip4Address.valueOf(ipPrefix),prefixLength));
-    }
-
-    public VsgServer(PortNumber port, List<Integer> vlans){
-        vlanHandled = new LinkedList<>();
-        portNumber = port;
-        for(Integer i : vlans){
-            vlanHandled.add(VlanId.vlanId(i.shortValue()));
-        }
-    }
-
     public VsgServer(int port, List<Integer> vlans){
-        new VsgServer(PortNumber.portNumber(port), vlans);
+
+        vlanHandled = new LinkedList<>();
+        for(Integer i : vlans){
+            vlanHandled.add(VlanId.vlanId(i.shortValue()));
+        }
+        portNumber = PortNumber.portNumber(port);
+
     }
+
 
 
 
@@ -62,13 +42,13 @@ public class VsgServer {
 
 
 
-    public Ip4Prefix getIpPrefix() {
+   /* public Ip4Prefix getIpPrefix() {
         return ipPrefix;
     }
 
     public void setIpPrefix(Ip4Prefix ipPrefix) {
         this.ipPrefix = ipPrefix;
-    }
+    }*/
 
 
     public PortNumber getPortNumber() {
@@ -77,5 +57,9 @@ public class VsgServer {
 
     public void setPortNumber(PortNumber portNumber) {
         this.portNumber = portNumber;
+    }
+
+    public String toString(){
+        return "port number : " + portNumber + ", contains " + vlanHandled.size() + "vlans";
     }
 }
