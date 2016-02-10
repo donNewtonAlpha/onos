@@ -19,9 +19,6 @@ import org.onosproject.net.flow.DefaultTrafficTreatment;
 import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.flow.TrafficSelector;
 import org.onosproject.net.flow.TrafficTreatment;
-import org.onosproject.net.flowobjective.DefaultForwardingObjective;
-import org.onosproject.net.flowobjective.FlowObjectiveService;
-import org.onosproject.net.flowobjective.ForwardingObjective;
 import org.onosproject.net.group.*;
 import org.onosproject.net.packet.*;
 import org.slf4j.Logger;
@@ -61,9 +58,6 @@ public class TorComponent implements TorService {
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected GroupService groupService;
-
-    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected FlowObjectiveService flowObjectiveService;
 
 
     static ApplicationId appId;
@@ -410,6 +404,7 @@ public class TorComponent implements TorService {
         TrafficTreatment.Builder outputServerLan = DefaultTrafficTreatment.builder();
         outputServerLan.group(serverLanGroup);
 
+
         FlowRule.Builder oltToServer = DefaultFlowRule.builder();
         oltToServer.withSelector(OltToServerSelector.build());
         oltToServer.withTreatment(outputServerLan.build());
@@ -420,30 +415,6 @@ public class TorComponent implements TorService {
         oltToServer.forDevice(torId);
 
         flowRuleService.applyFlowRules(oltToServer.build());
-
-        ////
-        // set the traffic to be set to the output port discovered
-        TrafficTreatment treatment = DefaultTrafficTreatment.builder()
-                .group(serverLanGroup)
-                .build();
-        log.info("TrafficTreatment toString {}", treatment.toString());
-
-
-        // actually write the openflow rule
-        ForwardingObjective forwardingObjective = DefaultForwardingObjective.builder()
-                .fromApp(appId)
-                .withSelector(OltToServerSelector.matchEthType(Ethernet.TYPE_VLAN).build())
-                .withTreatment(treatment)
-                .withFlag(ForwardingObjective.Flag.VERSATILE)
-                .withPriority(55555)
-                .makePermanent()
-                .add();
-
-        // commit the flow rule to the switch
-        flowObjectiveService.forward(torId, forwardingObjective);
-        log.info("ForwardingObjective{}", forwardingObjective.toString());
-        ////
-
 
 
 /*
