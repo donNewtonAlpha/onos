@@ -417,6 +417,7 @@ public class NewDistributedFlowRuleStore
     @Override
     public void storeBatch(FlowRuleBatchOperation operation) {
         if (operation.getOperations().isEmpty()) {
+            log.debug("storeBatch method : operation isEmpty");
             notifyDelegate(FlowRuleBatchEvent.completed(
                     new FlowRuleBatchRequest(operation.id(), Collections.emptySet()),
                     new CompletedBatchOperation(true, Collections.emptySet(), operation.deviceId())));
@@ -467,6 +468,7 @@ public class NewDistributedFlowRuleStore
 
     private void storeBatchInternal(FlowRuleBatchOperation operation) {
 
+        log.debug("storeBatchInternal");
         final DeviceId did = operation.deviceId();
         //final Collection<FlowEntry> ft = flowTable.getFlowEntries(did);
         Set<FlowRuleBatchEntry> currentOps = updateStoreInternal(operation);
