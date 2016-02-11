@@ -27,7 +27,9 @@ import org.apache.felix.scr.annotations.Service;
 import org.onlab.util.GuavaCollectors;
 import org.onlab.util.Tools;
 import org.onosproject.net.newresource.ContinuousResource;
+import org.onosproject.net.newresource.ContinuousResourceId;
 import org.onosproject.net.newresource.DiscreteResource;
+import org.onosproject.net.newresource.DiscreteResourceId;
 import org.onosproject.net.newresource.ResourceAllocation;
 import org.onosproject.net.newresource.ResourceConsumer;
 import org.onosproject.net.newresource.ResourceEvent;
@@ -35,6 +37,7 @@ import org.onosproject.net.newresource.ResourceId;
 import org.onosproject.net.newresource.Resource;
 import org.onosproject.net.newresource.ResourceStore;
 import org.onosproject.net.newresource.ResourceStoreDelegate;
+import org.onosproject.net.newresource.Resources;
 import org.onosproject.store.AbstractStore;
 import org.onosproject.store.serializers.KryoNamespaces;
 import org.onosproject.store.service.ConsistentMap;
@@ -49,7 +52,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -86,65 +89,68 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected StorageService service;
 
-    private ConsistentMap<DiscreteResource, ResourceConsumer> discreteConsumers;
-    private ConsistentMap<ResourceId, ContinuousResourceAllocation> continuousConsumers;
-    private ConsistentMap<DiscreteResource, Set<Resource>> childMap;
+    private ConsistentMap<DiscreteResourceId, ResourceConsumer> discreteConsumers;
+    private ConsistentMap<ContinuousResourceId, ContinuousResourceAllocation> continuousConsumers;
+    private ConsistentMap<DiscreteResourceId, Set<Resource>> childMap;
 
     @Activate
     public void activate() {
-        discreteConsumers = service.<DiscreteResource, ResourceConsumer>consistentMapBuilder()
+        discreteConsumers = service.<DiscreteResourceId, ResourceConsumer>consistentMapBuilder()
                 .withName(DISCRETE_CONSUMER_MAP)
                 .withSerializer(SERIALIZER)
                 .build();
-        continuousConsumers = service.<ResourceId, ContinuousResourceAllocation>consistentMapBuilder()
+        continuousConsumers = service.<ContinuousResourceId, ContinuousResourceAllocation>consistentMapBuilder()
                 .withName(CONTINUOUS_CONSUMER_MAP)
                 .withSerializer(SERIALIZER)
                 .build();
-        childMap = service.<DiscreteResource, Set<Resource>>consistentMapBuilder()
+        childMap = service.<DiscreteResourceId, Set<Resource>>consistentMapBuilder()
                 .withName(CHILD_MAP)
                 .withSerializer(SERIALIZER)
                 .build();
 
-        Tools.retryable(() -> childMap.put(Resource.ROOT, new LinkedHashSet<>()),
+        Tools.retryable(() -> childMap.put(Resource.ROOT.id(), new LinkedHashSet<>()),
                         ConsistentMapException.class, MAX_RETRIES, RETRY_DELAY);
         log.info("Started");
     }
 
+    // Computational complexity: O(1) if the resource is discrete type.
+    // O(n) if the resource is continuous type where n is the number of the existing allocations for the resource
     @Override
-    public List<ResourceConsumer> getConsumers(Resource resource) {
-        checkNotNull(resource);
-        checkArgument(resource instanceof DiscreteResource || resource instanceof ContinuousResource);
+    public List<ResourceAllocation> getResourceAllocations(ResourceId id) {
+        checkNotNull(id);
+        checkArgument(id instanceof DiscreteResourceId || id instanceof ContinuousResourceId);
 
-        if (resource instanceof DiscreteResource) {
-            return getConsumers((DiscreteResource) resource);
+        if (id instanceof DiscreteResourceId) {
+            return getResourceAllocations((DiscreteResourceId) id);
         } else {
-            return getConsumers((ContinuousResource) resource);
+            return getResourceAllocations((ContinuousResourceId) id);
         }
     }
 
-    private List<ResourceConsumer> getConsumers(DiscreteResource resource) {
+    // computational complexity: O(1)
+    private List<ResourceAllocation> getResourceAllocations(DiscreteResourceId resource) {
         Versioned<ResourceConsumer> consumer = discreteConsumers.get(resource);
         if (consumer == null) {
             return ImmutableList.of();
         }
 
-        return ImmutableList.of(consumer.value());
+        return ImmutableList.of(new ResourceAllocation(Resources.discrete(resource).resource(), consumer.value()));
     }
 
-    private List<ResourceConsumer> getConsumers(ContinuousResource resource) {
-        Versioned<ContinuousResourceAllocation> allocations = continuousConsumers.get(resource.id());
+    // computational complexity: O(n) where n is the number of the existing allocations for the resource
+    private List<ResourceAllocation> getResourceAllocations(ContinuousResourceId resource) {
+        Versioned<ContinuousResourceAllocation> allocations = continuousConsumers.get(resource);
         if (allocations == null) {
             return ImmutableList.of();
         }
 
         return allocations.value().allocations().stream()
-                .filter(x -> x.resource().equals(resource))
-                .map(ResourceAllocation::consumer)
+                .filter(x -> x.resource().id().equals(resource))
                 .collect(GuavaCollectors.toImmutableList());
     }
 
     @Override
-    public boolean register(List<Resource> resources) {
+    public boolean register(List<? extends Resource> resources) {
         checkNotNull(resources);
         if (log.isTraceEnabled()) {
             resources.forEach(r -> log.trace("registering {}", r));
@@ -153,20 +159,20 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
         TransactionContext tx = service.transactionContextBuilder().build();
         tx.begin();
 
-        TransactionalMap<DiscreteResource, Set<Resource>> childTxMap =
+        TransactionalMap<DiscreteResourceId, Set<Resource>> childTxMap =
                 tx.getTransactionalMap(CHILD_MAP, SERIALIZER);
 
+        // the order is preserved by LinkedHashMap
         Map<DiscreteResource, List<Resource>> resourceMap = resources.stream()
                 .filter(x -> x.parent().isPresent())
-                .collect(Collectors.groupingBy(x -> x.parent().get()));
+                .collect(Collectors.groupingBy(x -> x.parent().get(), LinkedHashMap::new, Collectors.toList()));
 
         for (Map.Entry<DiscreteResource, List<Resource>> entry: resourceMap.entrySet()) {
-            Optional<DiscreteResource> child = lookup(childTxMap, entry.getKey());
-            if (!child.isPresent()) {
+            if (!lookup(childTxMap, entry.getKey().id()).isPresent()) {
                 return abortTransaction(tx);
             }
 
-            if (!appendValues(childTxMap, entry.getKey(), entry.getValue())) {
+            if (!appendValues(childTxMap, entry.getKey().id(), entry.getValue())) {
                 return abortTransaction(tx);
             }
         }
@@ -183,32 +189,39 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
     }
 
     @Override
-    public boolean unregister(List<Resource> resources) {
-        checkNotNull(resources);
+    public boolean unregister(List<? extends ResourceId> ids) {
+        checkNotNull(ids);
 
         TransactionContext tx = service.transactionContextBuilder().build();
         tx.begin();
 
-        TransactionalMap<DiscreteResource, Set<Resource>> childTxMap =
+        TransactionalMap<DiscreteResourceId, Set<Resource>> childTxMap =
                 tx.getTransactionalMap(CHILD_MAP, SERIALIZER);
-        TransactionalMap<DiscreteResource, ResourceConsumer> discreteConsumerTxMap =
+        TransactionalMap<DiscreteResourceId, ResourceConsumer> discreteConsumerTxMap =
                 tx.getTransactionalMap(DISCRETE_CONSUMER_MAP, SERIALIZER);
-        TransactionalMap<ResourceId, ContinuousResourceAllocation> continuousConsumerTxMap =
+        TransactionalMap<ContinuousResourceId, ContinuousResourceAllocation> continuousConsumerTxMap =
                 tx.getTransactionalMap(CONTINUOUS_CONSUMER_MAP, SERIALIZER);
 
         // Extract Discrete instances from resources
-        Map<DiscreteResource, List<Resource>> resourceMap = resources.stream()
+        List<Resource> resources = ids.stream()
                 .filter(x -> x.parent().isPresent())
-                .collect(Collectors.groupingBy(x -> x.parent().get()));
+                .map(x -> lookup(childTxMap, x))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .collect(Collectors.toList());
+        // the order is preserved by LinkedHashMap
+        Map<DiscreteResourceId, List<Resource>> resourceMap = resources.stream()
+                .collect(Collectors.groupingBy(x -> x.parent().get().id(), LinkedHashMap::new, Collectors.toList()));
 
         // even if one of the resources is allocated to a consumer,
         // all unregistrations are regarded as failure
-        for (Map.Entry<DiscreteResource, List<Resource>> entry: resourceMap.entrySet()) {
+        for (Map.Entry<DiscreteResourceId, List<Resource>> entry: resourceMap.entrySet()) {
             boolean allocated = entry.getValue().stream().anyMatch(x -> {
                 if (x instanceof DiscreteResource) {
-                    return discreteConsumerTxMap.get((DiscreteResource) x) != null;
+                    return discreteConsumerTxMap.get(((DiscreteResource) x).id()) != null;
                 } else if (x instanceof ContinuousResource) {
-                    ContinuousResourceAllocation allocations = continuousConsumerTxMap.get(x.id());
+                    ContinuousResourceAllocation allocations =
+                            continuousConsumerTxMap.get(((ContinuousResource) x).id());
                     return allocations != null && !allocations.allocations().isEmpty();
                 } else {
                     return false;
@@ -234,49 +247,51 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
                     .collect(Collectors.toList());
             notifyDelegate(events);
         } else {
-            log.warn("Failed to unregister {}: Commit failed.", resources);
+            log.warn("Failed to unregister {}: Commit failed.", ids);
         }
         return success;
     }
 
     @Override
-    public boolean allocate(List<Resource> resources, ResourceConsumer consumer) {
+    public boolean allocate(List<? extends Resource> resources, ResourceConsumer consumer) {
         checkNotNull(resources);
         checkNotNull(consumer);
 
         TransactionContext tx = service.transactionContextBuilder().build();
         tx.begin();
 
-        TransactionalMap<DiscreteResource, Set<Resource>> childTxMap =
+        TransactionalMap<DiscreteResourceId, Set<Resource>> childTxMap =
                 tx.getTransactionalMap(CHILD_MAP, SERIALIZER);
-        TransactionalMap<DiscreteResource, ResourceConsumer> discreteConsumerTxMap =
+        TransactionalMap<DiscreteResourceId, ResourceConsumer> discreteConsumerTxMap =
                 tx.getTransactionalMap(DISCRETE_CONSUMER_MAP, SERIALIZER);
-        TransactionalMap<ResourceId, ContinuousResourceAllocation> continuousConsumerTxMap =
+        TransactionalMap<ContinuousResourceId, ContinuousResourceAllocation> continuousConsumerTxMap =
                 tx.getTransactionalMap(CONTINUOUS_CONSUMER_MAP, SERIALIZER);
 
         for (Resource resource: resources) {
             if (resource instanceof DiscreteResource) {
-                if (!lookup(childTxMap, resource).isPresent()) {
+                if (!lookup(childTxMap, resource.id()).isPresent()) {
                     return abortTransaction(tx);
                 }
 
-                ResourceConsumer oldValue = discreteConsumerTxMap.put((DiscreteResource) resource, consumer);
+                ResourceConsumer oldValue = discreteConsumerTxMap.put(((DiscreteResource) resource).id(), consumer);
                 if (oldValue != null) {
                     return abortTransaction(tx);
                 }
             } else if (resource instanceof ContinuousResource) {
-                Optional<ContinuousResource> continuous = lookup(childTxMap, (ContinuousResource) resource);
-                if (!continuous.isPresent()) {
+                Optional<Resource> lookedUp = lookup(childTxMap, resource.id());
+                if (!lookedUp.isPresent()) {
                     return abortTransaction(tx);
                 }
 
-                ContinuousResourceAllocation allocations = continuousConsumerTxMap.get(continuous.get().id());
-                if (!hasEnoughResource(continuous.get(), (ContinuousResource) resource, allocations)) {
+                // Down cast: this must be safe as ContinuousResource is associated with ContinuousResourceId
+                ContinuousResource continuous = (ContinuousResource) lookedUp.get();
+                ContinuousResourceAllocation allocations = continuousConsumerTxMap.get(continuous.id());
+                if (!hasEnoughResource(continuous, (ContinuousResource) resource, allocations)) {
                     return abortTransaction(tx);
                 }
 
                 boolean success = appendValue(continuousConsumerTxMap,
-                        continuous.get(), new ResourceAllocation(continuous.get(), consumer));
+                        continuous, new ResourceAllocation(continuous, consumer));
                 if (!success) {
                     return abortTransaction(tx);
                 }
@@ -287,41 +302,37 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
     }
 
     @Override
-    public boolean release(List<Resource> resources, List<ResourceConsumer> consumers) {
-        checkNotNull(resources);
-        checkNotNull(consumers);
-        checkArgument(resources.size() == consumers.size());
+    public boolean release(List<ResourceAllocation> allocations) {
+        checkNotNull(allocations);
 
         TransactionContext tx = service.transactionContextBuilder().build();
         tx.begin();
 
-        TransactionalMap<DiscreteResource, ResourceConsumer> discreteConsumerTxMap =
+        TransactionalMap<DiscreteResourceId, ResourceConsumer> discreteConsumerTxMap =
                 tx.getTransactionalMap(DISCRETE_CONSUMER_MAP, SERIALIZER);
-        TransactionalMap<ResourceId, ContinuousResourceAllocation> continuousConsumerTxMap =
+        TransactionalMap<ContinuousResourceId, ContinuousResourceAllocation> continuousConsumerTxMap =
                 tx.getTransactionalMap(CONTINUOUS_CONSUMER_MAP, SERIALIZER);
-        Iterator<Resource> resourceIte = resources.iterator();
-        Iterator<ResourceConsumer> consumerIte = consumers.iterator();
 
-        while (resourceIte.hasNext() && consumerIte.hasNext()) {
-            Resource resource = resourceIte.next();
-            ResourceConsumer consumer = consumerIte.next();
+        for (ResourceAllocation allocation : allocations) {
+            Resource resource = allocation.resource();
+            ResourceConsumer consumer = allocation.consumer();
 
             if (resource instanceof DiscreteResource) {
                 // if this single release fails (because the resource is allocated to another consumer,
                 // the whole release fails
-                if (!discreteConsumerTxMap.remove((DiscreteResource) resource, consumer)) {
+                if (!discreteConsumerTxMap.remove(((DiscreteResource) resource).id(), consumer)) {
                     return abortTransaction(tx);
                 }
             } else if (resource instanceof ContinuousResource) {
                 ContinuousResource continuous = (ContinuousResource) resource;
-                ContinuousResourceAllocation allocation = continuousConsumerTxMap.get(continuous.id());
-                ImmutableList<ResourceAllocation> newAllocations = allocation.allocations().stream()
+                ContinuousResourceAllocation continuousAllocation = continuousConsumerTxMap.get(continuous.id());
+                ImmutableList<ResourceAllocation> newAllocations = continuousAllocation.allocations().stream()
                         .filter(x -> !(x.consumer().equals(consumer) &&
                                 ((ContinuousResource) x.resource()).value() == continuous.value()))
                         .collect(GuavaCollectors.toImmutableList());
 
-                if (!continuousConsumerTxMap.replace(continuous.id(), allocation,
-                        new ContinuousResourceAllocation(allocation.original(), newAllocations))) {
+                if (!continuousConsumerTxMap.replace(continuous.id(), continuousAllocation,
+                        new ContinuousResourceAllocation(continuousAllocation.original(), newAllocations))) {
                     return abortTransaction(tx);
                 }
             }
@@ -330,20 +341,23 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
         return tx.commit();
     }
 
+    // computational complexity: O(1) if the resource is discrete type.
+    // O(n) if the resource is continuous type where n is the number of the children of
+    // the specified resource's parent
     @Override
     public boolean isAvailable(Resource resource) {
         checkNotNull(resource);
         checkArgument(resource instanceof DiscreteResource || resource instanceof ContinuousResource);
 
         // check if it's registered or not.
-        Versioned<Set<Resource>> v = childMap.get(resource.parent().get());
+        Versioned<Set<Resource>> v = childMap.get(resource.parent().get().id());
         if (v == null || !v.value().contains(resource)) {
             return false;
         }
 
         if (resource instanceof DiscreteResource) {
             // check if already consumed
-            return getConsumers((DiscreteResource) resource).isEmpty();
+            return getResourceAllocations(resource.id()).isEmpty();
         } else {
             ContinuousResource requested = (ContinuousResource) resource;
             ContinuousResource registered = v.value().stream()
@@ -360,6 +374,7 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
         }
     }
 
+    // computational complexity: O(n) where n is the number of existing allocations for the resource
     private boolean isAvailable(ContinuousResource resource) {
         Versioned<ContinuousResourceAllocation> allocation = continuousConsumers.get(resource.id());
         if (allocation == null) {
@@ -370,6 +385,8 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
         return hasEnoughResource(allocation.value().original(), resource, allocation.value());
     }
 
+    // computational complexity: O(n + m) where n is the number of entries in discreteConsumers
+    // and m is the number of allocations for all continuous resources
     @Override
     public Collection<Resource> getResources(ResourceConsumer consumer) {
         checkNotNull(consumer);
@@ -378,7 +395,8 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
         // TODO: revisit for better backend data structure
         Stream<DiscreteResource> discreteStream = discreteConsumers.entrySet().stream()
                 .filter(x -> x.getValue().value().equals(consumer))
-                .map(Map.Entry::getKey);
+                .map(Map.Entry::getKey)
+                .map(x -> Resources.discrete(x).resource());
 
         Stream<ContinuousResource> continuousStream = continuousConsumers.values().stream()
                 .flatMap(x -> x.value().allocations().stream()
@@ -389,15 +407,12 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
         return Stream.concat(discreteStream, continuousStream).collect(Collectors.toList());
     }
 
+    // computational complexity: O(1)
     @Override
-    public Set<Resource> getChildResources(Resource parent) {
+    public Set<Resource> getChildResources(DiscreteResourceId parent) {
         checkNotNull(parent);
-        if (!(parent instanceof DiscreteResource)) {
-            // only Discrete resource can have child resource
-            return ImmutableSet.of();
-        }
 
-        Versioned<Set<Resource>> children = childMap.get((DiscreteResource) parent);
+        Versioned<Set<Resource>> children = childMap.get(parent);
         if (children == null) {
             return ImmutableSet.of();
         }
@@ -405,13 +420,13 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
         return children.value();
     }
 
+    // computational complexity: O(n) where n is the number of the children of the parent
     @Override
-    public <T> Collection<Resource> getAllocatedResources(Resource parent, Class<T> cls) {
+    public <T> Collection<Resource> getAllocatedResources(DiscreteResourceId parent, Class<T> cls) {
         checkNotNull(parent);
         checkNotNull(cls);
-        checkArgument(parent instanceof DiscreteResource);
 
-        Versioned<Set<Resource>> children = childMap.get((DiscreteResource) parent);
+        Versioned<Set<Resource>> children = childMap.get(parent);
         if (children == null) {
             return ImmutableList.of();
         }
@@ -419,11 +434,11 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
         Stream<DiscreteResource> discrete = children.value().stream()
                 .filter(x -> x.last().getClass().equals(cls))
                 .filter(x -> x instanceof DiscreteResource)
-                .map(x -> (DiscreteResource) x)
-                .filter(discreteConsumers::containsKey);
+                .map(x -> ((DiscreteResource) x))
+                .filter(x -> discreteConsumers.containsKey(x.id()));
 
         Stream<ContinuousResource> continuous = children.value().stream()
-                .filter(x -> x.id().equals(parent.id().child(cls)))
+                .filter(x -> x.id().equals(parent.child(cls)))
                 .filter(x -> x instanceof ContinuousResource)
                 .map(x -> (ContinuousResource) x)
                 .filter(x -> continuousConsumers.containsKey(x.id()))
@@ -445,7 +460,8 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
     }
 
     // Appends the specified ResourceAllocation to the existing values stored in the map
-    private boolean appendValue(TransactionalMap<ResourceId, ContinuousResourceAllocation> map,
+    // computational complexity: O(n) where n is the number of the elements in the associated allocation
+    private boolean appendValue(TransactionalMap<ContinuousResourceId, ContinuousResourceAllocation> map,
                                 ContinuousResource original, ResourceAllocation value) {
         ContinuousResourceAllocation oldValue = map.putIfAbsent(original.id(),
                 new ContinuousResourceAllocation(original, ImmutableList.of(value)));
@@ -474,8 +490,9 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
      * @param values values to be appended
      * @return true if the operation succeeds, false otherwise.
      */
-    private boolean appendValues(TransactionalMap<DiscreteResource, Set<Resource>> map,
-                                 DiscreteResource key, List<Resource> values) {
+    // computational complexity: O(n) where n is the number of the specified value
+    private boolean appendValues(TransactionalMap<DiscreteResourceId, Set<Resource>> map,
+                                 DiscreteResourceId key, List<Resource> values) {
         Set<Resource> oldValues = map.putIfAbsent(key, new LinkedHashSet<>(values));
         if (oldValues == null) {
             return true;
@@ -500,8 +517,9 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
      * @param values values to be removed
      * @return true if the operation succeeds, false otherwise
      */
-    private boolean removeValues(TransactionalMap<DiscreteResource, Set<Resource>> map,
-                                 DiscreteResource key, List<Resource> values) {
+    // computational complexity: O(n) where n is the number of the specified values
+    private boolean removeValues(TransactionalMap<DiscreteResourceId, Set<Resource>> map,
+                                 DiscreteResourceId key, List<Resource> values) {
         Set<Resource> oldValues = map.putIfAbsent(key, new LinkedHashSet<>());
         if (oldValues == null) {
             log.trace("No-Op removing values. key {} did not exist", key);
@@ -520,32 +538,29 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
     }
 
     /**
-     * Returns the resource which has the same key as the key of the specified resource
-     * in the list as a value of the map.
+     * Returns the resource which has the same key as the specified resource ID
+     * in the set as a value of the map.
      *
-     * @param map map storing parent - child relationship of resources
-     * @param resource resource to be checked for its key
+     * @param childTxMap map storing parent - child relationship of resources
+     * @param id ID of resource to be checked
      * @return the resource which is regarded as the same as the specified resource
      */
-    // Naive implementation, which traverses all elements in the list
-    private <T extends Resource> Optional<T> lookup(
-            TransactionalMap<DiscreteResource, Set<Resource>> map, T resource) {
-        // if it is root, always returns itself
-        if (!resource.parent().isPresent()) {
-            return Optional.of(resource);
+    // Naive implementation, which traverses all elements in the set
+    // computational complexity: O(n) where n is the number of elements
+    // in the associated set
+    private Optional<Resource> lookup(TransactionalMap<DiscreteResourceId, Set<Resource>> childTxMap, ResourceId id) {
+        if (!id.parent().isPresent()) {
+            return Optional.of(Resource.ROOT);
         }
 
-        Set<Resource> values = map.get(resource.parent().get());
+        Set<Resource> values = childTxMap.get(id.parent().get());
         if (values == null) {
             return Optional.empty();
         }
 
-        @SuppressWarnings("unchecked")
-        Optional<T> result = values.stream()
-                .filter(x -> x.id().equals(resource.id()))
-                .map(x -> (T) x)
+        return values.stream()
+                .filter(x -> x.id().equals(id))
                 .findFirst();
-        return result;
     }
 
     /**
@@ -557,6 +572,7 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
      * @param allocation current allocation of the resource
      * @return true if there is enough resource volume. Otherwise, false.
      */
+    // computational complexity: O(n) where n is the number of allocations
     private boolean hasEnoughResource(ContinuousResource original,
                                       ContinuousResource request,
                                       ContinuousResourceAllocation allocation) {

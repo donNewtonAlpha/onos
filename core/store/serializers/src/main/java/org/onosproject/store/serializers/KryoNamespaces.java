@@ -20,6 +20,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 
+import com.google.common.collect.Sets;
 import org.onlab.packet.ChassisId;
 import org.onlab.packet.EthType;
 import org.onlab.packet.Ip4Address;
@@ -76,6 +77,8 @@ import org.onosproject.net.OduCltPort;
 import org.onosproject.net.OduSignalId;
 import org.onosproject.net.OduSignalType;
 import org.onosproject.net.OmsPort;
+import org.onosproject.net.OtuPort;
+import org.onosproject.net.OtuSignalType;
 import org.onosproject.net.Port;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.TributarySlot;
@@ -84,6 +87,7 @@ import org.onosproject.net.device.DefaultPortDescription;
 import org.onosproject.net.device.DefaultPortStatistics;
 import org.onosproject.net.device.OchPortDescription;
 import org.onosproject.net.device.OduCltPortDescription;
+import org.onosproject.net.device.OtuPortDescription;
 import org.onosproject.net.device.OmsPortDescription;
 import org.onosproject.net.device.PortStatistics;
 import org.onosproject.net.flow.CompletedBatchOperation;
@@ -199,6 +203,7 @@ import org.onosproject.net.resource.link.MplsLabelResourceAllocation;
 import org.onosproject.net.resource.link.MplsLabelResourceRequest;
 import org.onosproject.security.Permission;
 import org.onosproject.store.Timestamp;
+import org.onosproject.store.primitives.TransactionId;
 import org.onosproject.store.service.MapEvent;
 import org.onosproject.store.service.SetEvent;
 import org.onosproject.store.service.Versioned;
@@ -218,6 +223,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class KryoNamespaces {
 
@@ -227,6 +233,7 @@ public final class KryoNamespaces {
             .register(AtomicBoolean.class)
             .register(AtomicInteger.class)
             .register(AtomicLong.class)
+            .register(AtomicReference.class)
             .register(new ImmutableListSerializer(),
                       ImmutableList.class,
                       ImmutableList.of(1).getClass(),
@@ -244,6 +251,7 @@ public final class KryoNamespaces {
             .register(HashMap.class)
             .register(ConcurrentHashMap.class)
             .register(CopyOnWriteArraySet.class)
+            .register(Sets.newConcurrentHashSet().getClass())
             .register(ArrayList.class,
                       LinkedList.class,
                       HashSet.class,
@@ -483,6 +491,7 @@ public final class KryoNamespaces {
             .register(new ExtensionCriterionSerializer(), ExtensionCriterion.class)
             .register(ExtensionSelectorType.class)
             .register(ExtensionTreatmentType.class)
+            .register(TransactionId.class)
             .register(Versioned.class)
             .register(MapEvent.class)
             .register(MapEvent.Type.class)
@@ -505,6 +514,9 @@ public final class KryoNamespaces {
             .register(OchPortDescription.class)
             .register(OmsPortDescription.class)
             .register(TributarySlot.class)
+            .register(OtuPort.class)
+            .register(OtuSignalType.class)
+            .register(OtuPortDescription.class)
             .register(
                     MplsIntent.class,
                     MplsPathIntent.class,

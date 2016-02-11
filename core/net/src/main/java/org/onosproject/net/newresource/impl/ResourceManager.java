@@ -25,10 +25,12 @@ import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.apache.felix.scr.annotations.Service;
 import org.onlab.util.GuavaCollectors;
 import org.onosproject.event.AbstractListenerManager;
+import org.onosproject.net.newresource.DiscreteResourceId;
 import org.onosproject.net.newresource.ResourceAdminService;
 import org.onosproject.net.newresource.ResourceAllocation;
 import org.onosproject.net.newresource.ResourceConsumer;
 import org.onosproject.net.newresource.ResourceEvent;
+import org.onosproject.net.newresource.ResourceId;
 import org.onosproject.net.newresource.ResourceListener;
 import org.onosproject.net.newresource.ResourceService;
 import org.onosproject.net.newresource.Resource;
@@ -78,7 +80,7 @@ public final class ResourceManager extends AbstractListenerManager<ResourceEvent
 
     @Override
     public List<ResourceAllocation> allocate(ResourceConsumer consumer,
-                                             List<Resource> resources) {
+                                             List<? extends Resource> resources) {
         checkNotNull(consumer);
         checkNotNull(resources);
 
@@ -96,14 +98,7 @@ public final class ResourceManager extends AbstractListenerManager<ResourceEvent
     public boolean release(List<ResourceAllocation> allocations) {
         checkNotNull(allocations);
 
-        List<Resource> resources = allocations.stream()
-                .map(ResourceAllocation::resource)
-                .collect(Collectors.toList());
-        List<ResourceConsumer> consumers = allocations.stream()
-                .map(ResourceAllocation::consumer)
-                .collect(Collectors.toList());
-
-        return store.release(resources, consumers);
+        return store.release(allocations);
     }
 
     @Override
@@ -115,25 +110,21 @@ public final class ResourceManager extends AbstractListenerManager<ResourceEvent
     }
 
     @Override
-    public List<ResourceAllocation> getResourceAllocations(Resource resource) {
-        checkNotNull(resource);
+    public List<ResourceAllocation> getResourceAllocations(ResourceId id) {
+        checkNotNull(id);
 
-        List<ResourceConsumer> consumers = store.getConsumers(resource);
-        return consumers.stream()
-                .map(x -> new ResourceAllocation(resource, x))
-                .collect(GuavaCollectors.toImmutableList());
+        return store.getResourceAllocations(id);
     }
 
     @Override
-    public <T> Collection<ResourceAllocation> getResourceAllocations(Resource parent, Class<T> cls) {
+    public <T> Collection<ResourceAllocation> getResourceAllocations(DiscreteResourceId parent, Class<T> cls) {
         checkNotNull(parent);
         checkNotNull(cls);
 
         // We access store twice in this method, then the store may be updated by others
         Collection<Resource> resources = store.getAllocatedResources(parent, cls);
         return resources.stream()
-                .flatMap(resource -> store.getConsumers(resource).stream()
-                        .map(consumer -> new ResourceAllocation(resource, consumer)))
+                .flatMap(resource -> store.getResourceAllocations(resource.id()).stream())
                 .collect(GuavaCollectors.toImmutableList());
     }
 
@@ -148,7 +139,7 @@ public final class ResourceManager extends AbstractListenerManager<ResourceEvent
     }
 
     @Override
-    public Set<Resource> getAvailableResources(Resource parent) {
+    public Set<Resource> getAvailableResources(DiscreteResourceId parent) {
         checkNotNull(parent);
 
         Set<Resource> children = store.getChildResources(parent);
@@ -159,7 +150,7 @@ public final class ResourceManager extends AbstractListenerManager<ResourceEvent
     }
 
     @Override
-    public Set<Resource> getRegisteredResources(Resource parent) {
+    public Set<Resource> getRegisteredResources(DiscreteResourceId parent) {
         checkNotNull(parent);
 
         return store.getChildResources(parent);
@@ -173,17 +164,17 @@ public final class ResourceManager extends AbstractListenerManager<ResourceEvent
     }
 
     @Override
-    public boolean registerResources(List<Resource> resources) {
+    public boolean register(List<? extends Resource> resources) {
         checkNotNull(resources);
 
         return store.register(resources);
     }
 
     @Override
-    public boolean unregisterResources(List<Resource> resources) {
-        checkNotNull(resources);
+    public boolean unregister(List<? extends ResourceId> ids) {
+        checkNotNull(ids);
 
-        return store.unregister(resources);
+        return store.unregister(ids);
     }
 
     private class InternalStoreDelegate implements ResourceStoreDelegate {

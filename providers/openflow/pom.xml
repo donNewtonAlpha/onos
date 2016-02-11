@@ -39,6 +39,9 @@
         <module>meter</module>
         <module>base</module>
         <module>app</module>
+
+        <!-- optional -->
+        <module>message</module>
     </modules>
 
     <dependencies>

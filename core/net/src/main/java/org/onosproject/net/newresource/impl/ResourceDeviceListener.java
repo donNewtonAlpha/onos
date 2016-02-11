@@ -16,6 +16,7 @@
 package org.onosproject.net.newresource.impl;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
 import org.onlab.packet.MplsLabel;
 import org.onlab.packet.VlanId;
 import org.onlab.util.Bandwidth;
@@ -37,14 +38,18 @@ import org.onosproject.net.device.DeviceListener;
 import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.driver.DriverHandler;
 import org.onosproject.net.driver.DriverService;
+import org.onosproject.net.newresource.DiscreteResource;
 import org.onosproject.net.newresource.ResourceAdminService;
 import org.onosproject.net.newresource.BandwidthCapacity;
 import org.onosproject.net.newresource.Resource;
 import org.onosproject.net.newresource.Resources;
+import org.onosproject.net.newresource.ResourceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -60,6 +65,7 @@ final class ResourceDeviceListener implements DeviceListener {
     private static final Logger log = LoggerFactory.getLogger(ResourceDeviceListener.class);
 
     private final ResourceAdminService adminService;
+    private final ResourceService resourceService;
     private final DeviceService deviceService;
     private final DriverService driverService;
     private final NetworkConfigService netcfgService;
@@ -75,9 +81,11 @@ final class ResourceDeviceListener implements DeviceListener {
      * @param netcfgService {@link NetworkConfigService} to be used.
      * @param executor executor used for processing resource registration
      */
-    ResourceDeviceListener(ResourceAdminService adminService, DeviceService deviceService, DriverService driverService,
+    ResourceDeviceListener(ResourceAdminService adminService, ResourceService resourceService,
+                           DeviceService deviceService, DriverService driverService,
                            NetworkConfigService netcfgService, ExecutorService executor) {
         this.adminService = checkNotNull(adminService);
+        this.resourceService = checkNotNull(resourceService);
         this.deviceService = checkNotNull(deviceService);
         this.driverService = checkNotNull(driverService);
         this.netcfgService = checkNotNull(netcfgService);
@@ -119,21 +127,25 @@ final class ResourceDeviceListener implements DeviceListener {
     }
 
     private void registerDeviceResource(Device device) {
-        executor.submit(() -> adminService.registerResources(Resources.discrete(device.id()).resource()));
+        executor.submit(() -> adminService.register(Resources.discrete(device.id()).resource()));
     }
 
     private void unregisterDeviceResource(Device device) {
-        executor.submit(() -> adminService.unregisterResources(Resources.discrete(device.id()).resource()));
+        executor.submit(() -> {
+            DiscreteResource devResource = Resources.discrete(device.id()).resource();
+            List<Resource> allResources = getDescendantResources(devResource);
+            adminService.unregister(Lists.transform(allResources, Resource::id));
+        });
     }
 
     private void registerPortResource(Device device, Port port) {
         Resource portPath = Resources.discrete(device.id(), port.number()).resource();
         executor.submit(() -> {
-            adminService.registerResources(portPath);
+            adminService.register(portPath);
 
             queryBandwidth(device.id(), port.number())
                 .map(bw -> portPath.child(Bandwidth.class, bw.bps()))
-                .map(adminService::registerResources)
+                .map(adminService::register)
                 .ifPresent(success -> {
                    if (!success) {
                        log.error("Failed to register Bandwidth for {}", portPath.id());
@@ -143,40 +155,64 @@ final class ResourceDeviceListener implements DeviceListener {
             // for VLAN IDs
             Set<VlanId> vlans = queryVlanIds(device.id(), port.number());
             if (!vlans.isEmpty()) {
-                adminService.registerResources(vlans.stream()
-                                               .map(portPath::child)
-                                               .collect(Collectors.toList()));
+                adminService.register(vlans.stream()
+                        .map(portPath::child)
+                        .collect(Collectors.toList()));
             }
 
             // for MPLS labels
             Set<MplsLabel> mplsLabels = queryMplsLabels(device.id(), port.number());
             if (!mplsLabels.isEmpty()) {
-                adminService.registerResources(mplsLabels.stream()
-                                               .map(portPath::child)
-                                               .collect(Collectors.toList()));
+                adminService.register(mplsLabels.stream()
+                        .map(portPath::child)
+                        .collect(Collectors.toList()));
             }
 
             // for Lambdas
             Set<OchSignal> lambdas = queryLambdas(device.id(), port.number());
             if (!lambdas.isEmpty()) {
-                adminService.registerResources(lambdas.stream()
-                                               .map(portPath::child)
-                                               .collect(Collectors.toList()));
+                adminService.register(lambdas.stream()
+                        .map(portPath::child)
+                        .collect(Collectors.toList()));
             }
 
             // for Tributary slots
             Set<TributarySlot> tSlots = queryTributarySlots(device.id(), port.number());
             if (!tSlots.isEmpty()) {
-                adminService.registerResources(tSlots.stream()
-                                               .map(portPath::child)
-                                               .collect(Collectors.toList()));
+                adminService.register(tSlots.stream()
+                        .map(portPath::child)
+                        .collect(Collectors.toList()));
             }
         });
     }
 
     private void unregisterPortResource(Device device, Port port) {
-        Resource resource = Resources.discrete(device.id(), port.number()).resource();
-        executor.submit(() -> adminService.unregisterResources(resource));
+        executor.submit(() -> {
+            DiscreteResource portResource = Resources.discrete(device.id(), port.number()).resource();
+            List<Resource> allResources = getDescendantResources(portResource);
+            adminService.unregister(Lists.transform(allResources, Resource::id));
+        });
+    }
+
+    // Returns list of all descendant resources of given resource, including itself.
+    private List<Resource> getDescendantResources(DiscreteResource parent) {
+        LinkedList<Resource> allResources = new LinkedList<>();
+        allResources.add(parent);
+
+        Set<Resource> nextResources = resourceService.getRegisteredResources(parent.id());
+        while (!nextResources.isEmpty()) {
+            Set<Resource> currentResources = nextResources;
+            // resource list should be ordered from leaf to root
+            allResources.addAll(0, currentResources);
+
+            nextResources = currentResources.stream()
+                    .filter(r -> r instanceof DiscreteResource)
+                    .map(r -> (DiscreteResource) r)
+                    .flatMap(r -> resourceService.getRegisteredResources(r.id()).stream())
+                    .collect(Collectors.toSet());
+        }
+
+        return allResources;
     }
 
     /**

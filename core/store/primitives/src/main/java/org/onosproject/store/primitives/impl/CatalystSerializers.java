@@ -22,6 +22,7 @@ import io.atomix.copycat.client.Query;
 import io.atomix.manager.state.GetResource;
 import io.atomix.manager.state.GetResourceKeys;
 import io.atomix.resource.ResourceQuery;
+import io.atomix.variables.state.ValueCommands;
 
 import java.io.IOException;
 import java.net.URL;
@@ -32,18 +33,18 @@ import java.util.Scanner;
 import org.onlab.util.Match;
 import org.onosproject.cluster.NodeId;
 import org.onosproject.event.Change;
+import org.onosproject.store.primitives.MapUpdate;
+import org.onosproject.store.primitives.TransactionId;
 import org.onosproject.store.primitives.resources.impl.AtomixConsistentMapCommands;
 import org.onosproject.store.primitives.resources.impl.AtomixConsistentMapState;
 import org.onosproject.store.primitives.resources.impl.AtomixLeaderElectorCommands;
 import org.onosproject.store.primitives.resources.impl.CommitResult;
 import org.onosproject.store.primitives.resources.impl.MapEntryUpdateResult;
-import org.onosproject.store.primitives.resources.impl.MapUpdate;
 import org.onosproject.store.primitives.resources.impl.PrepareResult;
 import org.onosproject.store.primitives.resources.impl.RollbackResult;
-import org.onosproject.store.primitives.resources.impl.TransactionId;
-import org.onosproject.store.primitives.resources.impl.TransactionalMapUpdate;
 import org.onosproject.store.serializers.KryoNamespaces;
 import org.onosproject.store.service.MapEvent;
+import org.onosproject.store.service.MapTransaction;
 import org.onosproject.store.service.Versioned;
 
 import com.google.common.base.Throwables;
@@ -66,7 +67,8 @@ public final class CatalystSerializers {
                                 MapEntryUpdateResult.Status.class,
                                 MapUpdate.class,
                                 MapUpdate.Type.class,
-                                TransactionalMapUpdate.class,
+                                MapTransaction.class,
+                                Transaction.State.class,
                                 TransactionId.class,
                                 PrepareResult.class,
                                 CommitResult.class,
@@ -92,6 +94,8 @@ public final class CatalystSerializers {
                                 GetResource.class,
                                 GetResourceKeys.class,
                                 ResourceQuery.class,
+                                ValueCommands.Get.class,
+                                ValueCommands.Set.class,
                                 Query.ConsistencyLevel.class));
         // ONOS classes
         serializer.register(Change.class, factory);
@@ -99,7 +103,8 @@ public final class CatalystSerializers {
         serializer.register(Match.class, factory);
         serializer.register(MapEntryUpdateResult.class, factory);
         serializer.register(MapEntryUpdateResult.Status.class, factory);
-        serializer.register(TransactionalMapUpdate.class, factory);
+        serializer.register(MapTransaction.class, factory);
+        serializer.register(Transaction.State.class, factory);
         serializer.register(PrepareResult.class, factory);
         serializer.register(CommitResult.class, factory);
         serializer.register(RollbackResult.class, factory);
@@ -113,6 +118,8 @@ public final class CatalystSerializers {
         serializer.register(ResourceQuery.class, factory);
         serializer.register(GetResource.class, factory);
         serializer.register(GetResourceKeys.class, factory);
+        serializer.register(ValueCommands.Get.class, factory);
+        serializer.register(ValueCommands.Set.class, factory);
 
         // ConsistentMap
         serializer.register(AtomixConsistentMapCommands.UpdateAndGet.class, factory);

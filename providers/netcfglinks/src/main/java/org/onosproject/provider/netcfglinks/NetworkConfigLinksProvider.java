@@ -60,6 +60,8 @@ import org.onosproject.net.packet.PacketProcessor;
 import org.onosproject.net.packet.PacketService;
 import org.onosproject.net.provider.AbstractProvider;
 import org.onosproject.net.provider.ProviderId;
+import org.onosproject.provider.lldpcommon.LinkDiscoveryContext;
+import org.onosproject.provider.lldpcommon.LinkDiscovery;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,7 +106,7 @@ public class NetworkConfigLinksProvider
     // Device link discovery helpers.
     protected final Map<DeviceId, LinkDiscovery> discoverers = new ConcurrentHashMap<>();
 
-    private final DiscoveryContext context = new InternalDiscoveryContext();
+    private final LinkDiscoveryContext context = new InternalDiscoveryContext();
 
     private LinkProviderService providerService;
 
@@ -117,7 +119,7 @@ public class NetworkConfigLinksProvider
     private final InternalDeviceListener deviceListener = new InternalDeviceListener();
     private final InternalConfigListener cfgListener = new InternalConfigListener();
 
-    private Set<LinkKey> configuredLinks = new HashSet<>();
+    protected Set<LinkKey> configuredLinks = new HashSet<>();
 
     public NetworkConfigLinksProvider() {
         super(new ProviderId("lldp", PROVIDER_NAME));
@@ -206,7 +208,7 @@ public class NetworkConfigLinksProvider
     /**
      * Provides processing context for the device link discovery helpers.
      */
-    private class InternalDiscoveryContext implements DiscoveryContext {
+    private class InternalDiscoveryContext implements LinkDiscoveryContext {
         @Override
         public MastershipService mastershipService() {
             return masterService;
@@ -234,7 +236,16 @@ public class NetworkConfigLinksProvider
 
         @Override
         public void touchLink(LinkKey key) {
-            //linkTimes.put(key, System.currentTimeMillis());
+        }
+
+        @Override
+        public String fingerprint() {
+            return "";
+        }
+
+        @Override
+        public DeviceService deviceService() {
+            return deviceService;
         }
     }
 
@@ -257,6 +268,35 @@ public class NetworkConfigLinksProvider
         }
         return null;
     }
+
+    /**
+     * Removes after stopping discovery helper for specified device.
+     * @param deviceId device to remove
+     */
+    private void removeDevice(final DeviceId deviceId) {
+        discoverers.computeIfPresent(deviceId, (did, ld) -> {
+            ld.stop();
+            return null;
+        });
+
+    }
+
+    /**
+     * Removes a port from the specified discovery helper.
+     * @param port the port
+     */
+    private void removePort(Port port) {
+        if (port.element() instanceof Device) {
+            Device d = (Device) port.element();
+            LinkDiscovery ld = discoverers.get(d.id());
+            if (ld != null) {
+                ld.removePort(port.number());
+            }
+        } else {
+            log.warn("Attempted to remove non-Device port", port);
+        }
+    }
+
 
     /**
      * Processes incoming packets.
@@ -355,21 +395,21 @@ public class NetworkConfigLinksProvider
                         updateDevice(device).ifPresent(ld -> updatePort(ld, port));
                     } else {
                         log.debug("Port down {}", port);
-                        //removePort(port);
+                        removePort(port);
                         providerService.linksVanished(new ConnectPoint(port.element().id(),
                                                                        port.number()));
                     }
                     break;
                 case PORT_REMOVED:
                     log.debug("Port removed {}", port);
-                    //removePort(port);
+                    removePort(port);
                     providerService.linksVanished(new ConnectPoint(port.element().id(),
                                                                    port.number()));
                     break;
                 case DEVICE_REMOVED:
                 case DEVICE_SUSPENDED:
                     log.debug("Device removed {}", deviceId);
-                    //removeDevice(deviceId);
+                    removeDevice(deviceId);
                     providerService.linksVanished(deviceId);
                     break;
                 case DEVICE_AVAILABILITY_CHANGED:
@@ -378,7 +418,7 @@ public class NetworkConfigLinksProvider
                         updateDevice(device).ifPresent(ld -> updatePorts(ld, deviceId));
                     } else {
                         log.debug("Device down {}", deviceId);
-                        //removeDevice(deviceId);
+                        removeDevice(deviceId);
                         providerService.linksVanished(deviceId);
                     }
                     break;

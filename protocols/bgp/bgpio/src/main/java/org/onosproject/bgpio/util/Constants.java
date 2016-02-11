@@ -34,7 +34,8 @@ public final class Constants {
     public static final short AFI_VALUE = 16388;
     public static final byte VPN_SAFI_VALUE = (byte) 0x80;
     public static final byte SAFI_VALUE = 71;
-
+    public static final short AFI_IPV4_UNICAST = 1;
+    public static final byte SAFI_IPV4_UNICAST = 1;
     public static final short AFI_FLOWSPEC_VALUE = 1;
     public static final byte SAFI_FLOWSPEC_VALUE = (byte) 133;
     public static final byte VPN_SAFI_FLOWSPEC_VALUE = (byte) 134;
@@ -46,6 +47,8 @@ public final class Constants {
     public static final int DEDICATED_ONE_PLUS_ONE = 0x10;
     public static final int ENHANCED = 0x20;
     public static final int RESERVED = 0x40;
+
+    public static final byte BGP_EXTENDED_COMMUNITY = 0x10;
 
     public static final byte BGP_FLOWSPEC_DST_PREFIX = 0x01;
     public static final byte BGP_FLOWSPEC_SRC_PREFIX = 0x02;

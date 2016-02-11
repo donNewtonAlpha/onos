@@ -19,6 +19,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
+import org.onosproject.store.primitives.TransactionId;
+
 /**
  * Service for administering storage instances.
  */
@@ -29,6 +31,7 @@ public interface StorageAdminService {
      *
      * @return list of partition information
      */
+    @Deprecated
     List<PartitionInfo> getPartitionInfo();
 
     /**
@@ -36,6 +39,7 @@ public interface StorageAdminService {
      *
      * @return list of map information
      */
+    @Deprecated
     List<MapInfo> getMapInfo();
 
     /**
@@ -45,6 +49,7 @@ public interface StorageAdminService {
      *
      * @return mapping from counter name to that counter's next value
      */
+    @Deprecated
     Map<String, Long> getCounters();
 
     /**
@@ -52,6 +57,7 @@ public interface StorageAdminService {
      *
      * @return mapping from counter name to that counter's next value
      */
+    @Deprecated
     Map<String, Long> getPartitionedDatabaseCounters();
 
     /**
@@ -59,17 +65,13 @@ public interface StorageAdminService {
      *
      * @return mapping from counter name to that counter's next value
      */
+    @Deprecated
     Map<String, Long> getInMemoryDatabaseCounters();
 
     /**
-     * Returns all the transactions in the system.
+     * Returns all pending transactions.
      *
-     * @return collection of transactions
+     * @return collection of pending transaction identifiers.
      */
-    Collection<Transaction> getTransactions();
-
-    /**
-     * Redrives stuck transactions while removing those that are done.
-     */
-    void redriveTransactions();
+    Collection<TransactionId> getPendingTransactions();
 }

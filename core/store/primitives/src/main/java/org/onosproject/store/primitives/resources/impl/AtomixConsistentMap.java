@@ -31,9 +31,11 @@ import java.util.function.BiFunction;
 import java.util.function.Predicate;
 
 import org.onlab.util.Match;
+import org.onosproject.store.primitives.TransactionId;
 import org.onosproject.store.service.AsyncConsistentMap;
 import org.onosproject.store.service.MapEvent;
 import org.onosproject.store.service.MapEventListener;
+import org.onosproject.store.service.MapTransaction;
 import org.onosproject.store.service.Versioned;
 
 import com.google.common.collect.Sets;
@@ -235,18 +237,6 @@ public class AtomixConsistentMap extends Resource<AtomixConsistentMap, Resource.
         });
     }
 
-    public CompletableFuture<PrepareResult> prepare(TransactionalMapUpdate<String, byte[]> update) {
-        return submit(new AtomixConsistentMapCommands.TransactionPrepare(update));
-    }
-
-    public CompletableFuture<CommitResult> commit(TransactionId transactionId) {
-        return submit(new AtomixConsistentMapCommands.TransactionCommit(transactionId));
-    }
-
-    public CompletableFuture<RollbackResult> rollback(TransactionId transactionId) {
-        return submit(new AtomixConsistentMapCommands.TransactionRollback(transactionId));
-    }
-
     @Override
     public synchronized CompletableFuture<Void> addListener(MapEventListener<String, byte[]> listener) {
         if (!mapEventListeners.isEmpty()) {
@@ -272,6 +262,24 @@ public class AtomixConsistentMap extends Resource<AtomixConsistentMap, Resource.
         if (status == MapEntryUpdateResult.Status.WRITE_LOCK) {
             throw new ConcurrentModificationException("Cannot update map: Another transaction in progress");
         }
+    }
+
+    @Override
+    public CompletableFuture<Boolean> prepare(MapTransaction<String, byte[]> transaction) {
+        return submit(new AtomixConsistentMapCommands.TransactionPrepare(transaction))
+                .thenApply(v -> v == PrepareResult.OK);
+    }
+
+    @Override
+    public CompletableFuture<Void> commit(TransactionId transactionId) {
+        return submit(new AtomixConsistentMapCommands.TransactionCommit(transactionId))
+                .thenApply(v -> null);
+    }
+
+    @Override
+    public CompletableFuture<Void> rollback(TransactionId transactionId) {
+        return submit(new AtomixConsistentMapCommands.TransactionRollback(transactionId))
+                .thenApply(v -> null);
     }
 
     /**

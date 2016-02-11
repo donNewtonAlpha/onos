@@ -37,8 +37,11 @@ import java.util.stream.Collectors;
 
 import org.onlab.util.CountDownCompleter;
 import org.onlab.util.Match;
+import org.onosproject.store.primitives.MapUpdate;
+import org.onosproject.store.primitives.TransactionId;
 import org.onosproject.store.primitives.resources.impl.AtomixConsistentMapCommands.TransactionPrepare;
 import org.onosproject.store.service.MapEvent;
+import org.onosproject.store.service.MapTransaction;
 import org.onosproject.store.service.Versioned;
 
 import com.google.common.collect.Maps;
@@ -382,9 +385,8 @@ public class AtomixConsistentMapState extends ResourceStateMachine implements
             Commit<? extends AtomixConsistentMapCommands.TransactionPrepare> commit) {
         boolean ok = false;
         try {
-            TransactionalMapUpdate<String, byte[]> transactionUpdate = commit
-                    .operation().transactionUpdate();
-            for (MapUpdate<String, byte[]> update : transactionUpdate.batch()) {
+            MapTransaction<String, byte[]> transaction = commit.operation().transaction();
+            for (MapUpdate<String, byte[]> update : transaction.updates()) {
                 String key = update.key();
                 if (preparedKeys.contains(key)) {
                     return PrepareResult.CONCURRENT_TRANSACTION;
@@ -403,8 +405,8 @@ public class AtomixConsistentMapState extends ResourceStateMachine implements
             // No violations detected. Add to pendingTranctions and mark
             // modified keys as
             // currently locked to updates.
-            pendingTransactions.put(transactionUpdate.transactionId(), commit);
-            transactionUpdate.batch().forEach(u -> preparedKeys.add(u.key()));
+            pendingTransactions.put(transaction.transactionId(), commit);
+            transaction.updates().forEach(u -> preparedKeys.add(u.key()));
             ok = true;
             return PrepareResult.OK;
         } finally {
@@ -429,16 +431,15 @@ public class AtomixConsistentMapState extends ResourceStateMachine implements
             if (prepareCommit == null) {
                 return CommitResult.UNKNOWN_TRANSACTION_ID;
             }
-            TransactionalMapUpdate<String, byte[]> transactionalUpdate = prepareCommit
-                    .operation().transactionUpdate();
-            long totalReferencesToCommit = transactionalUpdate
-                    .batch()
+            MapTransaction<String, byte[]> transaction = prepareCommit.operation().transaction();
+            long totalReferencesToCommit = transaction
+                    .updates()
                     .stream()
                     .filter(update -> update.type() != MapUpdate.Type.REMOVE_IF_VERSION_MATCH)
                     .count();
             CountDownCompleter<Commit<? extends AtomixConsistentMapCommands.TransactionPrepare>> completer =
                     new CountDownCompleter<>(prepareCommit, totalReferencesToCommit, Commit::close);
-            for (MapUpdate<String, byte[]> update : transactionalUpdate.batch()) {
+            for (MapUpdate<String, byte[]> update : transaction.updates()) {
                 String key = update.key();
                 MapEntryValue previousValue = mapEntries.remove(key);
                 MapEntryValue newValue = null;
@@ -473,8 +474,10 @@ public class AtomixConsistentMapState extends ResourceStateMachine implements
             if (prepareCommit == null) {
                 return RollbackResult.UNKNOWN_TRANSACTION_ID;
             } else {
-                prepareCommit.operation().transactionUpdate().batch()
-                        .forEach(u -> preparedKeys.remove(u.key()));
+                prepareCommit.operation()
+                             .transaction()
+                             .updates()
+                             .forEach(u -> preparedKeys.remove(u.key()));
                 prepareCommit.close();
                 return RollbackResult.OK;
             }
@@ -608,9 +611,8 @@ public class AtomixConsistentMapState extends ResourceStateMachine implements
 
         @Override
         public byte[] value() {
-            TransactionalMapUpdate<String, byte[]> update = completer.object()
-                    .operation().transactionUpdate();
-            return update.valueForKey(key);
+            MapTransaction<String, byte[]> transaction = completer.object().operation().transaction();
+            return valueForKey(key, transaction);
         }
 
         @Override
@@ -621,6 +623,15 @@ public class AtomixConsistentMapState extends ResourceStateMachine implements
         @Override
         public void discard() {
             completer.countDown();
+        }
+
+        private byte[] valueForKey(String key, MapTransaction<String, byte[]> transaction) {
+            MapUpdate<String, byte[]>  update = transaction.updates()
+                                                           .stream()
+                                                           .filter(u -> u.key().equals(key))
+                                                           .findFirst()
+                                                           .orElse(null);
+            return update == null ? null : update.value();
         }
     }
 }

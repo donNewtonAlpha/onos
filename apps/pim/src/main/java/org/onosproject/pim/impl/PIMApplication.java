@@ -24,24 +24,17 @@ import org.onlab.packet.Ethernet;
 import org.onlab.packet.IPv4;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
-import org.onosproject.incubator.net.config.basics.ConfigException;
-import org.onosproject.incubator.net.config.basics.InterfaceConfig;
-import org.onosproject.incubator.net.intf.Interface;
-import org.onosproject.incubator.net.intf.InterfaceService;
-import org.onosproject.net.ConnectPoint;
-import org.onosproject.net.config.NetworkConfigEvent;
-import org.onosproject.net.config.NetworkConfigListener;
-import org.onosproject.net.config.NetworkConfigService;
 import org.onosproject.net.flow.DefaultTrafficSelector;
 import org.onosproject.net.flow.TrafficSelector;
 import org.onosproject.net.mcast.MulticastRouteService;
 import org.onosproject.net.packet.InboundPacket;
 import org.onosproject.net.packet.PacketContext;
+import org.onosproject.net.packet.PacketPriority;
 import org.onosproject.net.packet.PacketProcessor;
 import org.onosproject.net.packet.PacketService;
 import org.slf4j.Logger;
 
-import java.util.Set;
+import java.util.Optional;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -70,27 +63,17 @@ public class PIMApplication {
     // Create an instance of the PIM packet handler
     protected PIMPacketHandler pimPacketHandler;
 
-    // Get the network configuration updates
-    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected NetworkConfigService configService;
-
-    // Access defined network (IP) interfaces
-    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected InterfaceService interfaceService;
-
-    // Internal class used to listen for network configuration changes
-    private InternalConfigListener configListener = new InternalConfigListener();
-
     // Provide interfaces to the pimInterface manager as a result of Netconfig updates.
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected PIMInterfaceService pimInterfaceManager;
+
+    private final PIMPacketProcessor processor = new PIMPacketProcessor();
 
     /**
      * Activate the PIM component.
      */
     @Activate
     public void activate() {
-
         // Get our application ID
         appId = coreService.registerApplication("org.onosproject.pim");
 
@@ -100,18 +83,13 @@ public class PIMApplication {
         selector.matchIPProtocol(IPv4.PROTOCOL_PIM);
 
         // Use the traffic selector to tell the packet service which packets we want.
-        // PIMPacketService is an inner class defined below
-        PIMPacketProcessor processor = new PIMPacketProcessor();
         packetService.addProcessor(processor, PacketProcessor.director(5));
 
-        // Register for notifications from the Network config & Interface services.
-        // We'll use these services to represent "PIMInterfaces"
+        packetService.requestPackets(selector.build(), PacketPriority.CONTROL,
+                appId, Optional.empty());
 
         // Get a copy of the PIM Packet Handler
         pimPacketHandler = new PIMPacketHandler();
-
-        // Listen for network configuration changes
-        configService.addListener(configListener);
 
         log.info("Started");
     }
@@ -121,6 +99,8 @@ public class PIMApplication {
      */
     @Deactivate
     public void deactivate() {
+        packetService.removeProcessor(processor);
+
         log.info("Stopped");
     }
 
@@ -173,57 +153,4 @@ public class PIMApplication {
         }
     }
 
-    /*
-     * This class receives all events from the network config services, then hands the
-     * event off to the PIMInterfaceManager for proper handling.
-     *
-     * TODO: should this move to PIMInterfaceManager?
-     */
-    private class InternalConfigListener implements NetworkConfigListener {
-
-        @Override
-        public void event(NetworkConfigEvent event) {
-
-            log.debug(event.toString());
-            switch (event.type()) {
-                case CONFIG_ADDED:
-                case CONFIG_UPDATED:
-
-                    if (event.configClass() == InterfaceConfig.class) {
-                        InterfaceConfig config = configService.getConfig(
-                                (ConnectPoint) event.subject(),
-                                InterfaceConfig.class);
-
-                        log.debug("Got a network configuration event");
-
-                        // Walk the interfaces and feed them to the PIMInterfaceManager
-                        Set<Interface> intfs;
-                        try {
-                            intfs = config.getInterfaces();
-                            for (Interface intf : intfs) {
-                                pimInterfaceManager.updateInterface(intf);
-                            }
-                        } catch (ConfigException e) {
-                            log.error(e.toString());
-                            return;
-                        }
-                    }
-                    break;
-
-                case CONFIG_REMOVED:
-                    if (event.configClass() == InterfaceConfig.class) {
-                        ConnectPoint cp = (ConnectPoint) event.subject();
-                        //assertNotNull(cp);
-                        pimInterfaceManager.deleteInterface(cp);
-                    }
-                    break;
-
-                case CONFIG_REGISTERED:
-                case CONFIG_UNREGISTERED:
-                default:
-                    log.debug("\tWe are not handling this event type");
-                    break;
-            }
-        }
-    }
 }

@@ -209,7 +209,8 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
     }
 
     @Override
-    public void createServiceDependency(CordServiceId tServiceId, CordServiceId pServiceId) {
+    public void createServiceDependency(CordServiceId tServiceId, CordServiceId pServiceId,
+                                        boolean isBidirectional) {
         CordService tService = getCordService(tServiceId);
         CordService pService = getCordService(pServiceId);
 
@@ -219,7 +220,7 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
         }
 
         log.info("Service dependency from {} to {} created.", tService.id().id(), pService.id().id());
-        ruleInstaller.populateServiceDependencyRules(tService, pService);
+        ruleInstaller.populateServiceDependencyRules(tService, pService, isBidirectional);
     }
 
     @Override
@@ -265,7 +266,7 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
         SparseAnnotations annotations = DefaultAnnotations.builder()
                 .set(OPENSTACK_VM_ID, vPort.deviceId())
                 .set(SERVICE_ID, vPort.networkId())
-                .set(LOCATION_IP, node.localIp().toString())
+                .set(LOCATION_IP, node.dpIp().ip().toString())
                 .build();
 
         HostDescription hostDesc = new DefaultHostDescription(

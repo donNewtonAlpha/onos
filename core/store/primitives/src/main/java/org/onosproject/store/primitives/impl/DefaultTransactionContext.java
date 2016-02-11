@@ -18,14 +18,17 @@ package org.onosproject.store.primitives.impl;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.*;
 
+import org.onosproject.store.primitives.MapUpdate;
+import org.onosproject.store.primitives.TransactionId;
+import org.onosproject.store.primitives.resources.impl.CommitResult;
 import org.onosproject.store.service.ConsistentMapBuilder;
-import org.onosproject.store.service.DatabaseUpdate;
 import org.onosproject.store.service.Serializer;
-import org.onosproject.store.service.Transaction;
 import org.onosproject.store.service.TransactionContext;
 import org.onosproject.store.service.TransactionalMap;
 
@@ -44,20 +47,20 @@ public class DefaultTransactionContext implements TransactionContext {
     @SuppressWarnings("rawtypes")
     private final Map<String, DefaultTransactionalMap> txMaps = Maps.newConcurrentMap();
     private boolean isOpen = false;
-    private final Database database;
-    private final long transactionId;
+    private final Function<Transaction, CompletableFuture<CommitResult>> transactionCommitter;
+    private final TransactionId transactionId;
     private final Supplier<ConsistentMapBuilder> mapBuilderSupplier;
 
-    public DefaultTransactionContext(long transactionId,
-            Database database,
+    public DefaultTransactionContext(TransactionId transactionId,
+            Function<Transaction, CompletableFuture<CommitResult>> transactionCommitter,
             Supplier<ConsistentMapBuilder> mapBuilderSupplier) {
         this.transactionId = transactionId;
-        this.database = checkNotNull(database);
+        this.transactionCommitter = checkNotNull(transactionCommitter);
         this.mapBuilderSupplier = checkNotNull(mapBuilderSupplier);
     }
 
     @Override
-    public long transactionId() {
+    public TransactionId transactionId() {
         return transactionId;
     }
 
@@ -79,11 +82,16 @@ public class DefaultTransactionContext implements TransactionContext {
         checkState(isOpen, TX_NOT_OPEN_ERROR);
         checkNotNull(mapName);
         checkNotNull(serializer);
-        return txMaps.computeIfAbsent(mapName, name -> new DefaultTransactionalMap<>(
+        return txMaps.computeIfAbsent(mapName, name -> {
+            ConsistentMapBuilder mapBuilder =  (ConsistentMapBuilder) mapBuilderSupplier.get()
+                                                                                        .withName(name)
+                                                                                        .withSerializer(serializer);
+            return new DefaultTransactionalMap<>(
                                 name,
-                                mapBuilderSupplier.get().withName(name).withSerializer(serializer).build(),
+                                mapBuilder.buildAsyncMap(),
                                 this,
-                                serializer));
+                                serializer);
+        });
     }
 
     @SuppressWarnings("unchecked")
@@ -91,13 +99,13 @@ public class DefaultTransactionContext implements TransactionContext {
     public boolean commit() {
         // TODO: rework commit implementation to be more intuitive
         checkState(isOpen, TX_NOT_OPEN_ERROR);
-        CommitResponse response = null;
+        CommitResult result = null;
         try {
-            List<DatabaseUpdate> updates = Lists.newLinkedList();
-            txMaps.values().forEach(m -> updates.addAll(m.prepareDatabaseUpdates()));
-            Transaction transaction = new DefaultTransaction(transactionId, updates);
-            response = Futures.getUnchecked(database.prepareAndCommit(transaction));
-            return response.success();
+            List<MapUpdate<String, byte[]>> updates = Lists.newLinkedList();
+            txMaps.values().forEach(m -> updates.addAll(m.toMapUpdates()));
+            Transaction transaction = new Transaction(transactionId, updates);
+            result = Futures.getUnchecked(transactionCommitter.apply(transaction));
+            return result == CommitResult.OK;
         } catch (Exception e) {
             abort();
             return false;
@@ -110,7 +118,7 @@ public class DefaultTransactionContext implements TransactionContext {
     public void abort() {
         if (isOpen) {
             try {
-                txMaps.values().forEach(m -> m.rollback());
+                txMaps.values().forEach(m -> m.abort());
             } finally {
                 isOpen = false;
             }
@@ -127,5 +135,10 @@ public class DefaultTransactionContext implements TransactionContext {
             s.add(e.getKey(), e.getValue());
         });
         return s.toString();
+    }
+
+    @Override
+    public String name() {
+        return transactionId.toString();
     }
 }

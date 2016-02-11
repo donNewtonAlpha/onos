@@ -24,13 +24,22 @@ import org.onlab.packet.PIM;
 import org.onlab.packet.pim.PIMHello;
 import org.onlab.packet.pim.PIMHelloOption;
 import org.onosproject.incubator.net.intf.Interface;
+import org.onosproject.net.flow.DefaultTrafficTreatment;
+import org.onosproject.net.flow.TrafficTreatment;
 import org.onosproject.net.host.InterfaceIpAddress;
+import org.onosproject.net.packet.DefaultOutboundPacket;
+import org.onosproject.net.packet.PacketService;
 import org.slf4j.Logger;
 
+import java.nio.ByteBuffer;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
+import java.util.stream.Collectors;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -38,11 +47,14 @@ import static org.slf4j.LoggerFactory.getLogger;
  * PIM Interface represents an ONOS Interface with IP and MAC addresses for
  * a given ConnectPoint.
  */
-public class PIMInterface {
+public final class PIMInterface {
 
     private final Logger log = getLogger(getClass());
 
+    private final PacketService packetService;
+
     private Interface onosInterface;
+    private final TrafficTreatment outputTreatment;
 
     // Our hello opt holdtime
     private short holdtime = PIMHelloOption.DEFAULT_HOLDTIME;
@@ -54,10 +66,10 @@ public class PIMInterface {
     private int priority   = PIMHelloOption.DEFAULT_PRIORITY;
 
     // Our current genid
-    private int genid      = PIMHelloOption.DEFAULT_GENID;   // Needs to be assigned.
+    private final int generationId;
 
     // The IP address of the DR
-    IpAddress drIpaddress;
+    private IpAddress drIpaddress;
 
     // A map of all our PIM neighbors keyed on our neighbors IP address
     private Map<IpAddress, PIMNeighbor> pimNeighbors = new HashMap<>();
@@ -66,20 +78,39 @@ public class PIMInterface {
      * Create a PIMInterface from an ONOS Interface.
      *
      * @param intf the ONOS Interface.
+     * @param holdTime hold time
+     * @param priority priority
+     * @param propagationDelay propagation delay
+     * @param overrideInterval override interval
+     * @param packetService reference to the packet service
      */
-    public PIMInterface(Interface intf) {
+    private PIMInterface(Interface intf,
+                        short holdTime,
+                        int priority,
+                        short propagationDelay,
+                        short overrideInterval,
+                        PacketService packetService) {
+
         onosInterface = intf;
+        outputTreatment = createOutputTreatment();
+        this.holdtime = holdTime;
+        this.packetService = packetService;
         IpAddress ourIp = getIpAddress();
         MacAddress mac = intf.mac();
 
-        // Create a PIM Neighbor to represent ourselves for DR election.
-        PIMNeighbor us = new PIMNeighbor(ourIp, mac);
+        generationId = new Random().nextInt();
 
-        // Priority and IP address are all we need to DR election.
-        us.setPriority(priority);
+        // Create a PIM Neighbor to represent ourselves for DR election.
+        PIMNeighbor us = new PIMNeighbor(ourIp, mac, holdTime, 0, priority, generationId);
 
         pimNeighbors.put(ourIp, us);
         drIpaddress = ourIp;
+    }
+
+    private TrafficTreatment createOutputTreatment() {
+        return DefaultTrafficTreatment.builder()
+                .setOutput(onosInterface.connectPoint().port())
+                .build();
     }
 
     /**
@@ -162,8 +193,34 @@ public class PIMInterface {
      *
      * @return our generation ID
      */
-    public int getGenid() {
-        return genid;
+    public int getGenerationId() {
+        return generationId;
+    }
+
+    /**
+     * Gets the neighbors seen on this interface.
+     *
+     * @return PIM neighbors
+     */
+    public Collection<PIMNeighbor> getNeighbors() {
+        return pimNeighbors.values();
+    }
+
+    /**
+     * Checks whether any of our neighbors have expired, and cleans up their
+     * state if they have.
+     */
+    public void checkNeighborTimeouts() {
+        Set<PIMNeighbor> expired = pimNeighbors.values().stream()
+                // Don't time ourselves out!
+                .filter(neighbor -> !neighbor.ipAddress().equals(getIpAddress()))
+                .filter(neighbor -> neighbor.isExpired())
+                .collect(Collectors.toSet());
+
+        for (PIMNeighbor neighbor : expired) {
+            log.info("Timing out neighbor {}", neighbor);
+            pimNeighbors.remove(neighbor.ipAddress(), neighbor);
+        }
     }
 
     /**
@@ -172,7 +229,6 @@ public class PIMInterface {
      * result of a newly created interface.
      */
     public void sendHello() {
-
         // Create the base PIM Packet and mark it a hello packet
         PIMPacket pimPacket = new PIMPacket(PIM.TYPE_HELLO);
 
@@ -183,11 +239,17 @@ public class PIMInterface {
         // Create the hello message with options
         PIMHello hello = new PIMHello();
         hello.createDefaultOptions();
+        hello.addOption(PIMHelloOption.createHoldTime(holdtime));
+        hello.addOption(PIMHelloOption.createPriority(priority));
+        hello.addOption(PIMHelloOption.createGenID(generationId));
 
         // Now set the hello option payload
         pimPacket.setPIMPayload(hello);
 
-        // TODO: How to send the packet.?.
+        packetService.emit(new DefaultOutboundPacket(
+                onosInterface.connectPoint().deviceId(),
+                outputTreatment,
+                ByteBuffer.wrap(pimPacket.getEthernet().serialize())));
     }
 
     /**
@@ -197,7 +259,7 @@ public class PIMInterface {
      *     <li>We <em>may</em> have to create a new neighbor if one does not already exist</li>
      *     <li>We <em>may</em> need to re-elect a new DR if new information is received</li>
      *     <li>We <em>may</em> need to send an existing neighbor all joins if the genid changed</li>
-     *     <li>We will refresh the neighbors timestamp</li>
+     *     <li>We will refresh the neighbor's timestamp</li>
      * </ul>
      *
      * @param ethPkt the Ethernet packet header
@@ -222,7 +284,7 @@ public class PIMInterface {
         checkNotNull(dr);
 
         IpAddress drip = drIpaddress;
-        int drpri = dr.getPriority();
+        int drpri = dr.priority();
 
         // Assume we do not need to run a DR election
         boolean reElectDr = false;
@@ -232,22 +294,28 @@ public class PIMInterface {
 
         // Determine if we already have a PIMNeighbor
         PIMNeighbor nbr = pimNeighbors.getOrDefault(srcip, null);
+        PIMNeighbor newNbr = PIMNeighbor.createPimNeighbor(srcip, nbrmac, hello.getOptions().values());
+
         if (nbr == null) {
-            nbr = new PIMNeighbor(srcip, hello.getOptions());
-            checkNotNull(nbr);
-        } else {
-            Integer previousGenid = nbr.getGenid();
-            nbr.addOptions(hello.getOptions());
-            if (previousGenid != nbr.getGenid()) {
-                genidChanged = true;
+            pimNeighbors.putIfAbsent(srcip, newNbr);
+            nbr = newNbr;
+        } else if (!nbr.equals(newNbr)) {
+            if (newNbr.holdtime() == 0) {
+                // Neighbor has shut down. Remove them and clean up
+                pimNeighbors.remove(srcip, nbr);
+                return;
+            } else {
+                // Neighbor has changed one of their options.
+                pimNeighbors.put(srcip, newNbr);
+                nbr = newNbr;
             }
         }
 
-        // Refresh this neighbors timestamp
+        // Refresh this neighbor's timestamp
         nbr.refreshTimestamp();
 
         /*
-         * the election method will frist determine if an election
+         * the election method will first determine if an election
          * needs to be run, if so it will run the election.  The
          * IP address of the DR will be returned.  If the IP address
          * of the DR is different from what we already have we know a
@@ -261,17 +329,17 @@ public class PIMInterface {
     }
 
     // Run an election if we need to.  Return the elected IP address.
-    private IpAddress election(PIMNeighbor nbr, IpAddress drip, int drpri) {
+    private IpAddress election(PIMNeighbor nbr, IpAddress drIp, int drPriority) {
 
-        IpAddress nbrip = nbr.getIpaddr();
-        if (nbr.getPriority() > drpri) {
-            return nbrip;
+        IpAddress nbrIp = nbr.ipAddress();
+        if (nbr.priority() > drPriority) {
+            return nbrIp;
         }
 
-        if (nbrip.compareTo(drip) > 0) {
-            return nbrip;
+        if (nbrIp.compareTo(drIp) > 0) {
+            return nbrIp;
         }
-        return drip;
+        return drIp;
     }
 
     /**
@@ -281,5 +349,106 @@ public class PIMInterface {
      */
     public void processJoinPrune(Ethernet ethPkt) {
         // TODO: add Join/Prune processing code.
+    }
+
+    /**
+     * Returns a builder for a PIM interface.
+     *
+     * @return PIM interface builder
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    /**
+     * Builder for a PIM interface.
+     */
+    public static class Builder {
+        private Interface intf;
+        private PacketService packetService;
+        private short holdtime = PIMHelloOption.DEFAULT_HOLDTIME;
+        private int priority   = PIMHelloOption.DEFAULT_PRIORITY;
+        private short propagationDelay = PIMHelloOption.DEFAULT_PRUNEDELAY;
+        private short overrideInterval = PIMHelloOption.DEFAULT_OVERRIDEINTERVAL;
+
+        /**
+         * Uses the specified ONOS interface.
+         *
+         * @param intf ONOS interface
+         * @return this PIM interface builder
+         */
+        public Builder withInterface(Interface intf) {
+            this.intf = checkNotNull(intf);
+            return this;
+        }
+
+        /**
+         * Sets the reference to the packet service.
+         *
+         * @param packetService packet service
+         * @return this PIM interface builder
+         */
+        public Builder withPacketService(PacketService packetService) {
+            this.packetService = checkNotNull(packetService);
+            return this;
+        }
+
+        /**
+         * Uses the specified hold time.
+         *
+         * @param holdTime hold time in seconds
+         * @return this PIM interface builder
+         */
+        public Builder withHoldTime(short holdTime) {
+            this.holdtime = holdTime;
+            return this;
+        }
+
+        /**
+         * Uses the specified DR priority.
+         *
+         * @param priority DR priority
+         * @return this PIM interface builder
+         */
+        public Builder withPriority(int priority) {
+            this.priority = priority;
+            return this;
+        }
+
+        /**
+         * Uses the specified propagation delay.
+         *
+         * @param propagationDelay propagation delay in ms
+         * @return this PIM interface builder
+         */
+        public Builder withPropagationDelay(short propagationDelay) {
+            this.propagationDelay = propagationDelay;
+            return this;
+        }
+
+        /**
+         * Uses the specified override interval.
+         *
+         * @param overrideInterval override interval in ms
+         * @return this PIM interface builder
+         */
+        public Builder withOverrideInterval(short overrideInterval) {
+            this.overrideInterval = overrideInterval;
+            return this;
+        }
+
+        /**
+         * Builds the PIM interface.
+         *
+         * @return PIM interface
+         */
+        public PIMInterface build() {
+            checkArgument(intf != null, "Must provide an interface");
+            checkArgument(packetService != null, "Must provide a packet service");
+
+            return new PIMInterface(intf, holdtime, priority, propagationDelay,
+                    overrideInterval, packetService);
+        }
+
     }
 }
