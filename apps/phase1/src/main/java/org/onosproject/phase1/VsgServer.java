@@ -2,6 +2,7 @@ package org.onosproject.phase1;
 
 import org.onlab.packet.Ip4Address;
 import org.onlab.packet.Ip4Prefix;
+import org.onlab.packet.MacAddress;
 import org.onlab.packet.VlanId;
 import org.onosproject.net.PortNumber;
 
@@ -11,55 +12,64 @@ import java.util.List;
 /**
  * Created by nick on 2/10/16.
  */
-public class VsgServer {
+public class VsgServer extends NetworkElement{
 
-    private List<VlanId> vlanHandled;
-    //private Ip4Prefix ipPrefix;
-    private PortNumber portNumber;
+    private List<VsgVm> vms;
+    private Ip4Prefix ipBlock;
+    private MacAddress mac;
 
 
-    public VsgServer(int port, List<Integer> vlans){
+    public VsgServer(int port, MacAddress serverMac, List<VsgVm> vms, Ip4Prefix prefix){
 
-        vlanHandled = new LinkedList<>();
-        for(Integer i : vlans){
-            vlanHandled.add(VlanId.vlanId(i.shortValue()));
-        }
-        portNumber = PortNumber.portNumber(port);
+        this.mac = serverMac;
+        super.setPortNumber(PortNumber.portNumber(port));
+        this.vms = vms;
+        this.ipBlock = prefix;
 
     }
-
-
 
 
 
     public List<VlanId> getVlanHandled() {
-        return vlanHandled;
+
+        LinkedList<VlanId> vlans = new LinkedList<>();
+
+        for(VsgVm vm : vms){
+            vlans.addAll(vm.getVlanHandled());
+        }
+
+        return vlans;
     }
 
-    public void setVlanHandled(List<VlanId> vlanHandled) {
-        this.vlanHandled = vlanHandled;
+    public void addVm(VsgVm newVm){
+        //check if it is already there
+        for(VsgVm vm : vms){
+            if(vm.getTransitNetworkIp().equals(newVm.getTransitNetworkIp())){
+                return;
+            }
+        }
+        vms.add(newVm);
+    }
+
+    public List<VsgVm> getVms() {
+        return vms;
+    }
+
+    public Ip4Prefix getIpBlock() {
+        return ipBlock;
+    }
+
+    public void setIpBlock(Ip4Prefix ipBlock) {
+        this.ipBlock = ipBlock;
     }
 
 
 
-   /* public Ip4Prefix getIpPrefix() {
-        return ipPrefix;
-    }
-
-    public void setIpPrefix(Ip4Prefix ipPrefix) {
-        this.ipPrefix = ipPrefix;
-    }*/
-
-
-    public PortNumber getPortNumber() {
-        return portNumber;
-    }
-
-    public void setPortNumber(PortNumber portNumber) {
-        this.portNumber = portNumber;
+    public MacAddress getMac() {
+        return mac;
     }
 
     public String toString(){
-        return "port number : " + portNumber + ", contains " + vlanHandled.size() + "vlans";
+        return "port number : " + getPortNumber() + ", contains " + vms.size() + " vms";
     }
 }

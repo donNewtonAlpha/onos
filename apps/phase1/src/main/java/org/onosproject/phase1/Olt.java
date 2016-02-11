@@ -10,13 +10,9 @@ import java.util.List;
 /**
  * Created by nick on 2/10/16.
  */
-public class Olt {
+public class Olt extends NetworkElement{
 
     private List<VlanId> vlanHandled;
-
-
-
-    private PortNumber portNumber;
 
 
     public Olt(PortNumber port, List<Integer> vlans){
@@ -25,7 +21,7 @@ public class Olt {
         for(Integer i : vlans){
             vlanHandled.add(VlanId.vlanId(i.shortValue()));
         }
-        portNumber = port;
+        super.setPortNumber(port);
 
     }
 
@@ -35,7 +31,7 @@ public class Olt {
         for(Integer i : vlans){
             vlanHandled.add(VlanId.vlanId(i.shortValue()));
         }
-        portNumber = PortNumber.portNumber(port);
+        super.setPortNumber(PortNumber.portNumber((short)port));
 
     }
 
@@ -47,15 +43,8 @@ public class Olt {
         this.vlanHandled = vlanHandled;
     }
 
-    public PortNumber getPortNumber() {
-        return portNumber;
-    }
-
-    public void setPortNumber(PortNumber portNumber) {
-        this.portNumber = portNumber;
-    }
 
     public String toString(){
-        return "port number : " + portNumber + ", contains " + vlanHandled.size() + " vlans !";
+        return "port number : " + getPortNumber() + ", contains " + vlanHandled.size() + " vlans !";
     }
 }
