@@ -84,18 +84,21 @@ public class TorComponent implements TorService {
 
 
     // Physical port 1, port splitting
-    static final PortNumber serverPort = PortNumber.portNumber(33);
-    static final PortNumber uversePort = PortNumber.portNumber(34);
-    static final PortNumber internetPort = PortNumber.portNumber(35);
+    static final PortNumber serverPort = PortNumber.portNumber(1);
+    static final PortNumber uversePort = PortNumber.portNumber(2);
+    static final PortNumber internetPort = PortNumber.portNumber(2);
     // Physical port 2
-    static final PortNumber oltPort = PortNumber.portNumber(37);
+    static final PortNumber oltPort = PortNumber.portNumber(3);
 
 
     static GroupId internetGroup;
     static GroupId serverWanGroup;
+    static GroupId serverWanRewriteGroup;
     static GroupId serverUverseGroup;
     static GroupId multicastToOltGroup;
     static GroupId serverLanGroup;
+    static GroupId serverLanRewriteGroup;
+
     static GroupId oltGroup;
     static GroupId floodGroup;
     static GroupId uverseGroup;
@@ -109,7 +112,7 @@ public class TorComponent implements TorService {
     static final VlanId outerTag = VlanId.vlanId((short) 5);
     static final VlanId innerTag = VlanId.vlanId((short) 7);
     static final VlanId tunnelVlan = VlanId.vlanId((short) 555);
-    static final VlanId internetVlan = VlanId.vlanId((short) 404);
+    static final VlanId internetVlan = VlanId.vlanId((short) 500);
     static final VlanId uverseVlan = VlanId.vlanId((short) 696);
     static final VlanId vlan0 = VlanId.vlanId((short) 1);
 
@@ -132,13 +135,16 @@ public class TorComponent implements TorService {
 
     private static final VlanId oltMulticastVlan = VlanId.vlanId((short) 4001);
 
-
+    //TODO
+    private final MacAddress VM_MAC = MacAddress.valueOf("76:eb:27:f6:47:f1");
 
     private final byte NO_FRAGMENT = (byte) 2;
     private final short DEFAULT_ID = (short) 1111;
     private final byte DEFAULT_TTL = 64;
     private final MacAddress DEFAULT_SOURCE_MAC = MacAddress.valueOf(123456789);
-    private final MacAddress VSG_MAC = MacAddress.valueOf("76:eb:27:f6:47:f1");
+    private final MacAddress VSG_MAC = VM_MAC;//MacAddress.valueOf("76:eb:27:f6:47:f1");
+
+
 
     private static final int JSON_COMMUNICATION_PORT = 6493;
 
@@ -153,57 +159,49 @@ public class TorComponent implements TorService {
         log.debug("trying to activate");
         appId = coreService.registerApplication("org.onosproject.tor");
 
-        packetService.addProcessor(new TorPacketProcessor(flowRuleService, packetService), 1);
+        //flowRuleService.addListener(new InternalListener);
+
+        //packetService.addProcessor(new TorPacketProcessor(flowRuleService, packetService), 1);
 
         //DNS for parental control
-        DnsProxy.initiate();
+        //DnsProxy.initiate();
 
         //Output groups
         initiateOutputGroups();
 
+        try {
+            Thread.sleep(1500);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+
         //Olt to vSGs server two way flow
         oltToServerBidirectionnal(outerTag);
-        //Tagging untagged packets from the internet
-        //defaultInternetTagging();
+
         //Dhcp for the vSGs WAN interfaces
-        dhcpFlows(vlan0, internetPort);
-        dhcpFlows(uverseVlan, uversePort);
+        //dhcpFlows(vlan0, internetPort);
+        //dhcpFlows(uverseVlan, uversePort);
         //Default ARP flow
-        arpFlows(vlan0, internetPort);
-        arpFlows(uverseVlan, uversePort);
+        //arpFlows(vlan0, internetPort);
+        //arpFlows(uverseVlan, uversePort);
         //UverseFeed to the Olt, bypassing the vSGs
-        uverseTraffic();
+        //uverseTraffic();
 
         //Packets capture  to controller
-        dnsCapture();
+        //dnsCapture();
         //igmpCapture();
-        ipLearningCapture(serverPort);
+        //ipLearningCapture(serverPort);
         //ipLearningCapture(oltPort); // For testing, not for the real system
 
         //newBrgDetectionCapture(MacAddress.valueOf("C4:6E:1F:C5:7A:8B"));
 
         //Listening for API calls
-        listen();
+        //listen();
 
-/*        TrafficSelector.Builder uverseSelector = DefaultTrafficSelector.builder();
-        uverseSelector.matchInPort(internetPort);
-        uverseSelector.matchEthType(Ethernet.TYPE_IPV4);
-        uverseSelector.matchIPSrc(IpPrefix.valueOf("224.0.0.0/8"));
 
-        FlowRule.Builder uverseRule = DefaultFlowRule.builder();
-        uverseRule.withSelector(uverseSelector.build());
-        uverseRule.withTreatment(DefaultTrafficTreatment.builder().drop().build());
-        uverseRule.withPriority(52000);
-        uverseRule.fromApp(appId);
-        uverseRule.forTable(ACL_TABLE);
-        uverseRule.forDevice(torId);
-        uverseRule.makePermanent();
-
-        uverseBlockingFlow = uverseRule.build();*/
-        //flowRuleService.applyFlowRules(uverseBlockingFlow);
-
-        Testing.initiate(flowRuleService, groupService);
-        Testing.connectPorts(30,31);
+//        Testing.initiate(flowRuleService, groupService);
+//        Testing.connectPorts(30,31);
 
     }
 
@@ -375,9 +373,13 @@ public class TorComponent implements TorService {
 
         //untaggedPacketsTagging(oltPort, tunnelVlan);
 
+        vlanTableHackFlows(oltPort, vlanId);
+        vlanTableHackFlows(serverPort, vlanId);
+
         TrafficSelector.Builder OltToServerSelector = DefaultTrafficSelector.builder();
         OltToServerSelector.matchInPort(oltPort);
         OltToServerSelector.matchVlanId(vlanId);
+        //OltToServerSelector.matchEthDst(MacAddress.BROADCAST);
 
 
         //ACL Table flow for olt to  server
@@ -389,7 +391,7 @@ public class TorComponent implements TorService {
         FlowRule.Builder oltToServer = DefaultFlowRule.builder();
         oltToServer.withSelector(OltToServerSelector.build());
         oltToServer.withTreatment(outputServerLan.build());
-        oltToServer.withPriority(41001);
+        oltToServer.withPriority(41003);
         oltToServer.fromApp(appId);
         oltToServer.forTable(ACL_TABLE);
         oltToServer.makePermanent();
@@ -397,6 +399,32 @@ public class TorComponent implements TorService {
 
         flowRuleService.applyFlowRules(oltToServer.build());
 
+
+/*
+
+        TrafficSelector.Builder OltToServerRewriteSelector = DefaultTrafficSelector.builder();
+        OltToServerRewriteSelector.matchInPort(oltPort);
+        OltToServerRewriteSelector.matchVlanId(vlanId);
+
+
+        //ACL Table flow for olt to  server
+
+        TrafficTreatment.Builder outputServerLanRewrite = DefaultTrafficTreatment.builder();
+        outputServerLanRewrite.group(serverLanRewriteGroup);
+
+
+        FlowRule.Builder oltToServerRewrite = DefaultFlowRule.builder();
+        oltToServerRewrite.withSelector(OltToServerRewriteSelector.build());
+        oltToServerRewrite.withTreatment(outputServerLanRewrite.build());
+        oltToServerRewrite.withPriority(41001);
+        oltToServerRewrite.fromApp(appId);
+        oltToServerRewrite.forTable(ACL_TABLE);
+        oltToServerRewrite.makePermanent();
+        oltToServerRewrite.forDevice(torId);
+
+        flowRuleService.applyFlowRules(oltToServer.build());
+
+*/
 
         //Flow from the extended LAN to the OLT (ACL)
 
@@ -673,7 +701,7 @@ public class TorComponent implements TorService {
 
         //Output groups
 
-        TrafficTreatment.Builder outputToUverse = DefaultTrafficTreatment.builder();
+   /*     TrafficTreatment.Builder outputToUverse = DefaultTrafficTreatment.builder();
         outputToUverse.setOutput(uversePort);
 
         Integer outputToUverseGroupId =  (((uverseVlan.toShort()) <<  16) |((short) uversePort.toLong()));
@@ -695,7 +723,7 @@ public class TorComponent implements TorService {
         outputToInternet.setOutput(internetPort);
 
 
-        Integer outputToInternetGroupId =  (((vlan0.toShort()) <<  16) |((short) internetPort.toLong()));
+        Integer outputToInternetGroupId =  (((internetVlan.toShort()) <<  16) |((short) internetPort.toLong()));
         final GroupKey outputToInternetGroupkey = new DefaultGroupKey(ByteBuffer.allocate(4).putInt(outputToInternetGroupId).array());
 
         GroupBucket outputToInternetBucket =
@@ -714,7 +742,7 @@ public class TorComponent implements TorService {
         TrafficTreatment.Builder outputToServer = DefaultTrafficTreatment.builder();
         outputToServer.setOutput(serverPort);
 
-        Integer outputToServerWanGroupId =   (((vlan0.toShort()) << 16 ) | ((short) serverPort.toLong()));
+        Integer outputToServerWanGroupId =   (((internetVlan.toShort()) << 16 ) | ((short) serverPort.toLong()));
         final GroupKey outputToServerWanGroupkey = new DefaultGroupKey(ByteBuffer.allocate(4).putInt(outputToServerWanGroupId).array());
 
         GroupBucket outputToServerWanBucket =
@@ -728,6 +756,25 @@ public class TorComponent implements TorService {
         groupService.addGroup(outputToServerWanGroupDescription);
 
         serverWanGroup =  groupService.getGroup(torId, outputToServerWanGroupkey).id();
+
+        *//*TrafficTreatment.Builder outputToServerRewrite = DefaultTrafficTreatment.builder();
+        outputToServerRewrite.setEthDst(VM_MAC);
+        outputToServerRewrite.group(serverWanGroup);
+
+        Integer outputToServerWanRewriteGroupId =   ((2 << 28) | ((internetVlan.toShort()) << 16 ) | ((short) serverPort.toLong()));
+        final GroupKey outputToServerWanRewriteGroupkey = new DefaultGroupKey(ByteBuffer.allocate(4).putInt(outputToServerWanRewriteGroupId).array());
+
+        GroupBucket outputToServerWanRewriteBucket =
+                DefaultGroupBucket.createIndirectGroupBucket(outputToServer.build());
+        GroupDescription outputToServerWanRewriteGroupDescription = new DefaultGroupDescription(torId,
+                GroupDescription.Type.INDIRECT,
+                new GroupBuckets(Collections.singletonList(outputToServerWanRewriteBucket)),
+                outputToServerWanRewriteGroupkey,
+                outputToServerWanRewriteGroupId,
+                appId);
+        groupService.addGroup(outputToServerWanRewriteGroupDescription);
+
+        serverWanRewriteGroup =  groupService.getGroup(torId, outputToServerWanRewriteGroupkey).id();*//*
 
 
         Integer outputToServerUverseGroupId =   (((uverseVlan.toShort()) << 16 ) | ((short) serverPort.toLong()));
@@ -763,7 +810,7 @@ public class TorComponent implements TorService {
         groupService.addGroup(outputToOltGroupDescription);
 
         multicastToOltGroup = groupService.getGroup(torId, outputToOltGroupkey).id();
-
+*/
 
 
 
@@ -785,10 +832,26 @@ public class TorComponent implements TorService {
 
         serverLanGroup = groupService.getGroup(torId, outputToServerLanGroupkey).id();
 
+       /* TrafficTreatment.Builder outputToServerLanRewrite = DefaultTrafficTreatment.builder();
+        outputToServerLanRewrite.setEthDst(VM_MAC);
+        outputToServerLanRewrite.group(serverLanGroup);
 
+        Integer outputToServerLanRewriteGroupId =  ((2 << 28) | ((outerTag.toShort()) << 16) | ((short) serverPort.toLong()));
+        final GroupKey outputToServerLanRewriteGroupkey = new DefaultGroupKey(ByteBuffer.allocate(4).putInt(outputToServerLanRewriteGroupId).array());
+
+        GroupBucket outputToServerLanRewriteBucket =
+                DefaultGroupBucket.createIndirectGroupBucket(outputToServerLanRewrite.build());
+        GroupDescription outputToServerLanRewriteGroupDescription = new DefaultGroupDescription(torId,
+                GroupDescription.Type.INDIRECT,
+                new GroupBuckets(Collections.singletonList(outputToServerLanRewriteBucket)),
+                outputToServerLanRewriteGroupkey,
+                outputToServerLanRewriteGroupId,
+                appId);
+        groupService.addGroup(outputToServerLanRewriteGroupDescription);
+
+        serverLanRewriteGroup = groupService.getGroup(torId, outputToServerLanRewriteGroupkey).id();*/
 
         TrafficTreatment.Builder toOltTreatment = DefaultTrafficTreatment.builder();
-        //toOltTreatment.popVlan();
         toOltTreatment.setOutput(oltPort);
 
 
@@ -809,6 +872,7 @@ public class TorComponent implements TorService {
 
         //Pop and output
 
+/*
 
         TrafficTreatment.Builder popToOltTreatment = DefaultTrafficTreatment.builder();
         popToOltTreatment.popVlan();
@@ -871,6 +935,7 @@ public class TorComponent implements TorService {
         groupService.addGroup(floodGroupDescription);
 
         floodGroup = groupService.getGroup(torId, floodGroupkey).id();
+*/
 
 
 
@@ -907,7 +972,7 @@ public class TorComponent implements TorService {
 
         TrafficSelector.Builder outgoingSelector = DefaultTrafficSelector.builder();
         outgoingSelector.matchInPort(serverPort);
-        outgoingSelector.matchVlanId(vlan0);
+        outgoingSelector.matchVlanId(internetVlan);
         outgoingSelector.matchEthType(Ethernet.TYPE_IPV4);
         outgoingSelector.matchIPSrc(customersIP.get(vlanId).toIpPrefix());
 
@@ -930,12 +995,12 @@ public class TorComponent implements TorService {
 
         TrafficSelector.Builder incomingSelector = DefaultTrafficSelector.builder();
         incomingSelector.matchInPort(internetPort);
-        incomingSelector.matchVlanId(vlan0);
+        incomingSelector.matchVlanId(internetVlan);
         incomingSelector.matchEthType(Ethernet.TYPE_IPV4);
         incomingSelector.matchIPDst(customersIP.get(vlanId).toIpPrefix());
 
         TrafficTreatment.Builder incomingTreatment = DefaultTrafficTreatment.builder();
-        incomingTreatment.group(serverWanGroup);
+        incomingTreatment.group(serverWanRewriteGroup);
 
         FlowRule.Builder incomingRule = DefaultFlowRule.builder();
         incomingRule.withSelector(incomingSelector.build());

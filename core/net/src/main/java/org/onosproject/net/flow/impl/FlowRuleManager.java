@@ -563,14 +563,17 @@ public class FlowRuleManager
 
             case BATCH_OPERATION_COMPLETED:
 
+                log.debug("FlowRuleManager InternalStoreDelegate, notify case BATCH_OPERATION_COMPLETED");
                 FlowOperationsProcessor fops = pendingFlowOperations.remove(
                         event.subject().batchId());
                 if (event.result().isSuccess()) {
                     if (fops != null) {
                         fops.satisfy(event.deviceId());
+                        log.debug("case BATCH_OPERATION_COMPLETED, event success");
                     }
                 } else {
                     fops.fail(event.deviceId(), event.result().failedItems());
+                    log.debug("case BATCH_OPERATION_COMPLETED, event faillure");
                 }
 
                 break;
