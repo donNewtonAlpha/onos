@@ -69,6 +69,7 @@
         <module>tor</module>
         <module>virtual-gigapower</module>
         <module>oneping</module>
+        <module>phase1</module>
   </modules>
 
     <properties>

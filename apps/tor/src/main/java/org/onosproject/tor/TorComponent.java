@@ -169,11 +169,6 @@ public class TorComponent implements TorService {
         //Output groups
         initiateOutputGroups();
 
-        try {
-            Thread.sleep(1500);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
 
 
         //Olt to vSGs server two way flow
@@ -342,7 +337,7 @@ public class TorComponent implements TorService {
 
     private void untaggedPacketsTagging(PortNumber port, VlanId vlanId){
 
-        vlanTableHackFlows(port,vlanId);
+        vlanTableFlows(port,vlanId);
 
         TrafficSelector.Builder taggingSelector = DefaultTrafficSelector.builder();
         taggingSelector.matchInPort(port);
@@ -373,8 +368,8 @@ public class TorComponent implements TorService {
 
         //untaggedPacketsTagging(oltPort, tunnelVlan);
 
-        vlanTableHackFlows(oltPort, vlanId);
-        vlanTableHackFlows(serverPort, vlanId);
+        vlanTableFlows(oltPort, vlanId);
+        vlanTableFlows(serverPort, vlanId);
 
         TrafficSelector.Builder OltToServerSelector = DefaultTrafficSelector.builder();
         OltToServerSelector.matchInPort(oltPort);
@@ -548,25 +543,25 @@ public class TorComponent implements TorService {
         log.info("Stopped");
     }
 
-    private void vlanTableHackFlows(PortNumber port, VlanId vlanId){
+    private void vlanTableFlows(PortNumber port, VlanId vlanId){
 
-        TrafficSelector.Builder vlanTableHackSelector = DefaultTrafficSelector.builder();
-        vlanTableHackSelector.matchInPort(port);
-        vlanTableHackSelector.matchVlanId(vlanId);
+        TrafficSelector.Builder vlanTableSelector = DefaultTrafficSelector.builder();
+        vlanTableSelector.matchInPort(port);
+        vlanTableSelector.matchVlanId(vlanId);
 
-        TrafficTreatment.Builder vlanTableHackTreatment = DefaultTrafficTreatment.builder();
-        vlanTableHackTreatment.transition(TMAC_TABLE);
+        TrafficTreatment.Builder vlanTableTreatment = DefaultTrafficTreatment.builder();
+        vlanTableTreatment.transition(TMAC_TABLE);
 
-        FlowRule.Builder vlanTableHackRule = DefaultFlowRule.builder();
-        vlanTableHackRule.withSelector(vlanTableHackSelector.build());
-        vlanTableHackRule.withTreatment(vlanTableHackTreatment.build());
-        vlanTableHackRule.withPriority(8);
-        vlanTableHackRule.forTable(VLAN_TABLE);
-        vlanTableHackRule.fromApp(appId);
-        vlanTableHackRule.forDevice(torId);
-        vlanTableHackRule.makePermanent();
+        FlowRule.Builder vlanTableRule = DefaultFlowRule.builder();
+        vlanTableRule.withSelector(vlanTableSelector.build());
+        vlanTableRule.withTreatment(vlanTableTreatment.build());
+        vlanTableRule.withPriority(8);
+        vlanTableRule.forTable(VLAN_TABLE);
+        vlanTableRule.fromApp(appId);
+        vlanTableRule.forDevice(torId);
+        vlanTableRule.makePermanent();
 
-        flowRuleService.applyFlowRules(vlanTableHackRule.build());
+        flowRuleService.applyFlowRules(vlanTableRule.build());
 
     }
 
