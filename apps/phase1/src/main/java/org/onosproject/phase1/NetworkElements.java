@@ -172,8 +172,7 @@ public class NetworkElements{
         //ACL table Flow
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchInPort(fromPort);
-        OfdpaMatchVlanVid matchVlan = new OfdpaMatchVlanVid(vlanId);
-        selector.extension(matchVlan, deviceId);
+        selector.extension(new OfdpaMatchVlanVid(vlanId), deviceId);
 
 
 
@@ -213,7 +212,7 @@ public class NetworkElements{
 
         TrafficSelector.Builder vlanTableSelector = DefaultTrafficSelector.builder();
         vlanTableSelector.matchInPort(port);
-        vlanTableSelector.matchVlanId(vlanId);
+        vlanTableSelector.extension(new OfdpaMatchVlanVid(vlanId), deviceId);
 
         TrafficTreatment.Builder vlanTableTreatment = DefaultTrafficTreatment.builder();
         vlanTableTreatment.transition(TMAC_TABLE);
@@ -237,7 +236,7 @@ public class NetworkElements{
 
         TrafficSelector.Builder taggingSelector = DefaultTrafficSelector.builder();
         taggingSelector.matchInPort(port);
-        taggingSelector.matchVlanId(VlanId.NONE);
+        taggingSelector.extension(new OfdpaMatchVlanVid(VlanId.NONE), deviceId);
 
         TrafficTreatment.Builder taggingTreatment = DefaultTrafficTreatment.builder();
         taggingTreatment.setVlanId(vlanId);
@@ -263,7 +262,7 @@ public class NetworkElements{
         //ACL table Flow
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         //selector.matchInPort(inPort);
-        selector.matchVlanId(internalInternetVlan);
+        selector.extension(new OfdpaMatchVlanVid(internalInternetVlan), deviceId);
         selector.matchEthDst(mac);
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
@@ -341,7 +340,7 @@ public class NetworkElements{
 
 
         TrafficSelector.Builder floodingSelector = DefaultTrafficSelector.builder();
-        floodingSelector.matchVlanId(internalInternetVlan);
+        floodingSelector.extension(new OfdpaMatchVlanVid(internalInternetVlan), deviceId);
         floodingSelector.matchEthDst(MacAddress.BROADCAST);
 
 
