@@ -18,7 +18,7 @@
     <parent>
         <artifactId>onos-apps</artifactId>
         <groupId>org.onosproject</groupId>
-        <version>1.5.0-SNAPSHOT</version>
+        <version>1.4.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -30,8 +30,8 @@
 
 
     <properties>
-        <onos.version>1.5.0-SNAPSHOT</onos.version>
-        <onos.app.name>org.onosproject.tor</onos.app.name>
+        <onos.version>1.4.0-SNAPSHOT</onos.version>
+        <onos.app.name>org.onosproject.phase1</onos.app.name>
         <onos.app.origin>SDN Arena, Inc.</onos.app.origin>
         <checkstyle.skip>true</checkstyle.skip>
     </properties>
@@ -94,6 +94,11 @@
             <groupId>org.osgi</groupId>
             <artifactId>org.osgi.core</artifactId>
             <version>4.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.onosproject</groupId>
+            <artifactId>onos-drivers</artifactId>
+            <version>1.5.0-SNAPSHOT</version>
         </dependency>
 
 
