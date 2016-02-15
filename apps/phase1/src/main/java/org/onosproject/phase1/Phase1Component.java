@@ -86,7 +86,7 @@ public class Phase1Component{
             oltVlans.add(i);
             vm1Vlans.add(i);
         }
-        Olt olt = new Olt(9, oltVlans);
+        Olt olt = new Olt(145, oltVlans);
         VsgVm vm1 = new VsgVm(Ip4Address.valueOf("10.255.255.2"), MacAddress.valueOf("52:54:00:E5:28:CF"),Ip4Prefix.valueOf("29.29.0.0/24"),vm1Vlans);
         LinkedList<VsgVm> vms1 = new LinkedList<>();
         vms1.add(vm1);
