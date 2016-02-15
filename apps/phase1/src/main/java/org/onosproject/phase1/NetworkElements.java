@@ -313,7 +313,11 @@ public class NetworkElements{
         untaggedPacketsTagging(secondaryInternet, secondaryInternetVlan, deviceId);
 
         PortNumber primaryQuagga = getPrimaryQuagga().getPortNumber();
-        PortNumber secondaryQuagga = getSecondaryQuagga().getPortNumber();
+        PortNumber secondaryQuagga = null;
+
+        if (getSecondaryQuagga() != null) {
+            secondaryQuagga = getSecondaryQuagga().getPortNumber();
+        }
 
 
         //Setting an output
