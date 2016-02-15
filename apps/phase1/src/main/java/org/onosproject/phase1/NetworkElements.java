@@ -40,9 +40,7 @@ public class NetworkElements{
     //Internet ports, connections to the external router (7750)
     static final PortNumber primaryInternet = PortNumber.portNumber(153);
     static final PortNumber secondaryInternet = PortNumber.portNumber(157);
-    //Quagga ports, connections to the Quagga VM(s)
-    static final PortNumber primaryQuagga = PortNumber.portNumber(4);
-    static final PortNumber secondaryQuagga = PortNumber.portNumber(4);
+
 
 
     static final VlanId internalInternetVlan = VlanId.vlanId((short) 500);
@@ -95,6 +93,26 @@ public class NetworkElements{
         }
 
         return servers;
+    }
+
+    private QuaggaInstance getQuagga(boolean primary){
+        for(NetworkElement element : elements){
+            if(element instanceof QuaggaInstance){
+                QuaggaInstance quagga = (QuaggaInstance) element;
+                if(quagga.isPrimary() == primary){
+                    return quagga;
+                }
+            }
+        }
+        return null;
+    }
+
+    private QuaggaInstance getPrimaryQuagga(){
+        return getQuagga(true);
+    }
+
+    private QuaggaInstance getSecondaryQuagga(){
+        return getQuagga(false);
     }
 
     public void update(){
@@ -292,10 +310,15 @@ public class NetworkElements{
         untaggedPacketsTagging(primaryInternet, primaryInternetVlan, deviceId);
         untaggedPacketsTagging(secondaryInternet, secondaryInternetVlan, deviceId);
 
-        //Setting an output
-        oneWayAclVlanFlow(primaryInternetVlan, primaryInternet, primaryQuagga, deviceId, 43001, false);
-        oneWayAclVlanFlow(secondaryInternetVlan, secondaryInternet, secondaryQuagga, deviceId, 43002, false);
+        PortNumber primaryQuagga = getPrimaryQuagga().getPortNumber();
+        PortNumber secondaryQuagga = getSecondaryQuagga().getPortNumber();
 
+
+        //Setting an output
+        oneWayAclVlanFlow(primaryInternetVlan, primaryInternet,primaryQuagga , deviceId, 43001, false);
+        if(secondaryQuagga != null) {
+            oneWayAclVlanFlow(secondaryInternetVlan, secondaryInternet, secondaryQuagga, deviceId, 43002, false);
+        }
         ////////
 
 
@@ -303,12 +326,15 @@ public class NetworkElements{
 
         //Vlan table
         vlanTableFlows(primaryQuagga, primaryInternetVlan, deviceId);
-        vlanTableFlows(secondaryQuagga, secondaryInternetVlan, deviceId);
+        if(secondaryQuagga != null) {
+            vlanTableFlows(secondaryQuagga, secondaryInternetVlan, deviceId);
+        }
 
         //ACL table
         oneWayAclVlanFlow(primaryInternetVlan, primaryQuagga, primaryInternet, deviceId, 41031, true);
-        oneWayAclVlanFlow(secondaryInternetVlan, secondaryQuagga, secondaryInternet, deviceId, 41032, true);
-
+        if(secondaryQuagga != null) {
+            oneWayAclVlanFlow(secondaryInternetVlan, secondaryQuagga, secondaryInternet, deviceId, 41032, true);
+        }
         /////////
 
 
@@ -316,7 +342,7 @@ public class NetworkElements{
 
     private void innerNetworkFlows(DeviceId deviceId){
 
-        //TODO : add the incoming port condition
+        //TODO : add the incoming port condition ???
 
         for(NetworkElement element:elements){
             if(element instanceof  VsgServer){
@@ -329,6 +355,9 @@ public class NetworkElements{
             } else if(element instanceof QuaggaInstance){
                 QuaggaInstance quagga = (QuaggaInstance) element;
                 innerNetworkMacFlow(quagga.getPortNumber(), quagga.getMac(), deviceId);
+            } else if(element instanceof IndependentServer){
+                IndependentServer independentServer = (IndependentServer) element;
+                innerNetworkMacFlow(independentServer.getPortNumber(), independentServer.getMac(), deviceId);
             }
 
         }

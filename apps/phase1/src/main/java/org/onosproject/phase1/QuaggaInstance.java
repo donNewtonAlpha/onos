@@ -9,15 +9,21 @@ import org.onosproject.net.PortNumber;
 public class QuaggaInstance extends NetworkElement {
 
     private MacAddress mac;
+    private boolean primary;
 
-    public QuaggaInstance(int port, MacAddress mac){
+    public QuaggaInstance(int port, MacAddress mac, boolean primary){
 
         super.setPortNumber(PortNumber.portNumber((short)port));
         this.mac = mac;
+        this.primary = primary;
     }
 
 
     public MacAddress getMac() {
         return mac;
+    }
+
+    public boolean isPrimary(){
+        return primary;
     }
 }
