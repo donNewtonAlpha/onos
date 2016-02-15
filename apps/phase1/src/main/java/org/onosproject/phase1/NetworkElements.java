@@ -5,6 +5,7 @@ import org.onlab.packet.VlanId;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.GroupId;
 import org.onosproject.driver.extensions.OfdpaMatchVlanVid;
+import org.onosproject.driver.extensions.OfdpaSetVlanVid;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.Link;
 import org.onosproject.net.PortNumber;
@@ -254,10 +255,11 @@ public class NetworkElements{
 
         TrafficSelector.Builder taggingSelector = DefaultTrafficSelector.builder();
         taggingSelector.matchInPort(port);
+        //taggingSelector.extension(new OfdpaMatchVlanVid(VlanId.vlanId((short) 0)), deviceId);
         taggingSelector.extension(new OfdpaMatchVlanVid(VlanId.NONE), deviceId);
 
         TrafficTreatment.Builder taggingTreatment = DefaultTrafficTreatment.builder();
-        taggingTreatment.setVlanId(vlanId);
+        taggingTreatment.extension(new OfdpaSetVlanVid(vlanId), deviceId);
         taggingTreatment.transition(TMAC_TABLE);
 
         FlowRule.Builder taggingRule = DefaultFlowRule.builder();
