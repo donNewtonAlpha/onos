@@ -70,6 +70,7 @@
         <module>virtual-gigapower</module>
         <module>oneping</module>
         <module>phase1</module>
+        <module>testing-app</module>
   </modules>
 
     <properties>

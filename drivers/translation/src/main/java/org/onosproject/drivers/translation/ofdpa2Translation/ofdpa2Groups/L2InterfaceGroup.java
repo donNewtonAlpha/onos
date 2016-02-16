@@ -1,4 +1,4 @@
-package ofda2Translation.ofdpa2Groups;
+package org.onosproject.drivers.translation.ofdpa2Translation.ofdpa2Groups;
 
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.GroupId;

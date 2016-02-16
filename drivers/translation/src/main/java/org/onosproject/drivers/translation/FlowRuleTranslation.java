@@ -1,6 +1,8 @@
-import javafx.scene.shape.Circle;
-import ofda2Translation.Ofdpa2Translation;
+package org.onosproject.drivers.translation;
+
+
 import org.onosproject.core.CoreService;
+import org.onosproject.drivers.translation.ofdpa2Translation.Ofdpa2Translation;
 import org.onosproject.net.Device;
 import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.flow.FlowRule;

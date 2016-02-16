@@ -1,6 +1,6 @@
-package ofda2Translation;
+package org.onosproject.drivers.translation.ofdpa2Translation;
 
-import ofda2Translation.ofdpa2Groups.GroupFinder;
+import org.onosproject.drivers.translation.ofdpa2Translation.ofdpa2Groups.GroupFinder;
 import org.onlab.packet.VlanId;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
@@ -43,19 +43,18 @@ public class Ofdpa2Translation {
 
     }
 
-    public static FlowRule[] translateToOfdpa(FlowRule flowRule, int flowTypeKey){
+    public static FlowRule[] translateToOfdpa(FlowRule originalRule, int flowTypeKey){
 
-        //TODO : deal with permanent/temporary flows
 
 
         switch (flowTypeKey){
-            case 1 :
-                VlanIdCriterion vlanIdCriterion = (VlanIdCriterion) flowRule.selector().getCriterion(Criterion.Type.VLAN_VID);
+            case 10001 :
+                VlanIdCriterion vlanIdCriterion = (VlanIdCriterion) originalRule.selector().getCriterion(Criterion.Type.VLAN_VID);
                 int i = 0;
                 FlowRule[] rules;
-                PortNumber inPort = ((PortCriterion) flowRule.selector().getCriterion(Criterion.Type.IN_PORT)).port();
+                PortNumber inPort = ((PortCriterion) originalRule.selector().getCriterion(Criterion.Type.IN_PORT)).port();
                 PortNumber outPort = null;
-                for(Instruction instruction : flowRule.treatment().allInstructions()){
+                for(Instruction instruction : originalRule.treatment().allInstructions()){
                     if(instruction instanceof Instructions.OutputInstruction){
                         outPort = ((Instructions.OutputInstruction) instruction).port();
                     }
@@ -68,36 +67,40 @@ public class Ofdpa2Translation {
 
                 if(vlanIdCriterion.vlanId().equals(VlanId.NONE)){
                     rules = new FlowRule[3];
-                    FlowRule[] vlanTableRules = untaggedPacketsTagging(inPort, tunnelVlanId, flowRule);
+                    FlowRule[] vlanTableRules = untaggedPacketsTagging(inPort, tunnelVlanId, originalRule);
                     for(int j = 0; j< vlanTableRules.length; j++){
                         rules[j] = vlanTableRules[j];
                         i++;
                     }
                 }else{
                     rules = new FlowRule[2];
-                    rules[0] = vlanTableFlows(inPort, vlanIdCriterion.vlanId(), flowRule);
+                    rules[0] = vlanTableFlows(inPort, vlanIdCriterion.vlanId(), originalRule);
                     i++;
                 }
 
                 TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
                 selector.matchInPort(inPort);
-                selector.extension(new OfdpaMatchVlanVid(vlanIdCriterion.vlanId()), flowRule.deviceId());
+                selector.extension(new OfdpaMatchVlanVid(vlanIdCriterion.vlanId()), originalRule.deviceId());
 
                 TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
                 if(vlanIdCriterion.vlanId().equals(VlanId.NONE)){
-                    treatment.group(GroupFinder.getL2Interface(outPort, tunnelVlanId, true, flowRule.deviceId(),coreService.getAppId(flowRule.appId())));
+                    treatment.group(GroupFinder.getL2Interface(outPort, tunnelVlanId, true, originalRule.deviceId(),coreService.getAppId(originalRule.appId())));
                 } else {
-                    treatment.group(GroupFinder.getL2Interface(outPort, vlanIdCriterion.vlanId(), false, flowRule.deviceId(), coreService.getAppId(flowRule.appId())));
+                    treatment.group(GroupFinder.getL2Interface(outPort, vlanIdCriterion.vlanId(), false, originalRule.deviceId(), coreService.getAppId(originalRule.appId())));
                 }
 
                 FlowRule.Builder rule = DefaultFlowRule.builder();
                 rule.withSelector(selector.build());
                 rule.withTreatment(treatment.build());
-                rule.withPriority(flowRule.priority());
-                rule.fromApp(coreService.getAppId(flowRule.appId()));
+                rule.withPriority(originalRule.priority());
+                rule.fromApp(coreService.getAppId(originalRule.appId()));
                 rule.forTable(ACL_TABLE);
-                rule.makePermanent();
-                rule.forDevice(flowRule.deviceId());
+                if(originalRule.isPermanent()) {
+                    rule.makePermanent();
+                } else {
+                    rule.makeTemporary(originalRule.timeout());
+                }
+                rule.forDevice(originalRule.deviceId());
 
                 rules[i] = rule.build();
 
@@ -132,7 +135,11 @@ public class Ofdpa2Translation {
         vlanTableRule.forTable(VLAN_TABLE);
         vlanTableRule.fromApp(coreService.getAppId(originalRule.appId()));
         vlanTableRule.forDevice(originalRule.deviceId());
-        vlanTableRule.makePermanent();
+        if(originalRule.isPermanent()){
+            vlanTableRule.makePermanent();
+        } else {
+            vlanTableRule.makeTemporary(originalRule.timeout());
+        }
 
         return vlanTableRule.build();
 
@@ -154,7 +161,11 @@ public class Ofdpa2Translation {
         FlowRule.Builder taggingRule = DefaultFlowRule.builder();
         taggingRule.withSelector(taggingSelector.build());
         taggingRule.withTreatment(taggingTreatment.build());
-        taggingRule.makePermanent();
+        if(originalRule.isPermanent()) {
+            taggingRule.makePermanent();
+        } else {
+            taggingRule.makeTemporary(originalRule.timeout());
+        }
         taggingRule.withPriority(originalRule.priority());
         taggingRule.fromApp(coreService.getAppId(originalRule.appId()));
         taggingRule.forDevice(originalRule.deviceId());
