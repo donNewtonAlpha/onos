@@ -76,6 +76,7 @@ public final class Instructions {
      * Creates a drop instruction.
      *
      * @return drop instruction
+     * @deprecated 1.4.0 Emu Release
      */
     @Deprecated
     public static DropInstruction createDrop() {
@@ -537,6 +538,7 @@ public final class Instructions {
 
     /**
      *  Drop instruction.
+     *  @deprecated 1.4.0 Emu Release
      */
     @Deprecated
     public static final class DropInstruction implements Instruction {

@@ -21,12 +21,11 @@ import com.google.common.base.MoreObjects;
 import java.util.Objects;
 import java.util.Optional;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 /**
  * Represents a resource path which specifies a resource which can be measured
  * as continuous value. Bandwidth of a link is an example of the resource.
- * <p>
- * Note: This class is exposed to the public, but intended to be used in the resource API
- * implementation only. It is not for resource API user.
  */
 @Beta
 public final class ContinuousResource implements Resource {
@@ -49,17 +48,12 @@ public final class ContinuousResource implements Resource {
         return id;
     }
 
-    /**
-     * The user of this methods must receive the return value as Double or double.
-     * Otherwise, this methods throws an exception.
-     *
-     * @param <T> type of the return value
-     * @return the volume of this resource
-     */
-    @SuppressWarnings("unchecked")
     @Override
-    public <T> T volume() {
-        return (T) Double.valueOf(value);
+    public boolean isTypeOf(Class<?> type) {
+        checkNotNull(type);
+
+        String typeName = (String) id.components().get(id.components().size() - 1);
+        return typeName.equals(type.getCanonicalName());
     }
 
     /**
@@ -67,21 +61,40 @@ public final class ContinuousResource implements Resource {
      *
      * @return the value of the resource amount
      */
-    // FIXME: overlapping a purpose with volume()
     public double value() {
         return value;
     }
 
     @Override
-    public boolean isTypeOf(Class<?> ancestorType) {
+    public boolean isSubTypeOf(Class<?> ancestor) {
+        checkNotNull(ancestor);
+
         String typeName = (String) id.components().get(id.components().size() - 1);
-        boolean foundInLeaf = typeName.equals(ancestorType.getCanonicalName());
+        boolean foundInLeaf = typeName.equals(ancestor.getCanonicalName());
         boolean foundInAncestor = id.components().subList(0, id.components().size()).stream()
                 .map(Object::getClass)
-                .filter(x -> x.equals(ancestorType))
+                .filter(x -> x.equals(ancestor))
                 .findAny()
                 .isPresent();
         return foundInAncestor || foundInLeaf;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * A user must specify Double.class or double.class to avoid an empty value.
+     */
+    @Override
+    public <T> Optional<T> valueAs(Class<T> type) {
+        checkNotNull(type);
+
+        if (type == Object.class || type == double.class || type == Double.class) {
+            @SuppressWarnings("unchecked")
+            T value = (T) Double.valueOf(this.value);
+            return Optional.of(value);
+        }
+
+        return Optional.empty();
     }
 
     @Override
@@ -129,7 +142,7 @@ public final class ContinuousResource implements Resource {
     public String toString() {
         return MoreObjects.toStringHelper(this)
                 .add("id", id)
-                .add("volume", value)
+                .add("value", value)
                 .toString();
     }
 }

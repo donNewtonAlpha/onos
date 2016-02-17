@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015, 2016 Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,10 +19,13 @@ import org.onlab.packet.Ethernet;
 import org.onlab.packet.IPv4;
 import org.onlab.packet.Ip4Address;
 import org.onlab.packet.IpAddress;
+import org.onlab.packet.IpPrefix;
 import org.onlab.packet.MacAddress;
 import org.onlab.packet.PIM;
 import org.onlab.packet.pim.PIMHello;
 import org.onlab.packet.pim.PIMHelloOption;
+import org.onlab.packet.pim.PIMJoinPrune;
+import org.onlab.packet.pim.PIMJoinPruneGroup;
 import org.onosproject.incubator.net.intf.Interface;
 import org.onosproject.net.flow.DefaultTrafficTreatment;
 import org.onosproject.net.flow.TrafficTreatment;
@@ -37,6 +40,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -65,6 +69,10 @@ public final class PIMInterface {
     // Neighbor priority
     private int priority   = PIMHelloOption.DEFAULT_PRIORITY;
 
+    private final int helloInterval;
+
+    private long lastHello;
+
     // Our current genid
     private final int generationId;
 
@@ -85,18 +93,22 @@ public final class PIMInterface {
      * @param packetService reference to the packet service
      */
     private PIMInterface(Interface intf,
-                        short holdTime,
-                        int priority,
-                        short propagationDelay,
-                        short overrideInterval,
-                        PacketService packetService) {
+                         int helloInterval,
+                         short holdTime,
+                         int priority,
+                         short propagationDelay,
+                         short overrideInterval,
+                         PacketService packetService) {
 
         onosInterface = intf;
         outputTreatment = createOutputTreatment();
+        this.helloInterval = helloInterval;
         this.holdtime = holdTime;
         this.packetService = packetService;
         IpAddress ourIp = getIpAddress();
         MacAddress mac = intf.mac();
+
+        lastHello = 0;
 
         generationId = new Random().nextInt();
 
@@ -229,6 +241,13 @@ public final class PIMInterface {
      * result of a newly created interface.
      */
     public void sendHello() {
+        if (lastHello + TimeUnit.SECONDS.toMillis(helloInterval) >
+                System.currentTimeMillis()) {
+            return;
+        }
+
+        lastHello = System.currentTimeMillis();
+
         // Create the base PIM Packet and mark it a hello packet
         PIMPacket pimPacket = new PIMPacket(PIM.TYPE_HELLO);
 
@@ -348,7 +367,39 @@ public final class PIMInterface {
      * @param ethPkt the Ethernet packet header.
      */
     public void processJoinPrune(Ethernet ethPkt) {
-        // TODO: add Join/Prune processing code.
+
+        IPv4 ip = (IPv4) ethPkt.getPayload();
+        checkNotNull(ip);
+
+        PIM pim = (PIM) ip.getPayload();
+        checkNotNull(pim);
+
+        PIMJoinPrune jpHdr = (PIMJoinPrune) pim.getPayload();
+        checkNotNull(jpHdr);
+
+        /*
+         * The Join/Prune messages are grouped by Group address. We'll walk each group address
+         * where we will possibly have to walk a list of source address for the joins and prunes.
+         */
+        Collection<PIMJoinPruneGroup> jpgs = jpHdr.getJoinPrunes();
+        for (PIMJoinPruneGroup jpg : jpgs) {
+            IpPrefix gpfx = jpg.getGroup();
+
+            // Walk the joins first.
+            for (IpPrefix spfx : jpg.getJoins().values()) {
+
+                // We may need
+
+
+            }
+
+            for (IpPrefix spfx : jpg.getPrunes().values()) {
+
+                // TODO: this is where we many need to remove multi-cast state and possibly intents.
+
+            }
+        }
+
     }
 
     /**
@@ -366,6 +417,7 @@ public final class PIMInterface {
     public static class Builder {
         private Interface intf;
         private PacketService packetService;
+        private int helloInterval = PIMInterfaceManager.DEFAULT_HELLO_INTERVAL;
         private short holdtime = PIMHelloOption.DEFAULT_HOLDTIME;
         private int priority   = PIMHelloOption.DEFAULT_PRIORITY;
         private short propagationDelay = PIMHelloOption.DEFAULT_PRUNEDELAY;
@@ -390,6 +442,17 @@ public final class PIMInterface {
          */
         public Builder withPacketService(PacketService packetService) {
             this.packetService = checkNotNull(packetService);
+            return this;
+        }
+
+        /**
+         * Users the specified hello interval.
+         *
+         * @param helloInterval hello interval in seconds
+         * @return this PIM interface builder
+         */
+        public Builder withHelloInterval(int helloInterval) {
+            this.helloInterval = helloInterval;
             return this;
         }
 
@@ -446,8 +509,8 @@ public final class PIMInterface {
             checkArgument(intf != null, "Must provide an interface");
             checkArgument(packetService != null, "Must provide a packet service");
 
-            return new PIMInterface(intf, holdtime, priority, propagationDelay,
-                    overrideInterval, packetService);
+            return new PIMInterface(intf, helloInterval, holdtime, priority,
+                    propagationDelay, overrideInterval, packetService);
         }
 
     }

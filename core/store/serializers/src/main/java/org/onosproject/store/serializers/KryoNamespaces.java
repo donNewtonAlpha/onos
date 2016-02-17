@@ -15,12 +15,13 @@
  */
 package org.onosproject.store.serializers;
 
+import com.esotericsoftware.kryo.serializers.JavaSerializer;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
-
 import com.google.common.collect.Sets;
+
 import org.onlab.packet.ChassisId;
 import org.onlab.packet.EthType;
 import org.onlab.packet.Ip4Address;
@@ -39,6 +40,7 @@ import org.onlab.util.Match;
 import org.onosproject.app.ApplicationState;
 import org.onosproject.cluster.ControllerNode;
 import org.onosproject.cluster.DefaultControllerNode;
+import org.onosproject.cluster.Leader;
 import org.onosproject.cluster.Leadership;
 import org.onosproject.cluster.LeadershipEvent;
 import org.onosproject.cluster.NodeId;
@@ -48,6 +50,7 @@ import org.onosproject.core.DefaultApplication;
 import org.onosproject.core.DefaultApplicationId;
 import org.onosproject.core.DefaultGroupId;
 import org.onosproject.core.Version;
+import org.onosproject.event.Change;
 import org.onosproject.incubator.net.domain.IntentDomainId;
 import org.onosproject.mastership.MastershipTerm;
 import org.onosproject.net.Annotations;
@@ -203,8 +206,10 @@ import org.onosproject.net.resource.link.MplsLabelResourceAllocation;
 import org.onosproject.net.resource.link.MplsLabelResourceRequest;
 import org.onosproject.security.Permission;
 import org.onosproject.store.Timestamp;
+import org.onosproject.store.primitives.MapUpdate;
 import org.onosproject.store.primitives.TransactionId;
 import org.onosproject.store.service.MapEvent;
+import org.onosproject.store.service.MapTransaction;
 import org.onosproject.store.service.SetEvent;
 import org.onosproject.store.service.Versioned;
 
@@ -248,10 +253,11 @@ public final class KryoNamespaces {
                       ImmutableMap.of().getClass(),
                       ImmutableMap.of("a", 1).getClass(),
                       ImmutableMap.of("R", 2, "D", 2).getClass())
+            .register(Collections.unmodifiableSet(Collections.emptySet()).getClass())
             .register(HashMap.class)
             .register(ConcurrentHashMap.class)
             .register(CopyOnWriteArraySet.class)
-            .register(Sets.newConcurrentHashSet().getClass())
+            .register(new JavaSerializer(), Sets.newConcurrentHashSet().getClass())
             .register(ArrayList.class,
                       LinkedList.class,
                       HashSet.class,
@@ -264,7 +270,6 @@ public final class KryoNamespaces {
             .register(Collections.emptySet().getClass())
             .register(Optional.class)
             .register(Collections.emptyList().getClass())
-            .register(Collections.unmodifiableSet(Collections.emptySet()).getClass())
             .register(Collections.singleton(Object.class).getClass())
             .build();
 
@@ -326,6 +331,8 @@ public final class KryoNamespaces {
                     Link.Type.class,
                     Link.State.class,
                     Timestamp.class,
+                    Change.class,
+                    Leader.class,
                     Leadership.class,
                     LeadershipEvent.class,
                     LeadershipEvent.Type.class,
@@ -492,6 +499,9 @@ public final class KryoNamespaces {
             .register(ExtensionSelectorType.class)
             .register(ExtensionTreatmentType.class)
             .register(TransactionId.class)
+            .register(MapTransaction.class)
+            .register(MapUpdate.class)
+            .register(MapUpdate.Type.class)
             .register(Versioned.class)
             .register(MapEvent.class)
             .register(MapEvent.Type.class)

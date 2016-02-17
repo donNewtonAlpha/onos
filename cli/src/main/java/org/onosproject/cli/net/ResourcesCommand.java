@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 
+import com.google.common.collect.Iterables;
 import org.apache.karaf.shell.commands.Argument;
 import org.apache.karaf.shell.commands.Command;
 import org.apache.karaf.shell.commands.Option;
@@ -36,6 +37,7 @@ import org.onosproject.net.TributarySlot;
 import org.onosproject.net.newresource.ContinuousResource;
 import org.onosproject.net.newresource.DiscreteResource;
 import org.onosproject.net.newresource.Resource;
+import org.onosproject.net.newresource.Resources;
 import org.onosproject.net.newresource.ResourceService;
 
 import com.google.common.base.Strings;
@@ -46,7 +48,6 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Range;
 import com.google.common.collect.RangeSet;
 import com.google.common.collect.TreeRangeSet;
-import org.onosproject.net.newresource.Resources;
 
 /**
  * Lists available resources.
@@ -113,14 +114,6 @@ public class ResourcesCommand extends AbstractShellCommand {
         if (resource.equals(Resource.ROOT)) {
             print("ROOT");
         } else {
-            String resourceName = resource.last().getClass().getSimpleName();
-
-            if (children.isEmpty() && !typesToPrint.isEmpty() && !typesToPrint.contains(resourceName)) {
-                // This resource is target of filtering
-                return;
-            }
-
-
             if (resource instanceof ContinuousResource) {
                 String s = ((String) resource.last());
                 String simpleName = s.substring(s.lastIndexOf('.') + 1);
@@ -133,8 +126,9 @@ public class ResourcesCommand extends AbstractShellCommand {
                 // Continuous resource is terminal node, stop here
                 return;
             } else {
+                String resourceName = resource.last().getClass().getSimpleName();
 
-                String toString = String.valueOf(resource.last());
+                String toString = String.valueOf(resource.valueAs(Object.class).orElse(""));
                 if (toString.startsWith(resourceName)) {
                     print("%s%s", Strings.repeat(" ", level),
                           toString);
@@ -158,15 +152,17 @@ public class ResourcesCommand extends AbstractShellCommand {
         List<Resource> nonAggregatable = new ArrayList<>();
 
         for (Resource r : children) {
+            if (!isPrintTarget(r)) {
+                continue;
+            }
+
             if (r instanceof ContinuousResource) {
                 // non-aggregatable terminal node
                 nonAggregatable.add(r);
-            } else if (aggregatableTypes.contains(r.last().getClass())) {
+            } else if (Iterables.any(aggregatableTypes, r::isTypeOf)) {
                 // aggregatable & terminal node
                 String className = r.last().getClass().getSimpleName();
-                if (typesToPrint.isEmpty() || typesToPrint.contains(className)) {
-                    aggregatables.put(className, r);
-                }
+                aggregatables.put(className, r);
             } else {
                 nonAggregatable.add(r);
             }
@@ -182,14 +178,13 @@ public class ResourcesCommand extends AbstractShellCommand {
 
                 // aggregate into RangeSet
                 e.getValue().stream()
-                    .map(Resource::last)
                     .map(res -> {
-                            if (res instanceof VlanId) {
-                                return (long) ((VlanId) res).toShort();
-                            } else if (res instanceof MplsLabel) {
-                                return (long) ((MplsLabel) res).toInt();
-                            } else if (res instanceof TributarySlot) {
-                                return ((TributarySlot) res).index();
+                            if (res.isTypeOf(VlanId.class)) {
+                                return (long) res.valueAs(VlanId.class).get().toShort();
+                            } else if (res.isTypeOf(MplsLabel.class)) {
+                                return (long) res.valueAs(MplsLabel.class).get().toInt();
+                            } else if (res.isTypeOf(TributarySlot.class)) {
+                                return res.valueAs(TributarySlot.class).get().index();
                             }
                             // TODO support Lambda (OchSignal types)
                             return 0L;
@@ -212,5 +207,30 @@ public class ResourcesCommand extends AbstractShellCommand {
         } else {
             nonAggregatable.forEach(r -> printResource(r, level + 1));
         }
+    }
+
+    private boolean isPrintTarget(Resource resource) {
+        if (typesToPrint.isEmpty()) {
+            return true;
+        }
+
+        String resourceName;
+        if (resource instanceof ContinuousResource) {
+            String s = (String) resource.last();
+            resourceName = s.substring(s.lastIndexOf('.') + 1);
+        } else if (resource instanceof DiscreteResource) {
+            // TODO This distributed store access incurs overhead.
+            //      This should be merged with the one in printResource()
+            if (!resourceService.getRegisteredResources(((DiscreteResource) resource).id()).isEmpty()) {
+                // resource which has children should be printed
+                return true;
+            }
+            resourceName = resource.last().getClass().getSimpleName();
+        } else {
+            log.warn("Unexpected resource class: {}", resource.getClass().getSimpleName());
+            return false;
+        }
+
+        return typesToPrint.contains(resourceName);
     }
 }

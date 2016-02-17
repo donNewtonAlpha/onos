@@ -21,13 +21,13 @@ import static org.slf4j.LoggerFactory.getLogger;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
+import org.apache.felix.scr.annotations.Deactivate;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.apache.felix.scr.annotations.Service;
@@ -91,6 +91,7 @@ public class PartitionManager extends AbstractListenerManager<PartitionEvent, Pa
         log.info("Started");
     }
 
+    @Deactivate
     public void deactivate() {
         eventDispatcher.removeSink(PartitionEvent.class);
 
@@ -146,9 +147,7 @@ public class PartitionManager extends AbstractListenerManager<PartitionEvent, Pa
     public List<PartitionInfo> partitionInfo() {
         return partitions.values()
                          .stream()
-                         .map(StoragePartition::info)
-                         .filter(Optional::isPresent)
-                         .map(Optional::get)
+                         .flatMap(x -> Tools.stream(x.info()))
                          .collect(Collectors.toList());
     }
 }

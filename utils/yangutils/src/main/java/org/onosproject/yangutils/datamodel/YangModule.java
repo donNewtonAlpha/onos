@@ -17,7 +17,14 @@ package org.onosproject.yangutils.datamodel;
 
 import java.util.LinkedList;
 import java.util.List;
-/*
+
+import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
+import org.onosproject.yangutils.parser.Parsable;
+import org.onosproject.yangutils.parser.ParsableDataType;
+import org.onosproject.yangutils.translator.CodeGenerator;
+import org.onosproject.yangutils.utils.io.CachedFileHandle;
+
+/*-
  * Reference:RFC 6020.
  * The "module" statement defines the module's name,
  * and groups all statements that belong to the module together. The "module"
@@ -57,14 +64,11 @@ import java.util.List;
  *                +--------------+---------+-------------+-----------------------+
  */
 
-import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
-import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.ParsableDataType;
-
 /**
  * Data model node to maintain information defined in YANG module.
  */
-public class YangModule extends YangNode implements YangLeavesHolder, YangDesc, YangReference, Parsable {
+public class YangModule extends YangNode
+        implements YangLeavesHolder, YangDesc, YangReference, Parsable, CodeGenerator {
 
     /**
      * Name of the module.
@@ -73,6 +77,7 @@ public class YangModule extends YangNode implements YangLeavesHolder, YangDesc, 
 
     /**
      * Reference:RFC 6020.
+     *
      * The "contact" statement provides contact information for the module. The
      * argument is a string that is used to specify contact information for the
      * person or persons to whom technical queries concerning this module should
@@ -83,6 +88,7 @@ public class YangModule extends YangNode implements YangLeavesHolder, YangDesc, 
 
     /**
      * Reference:RFC 6020.
+     *
      * The "description" statement takes as an argument a string that contains a
      * human-readable textual description of this definition. The text is
      * provided in a language (or languages) chosen by the module developer; for
@@ -119,6 +125,7 @@ public class YangModule extends YangNode implements YangLeavesHolder, YangDesc, 
 
     /**
      * Reference:RFC 6020.
+     *
      * The "organization" statement defines the party responsible for this
      * module. The argument is a string that is used to specify a textual
      * description of the organization(s) under whose auspices this module was
@@ -147,26 +154,34 @@ public class YangModule extends YangNode implements YangLeavesHolder, YangDesc, 
     private byte version;
 
     /**
+     * package of the generated java code.
+     */
+    private String pkg;
+
+    /**
+     * Cached Java File Handle.
+     */
+    private CachedFileHandle fileHandle;
+
+    /**
      * Create a YANG node of module type.
      */
     public YangModule() {
         super(YangNodeType.MODULE_NODE);
     }
 
-    /**
-     * Get the module name.
-     *
-     * @return the module name.
+    /* (non-Javadoc)
+     * @see org.onosproject.yangutils.datamodel.YangNode#getName()
      */
+    @Override
     public String getName() {
         return name;
     }
 
-    /**
-     * set the module name.
-     *
-     * @param moduleName the module name to set.
+    /* (non-Javadoc)
+     * @see org.onosproject.yangutils.datamodel.YangNode#setName(java.lang.String)
      */
+    @Override
     public void setName(String moduleName) {
         name = moduleName;
     }
@@ -375,7 +390,7 @@ public class YangModule extends YangNode implements YangLeavesHolder, YangDesc, 
      * @param org the organization to set.
      */
     public void setOrganization(String org) {
-        this.organization = org;
+        organization = org;
     }
 
     /**
@@ -451,6 +466,44 @@ public class YangModule extends YangNode implements YangLeavesHolder, YangDesc, 
     }
 
     /**
+     * Get the mapped java package.
+     *
+     * @return the java package
+     */
+    @Override
+    public String getPackage() {
+        return pkg;
+    }
+
+    /**
+     * Set the mapped java package.
+     *
+     * @param pcg the package to set
+     */
+    @Override
+    public void setPackage(String pcg) {
+        pkg = pcg;
+    }
+
+    /**
+     * Get the cached file handle.
+     *
+     * @return the fileHandle
+     */
+    public CachedFileHandle getFileHandle() {
+        return fileHandle;
+    }
+
+    /**
+     * Set the cached file handle.
+     *
+     * @param handle the fileHandle to set
+     */
+    public void setFileHandle(CachedFileHandle handle) {
+        fileHandle = handle;
+    }
+
+    /**
      * Returns the type of the parsed data.
      *
      * @return returns MODULE_DATA.
@@ -476,4 +529,22 @@ public class YangModule extends YangNode implements YangLeavesHolder, YangDesc, 
     public void validateDataOnExit() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
     }
+
+    /**
+     * Generates java code for module.
+     */
+    public void generateJavaCodeEntry() {
+        //TODO: autogenerated method stub, to be implemented
+
+        return;
+    }
+
+    /**
+     * Free resources used to generate code.
+     */
+    public void generateJavaCodeExit() {
+                //TODO: autogenerated method stub, to be implemented
+        return;
+    }
+
 }

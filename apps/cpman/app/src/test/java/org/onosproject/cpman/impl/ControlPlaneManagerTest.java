@@ -19,7 +19,8 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.onosproject.core.CoreServiceAdapter;
-import org.onosproject.net.device.DeviceServiceAdapter;
+import org.onosproject.cpman.impl.message.ControlMessageServiceAdaptor;
+import org.onosproject.cpman.impl.message.ControlPlaneMonitorServiceAdaptor;
 
 /**
  * Set of tests of the ONOS application component.
@@ -35,7 +36,8 @@ public class ControlPlaneManagerTest {
     public void setUp() {
         cpMan = new ControlPlaneManager();
         cpMan.coreService = new CoreServiceAdapter();
-        cpMan.deviceService = new DeviceServiceAdapter();
+        cpMan.messageService = new ControlMessageServiceAdaptor();
+        cpMan.monitorService = new ControlPlaneMonitorServiceAdaptor();
         cpMan.activate();
     }
 
