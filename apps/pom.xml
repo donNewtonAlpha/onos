@@ -71,6 +71,7 @@
         <module>oneping</module>
         <module>phase1</module>
         <module>testing-app</module>
+        <module>translation</module>
   </modules>
 
     <properties>

@@ -194,7 +194,6 @@ public class NetworkElements{
         selector.extension(new OfdpaMatchVlanVid(vlanId), deviceId);
 
 
-
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
         treatment.group(GroupFinder.getL2Interface(toPort, vlanId, popVlan, deviceId));
 

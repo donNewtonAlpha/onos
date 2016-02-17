@@ -8,7 +8,7 @@ import org.apache.felix.scr.annotations.*;
 import org.onlab.packet.*;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
-import org.onosproject.drivers.translation.FlowRuleTranslation;
+import org.onosproject.translation.FlowRuleTranslation;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.device.DeviceService;
@@ -39,8 +39,6 @@ public class TestingComponent {
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected CoreService coreService;
 
-    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected PacketService packetService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected FlowRuleService flowRuleService;
@@ -48,8 +46,6 @@ public class TestingComponent {
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected GroupService groupService;
 
-    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected DeviceService deviceService;
 
 
     static ApplicationId appId;
@@ -62,12 +58,37 @@ public class TestingComponent {
         log.debug("trying to activate");
         appId = coreService.registerApplication("org.onosproject.testing");
 
-        FlowRuleTranslation.initiation(groupService, deviceService, coreService);
         log.info("FlowRuleTranslation initiated");
 
-        testFlowTranslation1(15, 16, 436);
-        testMultipleOutputTreatment();
+        FlowRule flow1 = testFlow1(15,16,436);
+        FlowRule flow2 = testFlow1(17,18,-1);
 
+        try {
+            //Test 1, should add 1 flow in the vlan table, one flow in the acl table, one group (L2 interface)
+            testFlowTranslation(flow1);
+        } catch (Exception e){
+            log.error("Test 1 error",e);
+        }
+        log.info("Test 1 ended");
+
+        try {
+            //Test 2, can a treatment have multiple Output instructions ??
+            testMultipleOutputTreatment();
+        } catch(Exception e){
+            log.error("Test 2 error", e);
+        }
+
+        log.info("Test 2 ended");
+
+        try {
+            //Test3, can a translation be use to remove the flows
+            //testRemoveFlowTranslation1(flow1);
+            testFlowTranslation(flow2);
+        } catch (Exception e){
+            log.error("Test 3 error", e);
+        }
+
+        log.info("Test 3 ended");
 
     }
 
@@ -79,19 +100,29 @@ public class TestingComponent {
 
 
         Iterable<Group> appGroups = groupService.getGroups(torId, appId);
-        for (Group group : appGroups) {
+        for(Group group : appGroups) {
             groupService.removeGroup(group.deviceId(), group.appCookie(), group.appId());
         }
 
         log.info("Stopped");
     }
 
+    private FlowRule testFlow1(int inPort, int outPort, int vlan){
+        return testFlow1(inPort, outPort, vlan, null);
+    }
 
-    private void testFlowTranslation1(int inPort, int outPort, int vlan) {
+    private FlowRule testFlow1(int inPort, int outPort, int vlan, MacAddress dstMacToMatch) {
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchInPort(PortNumber.portNumber(inPort));
-        selector.matchVlanId(VlanId.vlanId((short) vlan));
+        if(vlan >=0) {
+            selector.matchVlanId(VlanId.vlanId((short) vlan));
+        } else {
+            selector.matchVlanId(VlanId.NONE);
+        }
+        if(dstMacToMatch != null){
+            selector.matchEthDst(dstMacToMatch);
+        }
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
         treatment.setOutput(PortNumber.portNumber(outPort));
@@ -104,14 +135,19 @@ public class TestingComponent {
         flow.fromApp(appId);
         flow.makePermanent();
 
-        FlowRule[] translatedRules = FlowRuleTranslation.translate(flow.build());
+        return flow.build();
+    }
+
+
+    private void testFlowTranslation(FlowRule ruleToTranslate){
+
+        FlowRule[] translatedRules = FlowRuleTranslation.translate(ruleToTranslate);
 
         for (int i = 0; i < translatedRules.length; i++) {
             log.info("Rule " + i + " : " + translatedRules[i].toString());
         }
 
         flowRuleService.applyFlowRules(translatedRules);
-
 
     }
 
@@ -125,6 +161,17 @@ public class TestingComponent {
         log.info("Treatment : " + treatment.build().toString());
 
 
+    }
+
+    private void testRemoveFlowTranslation(FlowRule flowToTranslateAndRemove){
+
+        FlowRule[] translatedRules = FlowRuleTranslation.translate(flowToTranslateAndRemove);
+
+        for (int i = 0; i < translatedRules.length; i++) {
+            log.info("Rule " + i + " : " + translatedRules[i].toString());
+        }
+
+        flowRuleService.removeFlowRules(translatedRules);
     }
 
 

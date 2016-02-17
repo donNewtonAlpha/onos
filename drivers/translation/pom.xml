@@ -28,7 +28,7 @@
     <artifactId>onos-drivers-translation</artifactId>
     <packaging>bundle</packaging>
 
-    <description>Ciena device drivers</description>
+    <description>Flow translation</description>
 
     <properties>
         <onos.app.name>org.onosproject.drivers.translation</onos.app.name>
@@ -36,11 +36,7 @@
     </properties>
 
     <dependencies>
-        <dependency>
-            <groupId>org.onosproject</groupId>
-            <artifactId>onos-drivers-utilities</artifactId>
-            <version>${project.version}</version>
-        </dependency>
+
         <dependency>
             <groupId>org.onosproject</groupId>
             <artifactId>onos-restsb-api</artifactId>

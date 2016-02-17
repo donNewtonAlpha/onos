@@ -80,38 +80,43 @@ public class Phase1Component{
         
         LinkedList<Integer> oltVlans = new LinkedList<>();
         LinkedList<Integer> vm1Vlans = new LinkedList<>();
+        LinkedList<Integer> vm2Vlans = new LinkedList<>();
 
 
         for(int i = 2; i < 6; i++){
             oltVlans.add(i);
             vm1Vlans.add(i);
+            vm2Vlans.add(i +5);
         }
         Olt olt = new Olt(145, oltVlans);
         VsgVm vm1 = new VsgVm(Ip4Address.valueOf("10.255.255.2"), MacAddress.valueOf("52:54:00:E5:28:CF"),Ip4Prefix.valueOf("29.29.0.0/24"),vm1Vlans);
         LinkedList<VsgVm> vms1 = new LinkedList<>();
         vms1.add(vm1);
 
+        //VsgVm vm2 = new VsgVm(Ip4Address.valueOf("10.255.255.2"), MacAddress.valueOf("14:55:00:E5:28:52"),Ip4Prefix.valueOf("29.29.0.0/24"),vm1Vlans);
+        LinkedList<VsgVm> vms2 = new LinkedList<>();
+        //vms1.add(vm2);
 
 
-        VsgServer vsgServer1 = new VsgServer(1,MacAddress.valueOf("e4:1d:2d:08:4b:80"), vms1, Ip4Prefix.valueOf("29.29.0.0/22"));
+        VsgServer vsgServer1 = new VsgServer(2,MacAddress.valueOf("e4:1d:2d:08:4b:80"), vms1, Ip4Prefix.valueOf("29.29.0.0/22"));
 
-        //VsgServer vsgServer2 = new VsgServer(5,MacAddress.valueOf("e4:1d:2d:2d:ad:50"), vms2, Ip4Prefix.valueOf("29.29.43.0/22"));
+        VsgServer vsgServer2 = new VsgServer(1,MacAddress.valueOf("e4:1d:2d:2d:ad:50"), vms2, Ip4Prefix.valueOf("29.29.43.0/22"));
 
         log.debug("Olt and server objects created");
         log.debug(" Olt : " + olt.toString());
         log.debug("VsgServer 1 : " + vsgServer1.toString());
 
 
-        QuaggaInstance primaryQuaggaInstance = new QuaggaInstance(4, MacAddress.valueOf("e4:1d:2d:2d:b3:e1"), true);
-        //QuaggaInstance secondaryQuaggaInstance = new QuaggaInstance(4, MacAddress.valueOf("12:12:76:12:21:22"));
+        QuaggaInstance primaryQuaggaInstance = new QuaggaInstance(4, MacAddress.valueOf("52:54:00:9e:a9:8a"), true);
+        QuaggaInstance secondaryQuaggaInstance = new QuaggaInstance(4, MacAddress.valueOf("52:54:00:9e:a9:8a"), false);
 
 
         NetworkElements elements = new NetworkElements(flowRuleService, groupService, appId, torId);
         elements.addElement(olt);
         elements.addElement(vsgServer1);
-        //elements.addElement(vsgServer2);
+        elements.addElement(vsgServer2);
         elements.addElement(primaryQuaggaInstance);
-        //elements.addElement(secondaryQuaggaInstance);
+        elements.addElement(secondaryQuaggaInstance);
 
         elements.update();
 

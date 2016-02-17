@@ -38,7 +38,6 @@
         <module>netconf</module>
         <module>ovsdb</module>
         <module>utilities</module>
-        <module>translation</module>
     </modules>
 
     <!--<properties>

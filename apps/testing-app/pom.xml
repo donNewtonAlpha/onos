@@ -69,12 +69,12 @@
 
         <dependency>
             <groupId>org.onosproject</groupId>
-            <artifactId>onos-drivers</artifactId>
+            <artifactId>onos-drivers-translation</artifactId>
             <version>1.5.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>org.onosproject</groupId>
-            <artifactId>onos-drivers-translation</artifactId>
+            <artifactId>onos-app-translation</artifactId>
             <version>1.5.0-SNAPSHOT</version>
         </dependency>
 
