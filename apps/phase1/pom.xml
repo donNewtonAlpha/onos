@@ -31,7 +31,7 @@
 
     <properties>
         <onos.version>1.5.0-SNAPSHOT</onos.version>
-        <onos.app.name>org.onosproject.tor</onos.app.name>
+        <onos.app.name>org.onosproject.phase1</onos.app.name>
         <onos.app.origin>SDN Arena, Inc.</onos.app.origin>
         <checkstyle.skip>true</checkstyle.skip>
     </properties>
@@ -42,12 +42,6 @@
             <groupId>org.onosproject</groupId>
             <artifactId>onlab-junit</artifactId>
             <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.onosproject</groupId>
-            <artifactId>onos-api</artifactId>
-            <version>${onos.version}</version>
         </dependency>
 
         <dependency>
@@ -94,6 +88,16 @@
             <groupId>org.osgi</groupId>
             <artifactId>org.osgi.core</artifactId>
             <version>4.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.onosproject</groupId>
+            <artifactId>onos-drivers</artifactId>
+            <version>1.5.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>org.onosproject</groupId>
+            <artifactId>onos-api</artifactId>
+            <version>1.5.0-SNAPSHOT</version>
         </dependency>
 
 

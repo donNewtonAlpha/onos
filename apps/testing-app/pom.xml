@@ -23,15 +23,15 @@
     </parent>
 
 
-    <artifactId>onos-app-tor</artifactId>
+    <artifactId>onos-app-testing</artifactId>
     <packaging>bundle</packaging>
 
-    <description>ONOS application to simulate the CORD fabric</description>
+    <description>ONOS application to test, flows, flow translation and other elements</description>
 
 
     <properties>
         <onos.version>1.5.0-SNAPSHOT</onos.version>
-        <onos.app.name>org.onosproject.tor</onos.app.name>
+        <onos.app.name>org.onosproject.testing</onos.app.name>
         <onos.app.origin>SDN Arena, Inc.</onos.app.origin>
         <checkstyle.skip>true</checkstyle.skip>
     </properties>
@@ -66,62 +66,20 @@
         </dependency>
 
 
-        <dependency>
-            <groupId>org.glassfish</groupId>
-            <artifactId>javax.json</artifactId>
-            <version>1.0.4</version>
-        </dependency>
-
 
         <dependency>
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
-            <version>1.2</version>
-        </dependency>
-
-        <dependency>
-            <groupId>javax.ws.rs</groupId>
-            <artifactId>jsr311-api</artifactId>
-            <version>1.1.1</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.osgi</groupId>
-            <artifactId>org.osgi.compendium</artifactId>
-            <version>4.2.0</version>
-        </dependency>
-        <dependency>
-            <groupId>org.osgi</groupId>
-            <artifactId>org.osgi.core</artifactId>
-            <version>4.2.0</version>
+            <groupId>org.onosproject</groupId>
+            <artifactId>onos-drivers-translation</artifactId>
+            <version>1.5.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>org.onosproject</groupId>
-            <artifactId>onos-drivers</artifactId>
+            <artifactId>onos-app-translation</artifactId>
             <version>1.5.0-SNAPSHOT</version>
         </dependency>
 
 
     </dependencies>
 
-    <build>
-        <plugins>
-
-            <plugin>
-                <groupId>org.apache.felix</groupId>
-                <artifactId>maven-bundle-plugin</artifactId>
-                <extensions>true</extensions>
-                <configuration>
-                    <instructions>
-                        <Bundle-SymbolicName>${project.artifactId}</Bundle-SymbolicName>
-                        <Import-Package>*, !org.glassfish</Import-Package>
-                        <Embed-Dependency>javax.json</Embed-Dependency>
-
-                    </instructions>
-                </configuration>
-            </plugin>
-
-        </plugins>
-    </build>
 
 </project>
