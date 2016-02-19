@@ -29,6 +29,14 @@ public abstract class ResourceId {
 
     abstract ImmutableList<Object> components();
 
+    abstract String simpleTypeName();
+
+    // caller must pass a non-null value
+    abstract boolean isTypeOf(Class<?> type);
+
+    // caller must pass a non-null value
+    abstract boolean isSubTypeOf(Class<?> ancestor);
+
     /**
      * Returns the parent resource ID of this instance.
      *

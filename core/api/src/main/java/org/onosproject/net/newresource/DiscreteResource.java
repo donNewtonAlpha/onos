@@ -46,50 +46,29 @@ public final class DiscreteResource implements Resource {
     }
 
     @Override
+    public String simpleTypeName() {
+        return id.simpleTypeName();
+    }
+
+    @Override
     public boolean isTypeOf(Class<?> type) {
         checkNotNull(type);
 
-        if (isRoot()) {
-            return false;
-        }
-
-        return type.isAssignableFrom(id.components().get(id.components().size() - 1).getClass());
+        return id.isTypeOf(type);
     }
 
     @Override
     public boolean isSubTypeOf(Class<?> ancestor) {
         checkNotNull(ancestor);
 
-        return id.components().stream()
-                .map(Object::getClass)
-                .filter(x -> x.equals(ancestor))
-                .findAny()
-                .isPresent();
+        return id.isSubTypeOf(ancestor);
     }
 
     @Override
     public <T> Optional<T> valueAs(Class<T> type) {
         checkNotNull(type);
 
-        if (!isTypeOf(type)) {
-            return Optional.empty();
-        }
-
-        @SuppressWarnings("unchecked")
-        T value = (T) id.components().get(id.components().size() - 1);
-        return Optional.of(value);
-    }
-
-    @Override
-    public Object last() {
-        if (id.components().isEmpty()) {
-            return null;
-        }
-        return id.components().get(id.components().size() - 1);
-    }
-
-    private boolean isRoot() {
-        return id.equals(ResourceId.ROOT);
+        return id.lastComponentAs(type);
     }
 
     @Override

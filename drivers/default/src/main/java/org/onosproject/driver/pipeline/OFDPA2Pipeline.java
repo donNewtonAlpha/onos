@@ -27,6 +27,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.google.common.collect.ImmutableList;
 import org.onlab.osgi.ServiceDirectory;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.IpPrefix;
@@ -553,6 +554,11 @@ public class OFDPA2Pipeline extends AbstractHandlerBehaviour implements Pipeline
                                                  VlanIdCriterion vidCriterion,
                                                  VlanId assignedVlan,
                                                  ApplicationId applicationId) {
+        // Consider PortNumber.ANY as wildcard. Match ETH_DST only
+        if (portCriterion != null && portCriterion.port() == PortNumber.ANY) {
+            return processEthDstOnlyFilter(ethCriterion, applicationId);
+        }
+
         //handling untagged packets via assigned VLAN
         if (vidCriterion.vlanId() == VlanId.NONE) {
             vidCriterion = (VlanIdCriterion) Criteria.matchVlanId(assignedVlan);
@@ -611,6 +617,24 @@ public class OFDPA2Pipeline extends AbstractHandlerBehaviour implements Pipeline
         return rules;
     }
 
+    protected List<FlowRule> processEthDstOnlyFilter(EthCriterion ethCriterion,
+            ApplicationId applicationId) {
+        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+        selector.matchEthType(Ethernet.TYPE_IPV4);
+        selector.matchEthDst(ethCriterion.mac());
+        treatment.transition(UNICAST_ROUTING_TABLE);
+        FlowRule rule = DefaultFlowRule.builder()
+                .forDevice(deviceId)
+                .withSelector(selector.build())
+                .withTreatment(treatment.build())
+                .withPriority(DEFAULT_PRIORITY)
+                .fromApp(applicationId)
+                .makePermanent()
+                .forTable(TMAC_TABLE).build();
+        return ImmutableList.<FlowRule>builder().add(rule).build();
+    }
+
     private Collection<FlowRule> processForward(ForwardingObjective fwd) {
         switch (fwd.flag()) {
             case SPECIFIC:
@@ -645,6 +669,7 @@ public class OFDPA2Pipeline extends AbstractHandlerBehaviour implements Pipeline
         if (fwd.nextId() == null && fwd.treatment() == null) {
             log.error("Forwarding objective {} from {} must contain "
                     + "nextId or Treatment", fwd.selector(), fwd.appId());
+            fail(fwd, ObjectiveError.BADPARAMS);
             return Collections.emptySet();
         }
 

@@ -36,7 +36,9 @@ public class TransactionCoordinator {
 
     /**
      * Commits a transaction.
-     * @param transactionId transaction
+     *
+     * @param transactionId           transaction
+     * @param transactionParticipants set of transaction participants
      * @return future for commit result
      */
     CompletableFuture<Void> commit(TransactionId transactionId, Set<TransactionParticipant> transactionParticipants) {
@@ -53,7 +55,7 @@ public class TransactionCoordinator {
                            : transactions.put(transactionId, Transaction.State.ROLLINGBACK)
                                          .thenCompose(v -> doRollback(transactionParticipants))
                                          .thenApply(v -> null))
-                    .thenCompose(v -> transactions.remove(transactionId).thenApply(u -> null))
+                    .thenCompose(v -> transactions.remove(transactionId))
                     .thenApply(v -> null);
     }
 

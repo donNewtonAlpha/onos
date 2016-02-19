@@ -66,6 +66,7 @@ import org.onosproject.olt.AccessDeviceData;
 import org.slf4j.Logger;
 
 import java.nio.ByteBuffer;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -82,7 +83,6 @@ import static org.slf4j.LoggerFactory.getLogger;
  */
 @Component(immediate = true)
 public class IgmpSnoop {
-
 
     private final Logger log = getLogger(getClass());
 
@@ -131,6 +131,8 @@ public class IgmpSnoop {
 
     private Map<DeviceId, AccessDeviceData> oltData = new ConcurrentHashMap<>();
 
+    private Map<IpAddress, IpAddress> ssmTranslateTable = new ConcurrentHashMap<>();
+
     private DeviceListener deviceListener = new InternalDeviceListener();
     private IgmpPacketProcessor processor = new IgmpPacketProcessor();
     private static ApplicationId appId;
@@ -141,12 +143,24 @@ public class IgmpSnoop {
     private static final Class<AccessDeviceConfig> CONFIG_CLASS =
             AccessDeviceConfig.class;
 
+    private static final Class<IgmpSsmTranslateConfig> SSM_TRANSLATE_CONFIG_CLASS =
+            IgmpSsmTranslateConfig.class;
+
     private ConfigFactory<DeviceId, AccessDeviceConfig> configFactory =
             new ConfigFactory<DeviceId, AccessDeviceConfig>(
                     SubjectFactories.DEVICE_SUBJECT_FACTORY, CONFIG_CLASS, "accessDevice") {
                 @Override
                 public AccessDeviceConfig createConfig() {
                     return new AccessDeviceConfig();
+                }
+            };
+
+    private ConfigFactory<ApplicationId, IgmpSsmTranslateConfig> ssmTranslateConfigFactory =
+            new ConfigFactory<ApplicationId, IgmpSsmTranslateConfig>(
+                    SubjectFactories.APP_SUBJECT_FACTORY, SSM_TRANSLATE_CONFIG_CLASS, "ssmTranslate", true) {
+                @Override
+                public IgmpSsmTranslateConfig createConfig() {
+                    return new IgmpSsmTranslateConfig();
                 }
             };
 
@@ -161,6 +175,7 @@ public class IgmpSnoop {
         packetService.addProcessor(processor, PacketProcessor.director(1));
 
         networkConfig.registerConfigFactory(configFactory);
+        networkConfig.registerConfigFactory(ssmTranslateConfigFactory);
         networkConfig.addListener(configListener);
 
         networkConfig.getSubjects(DeviceId.class, AccessDeviceConfig.class).forEach(
@@ -174,6 +189,16 @@ public class IgmpSnoop {
                     }
                 }
         );
+
+        IgmpSsmTranslateConfig ssmTranslateConfig =
+                networkConfig.getConfig(appId, IgmpSsmTranslateConfig.class);
+
+        if (ssmTranslateConfig != null) {
+            Collection<McastRoute> translations = ssmTranslateConfig.getSsmTranslations();
+            for (McastRoute route : translations) {
+                ssmTranslateTable.put(route.group(), route.source());
+            }
+        }
 
         oltData.keySet().stream()
                 .flatMap(did -> deviceService.getPorts(did).stream())
@@ -201,6 +226,7 @@ public class IgmpSnoop {
         deviceService.removeListener(deviceListener);
         networkConfig.removeListener(configListener);
         networkConfig.unregisterConfigFactory(configFactory);
+        networkConfig.unregisterConfigFactory(ssmTranslateConfigFactory);
         queryTask.cancel(true);
         queryService.shutdownNow();
         log.info("Stopped");
@@ -220,7 +246,7 @@ public class IgmpSnoop {
                 .withMeta(DefaultTrafficTreatment.builder()
                                   .setOutput(PortNumber.CONTROLLER).build())
                 .fromApp(appId)
-                .withPriority(1000)
+                .withPriority(10000)
                 .add(new ObjectiveContext() {
                     @Override
                     public void onSuccess(Objective objective) {
@@ -248,21 +274,27 @@ public class IgmpSnoop {
 
             IGMPMembership membership = (IGMPMembership) group;
 
-            McastRoute route = new McastRoute(IpAddress.valueOf("0.0.0.0"),
-                                              group.getGaddr(),
-                                              McastRoute.Type.IGMP);
+            // TODO allow pulling source from IGMP packet
+            IpAddress source = ssmTranslateTable.get(group.getGaddr());
+            if (source == null) {
+                log.warn("No source found in SSM translate table for {}", group.getGaddr());
+                return;
+            }
+
+            McastRoute route = new McastRoute(source,
+                    group.getGaddr(),
+                    McastRoute.Type.IGMP);
 
             if (membership.getRecordType() == IGMPMembership.MODE_IS_INCLUDE ||
                     membership.getRecordType() == IGMPMembership.CHANGE_TO_INCLUDE_MODE) {
 
+                multicastService.removeSink(route, location);
+                // TODO remove route if all sinks are gone
+            } else if (membership.getRecordType() == IGMPMembership.MODE_IS_EXCLUDE ||
+                    membership.getRecordType() == IGMPMembership.CHANGE_TO_EXCLUDE_MODE) {
 
                 multicastService.add(route);
                 multicastService.addSink(route, location);
-
-            } else if (membership.getRecordType() == IGMPMembership.MODE_IS_EXCLUDE ||
-                    membership.getRecordType() == IGMPMembership.CHANGE_TO_EXCLUDE_MODE) {
-                multicastService.removeSink(route, location);
-                // TODO remove route if all sinks are gone
             }
 
         });
@@ -385,6 +417,7 @@ public class IgmpSnoop {
     private class InternalDeviceListener implements DeviceListener {
         @Override
         public void event(DeviceEvent event) {
+            DeviceId devId = event.subject().id();
             switch (event.type()) {
 
                 case DEVICE_ADDED:
@@ -395,11 +428,15 @@ public class IgmpSnoop {
                 case PORT_STATS_UPDATED:
                     break;
                 case PORT_ADDED:
-                    if (event.port().isEnabled()) {
+                    if (!oltData.get(devId).uplink().equals(event.port().number()) &&
+                            event.port().isEnabled()) {
                         processFilterObjective(event.subject().id(), event.port(), false);
                     }
                     break;
                 case PORT_UPDATED:
+                    if (oltData.get(devId).uplink().equals(event.port().number())) {
+                        break;
+                    }
                     if (event.port().isEnabled()) {
                         processFilterObjective(event.subject().id(), event.port(), false);
                     } else {
@@ -436,9 +473,25 @@ public class IgmpSnoop {
                             provisionDefaultFlows((DeviceId) event.subject());
                         }
                     }
+                    if (event.configClass().equals(SSM_TRANSLATE_CONFIG_CLASS)) {
+                        IgmpSsmTranslateConfig config =
+                                networkConfig.getConfig((ApplicationId) event.subject(),
+                                        SSM_TRANSLATE_CONFIG_CLASS);
+
+                        if (config != null) {
+                            ssmTranslateTable.clear();
+                            config.getSsmTranslations().forEach(
+                                    route -> ssmTranslateTable.put(route.group(), route.source()));
+                        }
+                    }
                     break;
+                case CONFIG_REGISTERED:
                 case CONFIG_UNREGISTERED:
+                    break;
                 case CONFIG_REMOVED:
+                    if (event.configClass().equals(SSM_TRANSLATE_CONFIG_CLASS)) {
+                        ssmTranslateTable.clear();
+                    }
                 default:
                     break;
             }

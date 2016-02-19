@@ -202,10 +202,19 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
         TransactionalMap<ContinuousResourceId, ContinuousResourceAllocation> continuousConsumerTxMap =
                 tx.getTransactionalMap(CONTINUOUS_CONSUMER_MAP, SERIALIZER);
 
-        // Extract Discrete instances from resources
+        // Look up resources by resource IDs
         List<Resource> resources = ids.stream()
                 .filter(x -> x.parent().isPresent())
-                .flatMap(x -> Tools.stream(lookup(childTxMap, x)))
+                .map(x -> {
+                    // avoid access to consistent map in the case of discrete resource
+                    if (x instanceof DiscreteResourceId) {
+                        return Optional.of(Resources.discrete((DiscreteResourceId) x).resource());
+                    } else {
+                        return lookup(childTxMap, x);
+                    }
+                })
+                .filter(Optional::isPresent)
+                .map(Optional::get)
                 .collect(Collectors.toList());
         // the order is preserved by LinkedHashMap
         Map<DiscreteResourceId, List<Resource>> resourceMap = resources.stream()
@@ -231,7 +240,9 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
             }
 
             if (!removeValues(childTxMap, entry.getKey(), entry.getValue())) {
-                log.warn("Failed to unregister {}: Failed to remove values: {}",
+                log.warn("Failed to unregister {}: Failed to remove {} values.",
+                          entry.getKey(), entry.getValue().size());
+                log.debug("Failed to unregister {}: Failed to remove values: {}",
                          entry.getKey(), entry.getValue());
                 return abortTransaction(tx);
             }
@@ -501,13 +512,21 @@ public class ConsistentResourceStore extends AbstractStore<ResourceEvent, Resour
             return true;
         }
 
-        if (oldValues.containsAll(values)) {
+        Set<ResourceId> oldIds = oldValues.stream()
+                .map(Resource::id)
+                .collect(Collectors.toSet());
+        // values whose IDs don't match any IDs of oldValues
+        Set<Resource> addedValues = values.stream()
+                .filter(x -> !oldIds.contains(x.id()))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        // no new ID, then no-op
+        if (addedValues.isEmpty()) {
             // don't write to map because all values are already stored
             return true;
         }
 
         LinkedHashSet<Resource> newValues = new LinkedHashSet<>(oldValues);
-        newValues.addAll(values);
+        newValues.addAll(addedValues);
         return map.replace(key, oldValues, newValues);
     }
 

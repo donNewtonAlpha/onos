@@ -16,6 +16,7 @@
 package org.onosproject.cordvtn;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
@@ -156,7 +157,7 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
     private HostProviderService hostProvider;
     private CordVtnRuleInstaller ruleInstaller;
     private CordVtnArpProxy arpProxy;
-    private volatile MacAddress gatewayMac = MacAddress.NONE;
+    private volatile MacAddress privateGatewayMac = MacAddress.NONE;
 
     /**
      * Creates an cordvtn host location provider.
@@ -290,22 +291,14 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
 
     @Override
     public void removeServiceVm(ConnectPoint connectPoint) {
-        Host host = hostService.getConnectedHosts(connectPoint)
+        hostService.getConnectedHosts(connectPoint)
                 .stream()
-                .findFirst()
-                .orElse(null);
-
-        if (host == null) {
-            log.debug("No host is connected on {}", connectPoint.toString());
-            return;
-        }
-
-        hostProvider.hostVanished(host.id());
+                .forEach(host -> hostProvider.hostVanished(host.id()));
     }
 
     @Override
     public void updateVirtualSubscriberGateways(HostId vSgHostId, String serviceVlan,
-                                                Set<IpAddress> vSgIps) {
+                                                Map<IpAddress, MacAddress> vSgs) {
         Host vSgVm = hostService.getHost(vSgHostId);
 
         if (vSgVm == null || !vSgVm.annotations().value(S_TAG).equals(serviceVlan)) {
@@ -313,8 +306,54 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
             return;
         }
 
-        log.info("Updates vSGs in {} with {}", vSgVm.id(), vSgIps.toString());
-        ruleInstaller.populateSubscriberGatewayRules(vSgVm, vSgIps);
+        log.info("Updates vSGs in {} with {}", vSgVm.id(), vSgs.toString());
+        vSgs.entrySet().stream()
+                .forEach(entry -> addVirtualSubscriberGateway(
+                        vSgVm,
+                        entry.getKey(),
+                        entry.getValue(),
+                        serviceVlan));
+
+        hostService.getConnectedHosts(vSgVm.location()).stream()
+                .filter(host -> !host.mac().equals(vSgVm.mac()))
+                .filter(host -> !vSgs.values().contains(host.mac()))
+                .forEach(host -> {
+                    log.info("Removed vSG {}", host.toString());
+                    hostProvider.hostVanished(host.id());
+                });
+
+        ruleInstaller.populateSubscriberGatewayRules(vSgVm, vSgs.keySet());
+    }
+
+    /**
+     * Adds virtual subscriber gateway to the system.
+     *
+     * @param vSgHost host virtual machine of this vSG
+     * @param vSgIp vSG ip address
+     * @param vSgMac vSG mac address
+     * @param serviceVlan service vlan
+     */
+    private void addVirtualSubscriberGateway(Host vSgHost, IpAddress vSgIp, MacAddress vSgMac,
+                                             String serviceVlan) {
+        HostId hostId = HostId.hostId(vSgMac);
+        Host host = hostService.getHost(hostId);
+        if (host != null) {
+            log.trace("vSG with {} already exists", vSgMac.toString());
+            return;
+        }
+
+        log.info("vSG with IP({}) MAC({}) detected", vSgIp.toString(), vSgMac.toString());
+        DefaultAnnotations.Builder annotations = DefaultAnnotations.builder()
+                .set(S_TAG, serviceVlan);
+
+        HostDescription hostDesc = new DefaultHostDescription(
+                vSgMac,
+                VlanId.NONE,
+                vSgHost.location(),
+                Sets.newHashSet(vSgIp),
+                annotations.build());
+
+        hostProvider.hostDetected(hostId, hostDesc, false);
     }
 
     /**
@@ -438,24 +477,24 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
      * Returns public ip addresses of vSGs running inside a give vSG host.
      *
      * @param vSgHost vSG host
-     * @return set of ip address, or empty set
+     * @return map of ip and mac address, or empty map
      */
-    private Set<IpAddress> getSubscriberGatewayIps(Host vSgHost) {
+    private Map<IpAddress, MacAddress> getSubscriberGateways(Host vSgHost) {
         String vPortId = vSgHost.annotations().value(OPENSTACK_PORT_ID);
         String serviceVlan = vSgHost.annotations().value(S_TAG);
 
         OpenstackPort vPort = openstackService.port(vPortId);
         if (vPort == null) {
             log.warn("Failed to get OpenStack port {} for VM {}", vPortId, vSgHost.id());
-            return Sets.newHashSet();
+            return Maps.newHashMap();
         }
 
         if (!serviceVlan.equals(getServiceVlan(vPort))) {
             log.error("Host({}) s-tag does not match with vPort s-tag", vSgHost.id());
-            return Sets.newHashSet();
+            return Maps.newHashMap();
         }
 
-        return vPort.allowedAddressPairs().keySet();
+        return vPort.allowedAddressPairs();
     }
 
     /**
@@ -485,6 +524,11 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
      */
     private void serviceVmAdded(Host host) {
         String vNetId = host.annotations().value(SERVICE_ID);
+        if (vNetId == null) {
+            // ignore this host, it is not the service VM, or it's a vSG
+            return;
+        }
+
         OpenstackNetwork vNet = openstackService.network(vNetId);
         if (vNet == null) {
             log.warn("Failed to get OpenStack network {} for VM {}({}).",
@@ -509,19 +553,28 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
         } else {
             // TODO check if the service needs an update on its group buckets after done CORD-433
             ruleInstaller.updateServiceGroup(service);
-            arpProxy.addServiceIp(service.serviceIp());
+            arpProxy.addGateway(service.serviceIp(), privateGatewayMac);
 
             // sends gratuitous ARP here for the case of adding existing VMs
             // when ONOS or cordvtn app is restarted
-            arpProxy.sendGratuitousArp(service.serviceIp(), gatewayMac, Sets.newHashSet(host));
+            arpProxy.sendGratuitousArpForGateway(service.serviceIp(), Sets.newHashSet(host));
         }
 
         registerDhcpLease(host, service);
         ruleInstaller.populateBasicConnectionRules(host, getTunnelIp(host), vNet);
 
-        if (host.annotations().value(S_TAG) != null) {
+        String serviceVlan = host.annotations().value(S_TAG);
+        if (serviceVlan != null) {
             log.debug("vSG VM detected {}", host.id());
-            ruleInstaller.populateSubscriberGatewayRules(host, getSubscriberGatewayIps(host));
+            Map<IpAddress, MacAddress> vSgs = getSubscriberGateways(host);
+            vSgs.entrySet().stream()
+                    .forEach(entry -> addVirtualSubscriberGateway(
+                            host,
+                            entry.getKey(),
+                            entry.getValue(),
+                            serviceVlan));
+
+            ruleInstaller.populateSubscriberGatewayRules(host, vSgs.keySet());
         }
     }
 
@@ -531,12 +584,16 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
      * @param host host
      */
     private void serviceVmRemoved(Host host) {
-        if (host.annotations().value(OPENSTACK_VM_ID) == null) {
-            // this host was not injected from CordVtn, just return
+        String vNetId = host.annotations().value(SERVICE_ID);
+        if (vNetId == null) {
+            // ignore it, it's not the service VM or it's a vSG
+            String serviceVlan = host.annotations().value(S_TAG);
+            if (serviceVlan != null) {
+                log.info("vSG {} removed", host.id());
+            }
             return;
         }
 
-        String vNetId = host.annotations().value(SERVICE_ID);
         OpenstackNetwork vNet = openstackService.network(vNetId);
         if (vNet == null) {
             log.warn("Failed to get OpenStack network {} for VM {}({}).",
@@ -566,7 +623,7 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
             ruleInstaller.updateServiceGroup(service);
 
             if (getHostsWithOpenstackNetwork(vNet).isEmpty()) {
-                arpProxy.removeServiceIp(service.serviceIp());
+                arpProxy.removeGateway(service.serviceIp());
             }
         }
     }
@@ -575,13 +632,16 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
      * Sets service network gateway MAC address and sends out gratuitous ARP to all
      * VMs to update the gateway MAC address.
      *
-     * @param mac mac address
+     * @param newMac mac address to update
      */
-    private void setServiceGatewayMac(MacAddress mac) {
-        if (mac != null && !mac.equals(gatewayMac)) {
-            gatewayMac = mac;
-            log.debug("Set service gateway MAC address to {}", gatewayMac.toString());
+    private void setPrivateGatewayMac(MacAddress newMac) {
+        if (newMac == null || newMac.equals(privateGatewayMac)) {
+            // no updates, do nothing
+            return;
         }
+
+        privateGatewayMac = newMac;
+        log.debug("Set service gateway MAC address to {}", privateGatewayMac.toString());
 
         // TODO get existing service list from XOS and replace the loop below
         Set<String> vNets = Sets.newHashSet();
@@ -591,12 +651,26 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
         vNets.stream().forEach(vNet -> {
             CordService service = getCordService(CordServiceId.of(vNet));
             if (service != null) {
-                arpProxy.sendGratuitousArp(
-                        service.serviceIp(),
-                        gatewayMac,
-                        service.hosts().keySet());
+                arpProxy.addGateway(service.serviceIp(), privateGatewayMac);
+                arpProxy.sendGratuitousArpForGateway(service.serviceIp(), service.hosts().keySet());
             }
         });
+    }
+
+    /**
+     * Sets public gateway MAC address.
+     *
+     * @param publicGateways gateway ip and mac address pairs
+     */
+    private void setPublicGatewayMac(Map<IpAddress, MacAddress> publicGateways) {
+        publicGateways.entrySet()
+                .stream()
+                .forEach(entry -> {
+                    arpProxy.addGateway(entry.getKey(), entry.getValue());
+                    log.debug("Added public gateway IP {}, MAC {}",
+                              entry.getKey().toString(), entry.getValue().toString());
+                });
+        // TODO notice gateway MAC change to VMs holds this gateway IP
     }
 
     /**
@@ -609,7 +683,8 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
             return;
         }
 
-        setServiceGatewayMac(config.gatewayMac());
+        setPrivateGatewayMac(config.privateGatewayMac());
+        setPublicGatewayMac(config.publicGateways());
    }
 
     private class InternalHostListener implements HostListener {
@@ -644,7 +719,7 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
                 return;
             }
 
-            arpProxy.processArpPacket(context, ethPacket, gatewayMac);
+            arpProxy.processArpPacket(context, ethPacket);
         }
     }
 
