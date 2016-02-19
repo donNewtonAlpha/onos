@@ -41,22 +41,46 @@ public interface Resource {
     DiscreteResource ROOT = new DiscreteResource();
 
     /**
-     * Checks if the type of this instance is the specified type.
+     * Returns the ID of this resource.
      *
-     * @param ancestorType type of resource to be checked.
-     * @return true if this resource is under the resource whose type is the given type.
+     * @return the ID of this resource
      */
-    // TODO: find more proper name
-    boolean isTypeOf(Class<?> ancestorType);
+    ResourceId id();
 
     /**
-     * Returns the volume of this resource.
+     * Checks if the type of this instance is the specified type.
      *
-     * @param <T> type of return value
-     * @return the volume of this resource
+     * @param type type of resource to be checked
+     * @return true if this resource is the type of the specified type. Otherwise, false.
      */
-    // TODO: think about other naming possibilities. amount? quantity?
-    <T> T volume();
+    boolean isTypeOf(Class<?> type);
+
+    /**
+     * Checks if the type of this instance is the sub-type of the specified type.
+     *
+     * @param ancestor type of resource to be checked.
+     * @return true if this resource is under the resource whose type is the given type.
+     */
+    boolean isSubTypeOf(Class<?> ancestor);
+
+    /**
+     * Returns value interpreted as the specified type. If the specified type is
+     * incompatible with the underlying value, an empty instance is returned.
+     *
+     * @param type class instance specifying the type of return value
+     * @param <T> type of the return value
+     * @return the value of this resource as the specified type. If type mismatches,
+     * returns an empty instance.
+     */
+    <T> Optional<T> valueAs(Class<T> type);
+
+    /**
+     * Returns the last component of this instance.
+     *
+     * @return the last component of this instance.
+     * The return value is equal to the last object of {@code components()}.
+     */
+    Object last();
 
     /**
      * Returns the parent resource of this instance.
@@ -89,19 +113,4 @@ public interface Resource {
      * @return a child resource
      */
     ContinuousResource child(Class<?> child, double value);
-
-    /**
-     * Returns the last component of this instance.
-     *
-     * @return the last component of this instance.
-     * The return value is equal to the last object of {@code components()}.
-     */
-    Object last();
-
-    /**
-     * Returns the ID of this resource.
-     *
-     * @return the ID of this resource
-     */
-    ResourceId id();
 }

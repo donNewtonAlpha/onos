@@ -17,7 +17,6 @@ package org.onosproject.store.primitives.resources.impl;
 
 import io.atomix.catalyst.util.Listener;
 import io.atomix.copycat.client.CopycatClient;
-import io.atomix.resource.Consistency;
 import io.atomix.resource.Resource;
 import io.atomix.resource.ResourceTypeInfo;
 
@@ -36,9 +35,11 @@ import com.google.common.collect.Sets;
 /**
  * Distributed resource providing the {@link AsyncLeaderElector} primitive.
  */
-@ResourceTypeInfo(id = -152, stateMachine = AtomixLeaderElectorState.class)
-public class AtomixLeaderElector
-    extends Resource<AtomixLeaderElector, Resource.Options> implements AsyncLeaderElector {
+@ResourceTypeInfo(id = -152,
+                  stateMachine = AtomixLeaderElectorState.class,
+                  typeResolver = AtomixLeaderElectorCommands.TypeResolver.class)
+public class AtomixLeaderElector extends Resource<AtomixLeaderElector>
+    implements AsyncLeaderElector {
     private final Set<Consumer<Change<Leadership>>> leadershipChangeListeners =
             Sets.newConcurrentHashSet();
 
@@ -63,12 +64,6 @@ public class AtomixLeaderElector
 
     private void handleEvent(Change<Leadership> change) {
         leadershipChangeListeners.forEach(l -> l.accept(change));
-    }
-
-    @Override
-    public AtomixLeaderElector with(Consistency consistency) {
-        super.with(consistency);
-        return this;
     }
 
     @Override

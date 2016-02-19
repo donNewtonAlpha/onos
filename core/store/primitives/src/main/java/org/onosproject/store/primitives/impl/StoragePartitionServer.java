@@ -15,12 +15,14 @@
  */
 package org.onosproject.store.primitives.impl;
 
+import static org.slf4j.LoggerFactory.getLogger;
 import io.atomix.catalyst.serializer.Serializer;
 import io.atomix.catalyst.transport.Address;
 import io.atomix.catalyst.transport.Transport;
 import io.atomix.copycat.server.CopycatServer;
 import io.atomix.copycat.server.storage.Storage;
 import io.atomix.copycat.server.storage.StorageLevel;
+import io.atomix.manager.ResourceManagerTypeResolver;
 import io.atomix.manager.state.ResourceManagerState;
 import io.atomix.resource.ResourceRegistry;
 import io.atomix.resource.ResourceType;
@@ -35,6 +37,7 @@ import java.util.function.Supplier;
 
 import org.onosproject.cluster.NodeId;
 import org.onosproject.store.service.PartitionInfo;
+import org.slf4j.Logger;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
@@ -43,6 +46,8 @@ import com.google.common.collect.Sets;
  * {@link StoragePartition} server.
  */
 public class StoragePartitionServer implements Managed<StoragePartitionServer> {
+
+    private final Logger log = getLogger(getClass());
 
     private static final int MAX_ENTRIES_PER_LOG_SEGMENT = 32768;
     private final StoragePartition partition;
@@ -81,7 +86,13 @@ public class StoragePartitionServer implements Managed<StoragePartitionServer> {
         } else {
             serverOpenFuture = CompletableFuture.completedFuture(null);
         }
-        return serverOpenFuture.thenApply(v -> null);
+        return serverOpenFuture.whenComplete((r, e) -> {
+            if (e == null) {
+                log.info("Successfully started server for partition {}", partition.getId());
+            } else {
+                log.info("Failed to start server for partition {}", partition.getId(), e);
+            }
+        }).thenApply(v -> null);
     }
 
     @Override
@@ -97,7 +108,7 @@ public class StoragePartitionServer implements Managed<StoragePartitionServer> {
         ResourceRegistry registry = new ResourceRegistry();
         resourceTypes.forEach(registry::register);
         resourceResolver.resolve(registry);
-        return CopycatServer.builder(localAddress, partition.getMemberAddresses())
+        CopycatServer server = CopycatServer.builder(localAddress, partition.getMemberAddresses())
                 .withName("partition-" + partition.getId())
                 .withSerializer(serializer.clone())
                 .withTransport(transport.get())
@@ -105,11 +116,12 @@ public class StoragePartitionServer implements Managed<StoragePartitionServer> {
                 .withStorage(Storage.builder()
                          // FIXME: StorageLevel should be DISK
                         .withStorageLevel(StorageLevel.MEMORY)
-                        .withSerializer(serializer.clone())
                         .withDirectory(dataFolder)
                         .withMaxEntriesPerSegment(MAX_ENTRIES_PER_LOG_SEGMENT)
                         .build())
                 .build();
+        server.serializer().resolve(new ResourceManagerTypeResolver(registry));
+        return server;
     }
 
     public Set<NodeId> configuredMembers() {

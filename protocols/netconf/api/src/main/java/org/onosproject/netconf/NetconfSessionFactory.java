@@ -21,6 +21,12 @@ package org.onosproject.netconf;
  */
 public interface NetconfSessionFactory {
 
+    /**
+     * Creates a new NETCONF session for the specified device.
+     * @param netconfDeviceInfo information of the device to create the session for.
+     * @return Instance of NetconfSession.
+     * @throws NetconfException when problems arise establishing the connection.
+     */
     NetconfSession createNetconfSession(NetconfDeviceInfo netconfDeviceInfo)
             throws NetconfException;
 }

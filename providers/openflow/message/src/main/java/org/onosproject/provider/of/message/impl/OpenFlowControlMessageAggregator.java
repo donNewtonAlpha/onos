@@ -19,6 +19,7 @@ package org.onosproject.provider.of.message.impl;
 import com.codahale.metrics.Meter;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import org.onlab.metrics.MetricsComponent;
 import org.onlab.metrics.MetricsFeature;
 import org.onlab.metrics.MetricsService;
@@ -28,19 +29,20 @@ import org.onosproject.cpman.message.ControlMessageProviderService;
 import org.onosproject.net.DeviceId;
 import org.projectfloodlight.openflow.protocol.OFMessage;
 import org.projectfloodlight.openflow.protocol.OFType;
+import org.slf4j.Logger;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 
 import static org.onosproject.provider.of.message.impl.OpenFlowControlMessageMapper.lookupControlMessageType;
+import static org.slf4j.LoggerFactory.getLogger;
 
 /**
  * Collects the OpenFlow messages and aggregates using MetricsService.
  */
 public class OpenFlowControlMessageAggregator implements Runnable {
+
+    private final Logger log = getLogger(getClass());
 
     private static final Set<OFType> OF_TYPE_SET =
             ImmutableSet.of(OFType.PACKET_IN, OFType.PACKET_OUT, OFType.FLOW_MOD,
@@ -55,7 +57,7 @@ public class OpenFlowControlMessageAggregator implements Runnable {
     private static final String RATE_NAME = "rate";
     private static final String COUNT_NAME = "count";
 
-    private Collection<ControlMessage> controlMessages = new ArrayList<>();
+    private Set<ControlMessage> controlMessages = Sets.newConcurrentHashSet();
 
     // TODO: this needs to be configurable
     private static final int EXECUTE_PERIOD_IN_SECOND = 60;
@@ -101,10 +103,11 @@ public class OpenFlowControlMessageAggregator implements Runnable {
         // update 1 minute statistic information of all control messages
         OF_TYPE_SET.forEach(type -> controlMessages.add(
                 new DefaultControlMessage(lookupControlMessageType(type),
-                        getLoad(type), getRate(type), getCount(type),
+                        deviceId, getLoad(type), getRate(type), getCount(type),
                         System.currentTimeMillis())));
-        providerService.updateStatsInfo(deviceId,
-                Collections.unmodifiableCollection(controlMessages));
+        log.debug("sent aggregated control message");
+        providerService.updateStatsInfo(deviceId, ImmutableSet.copyOf(controlMessages));
+        controlMessages.clear();
     }
 
     /**
@@ -114,8 +117,11 @@ public class OpenFlowControlMessageAggregator implements Runnable {
      * @return load value
      */
     private long getLoad(OFType type) {
-        return (long) rateMeterMap.get(type).getOneMinuteRate() /
-                (long) countMeterMap.get(type).getOneMinuteRate();
+        if (countMeterMap.get(type).getOneMinuteRate() == 0D) {
+            return 0L;
+        }
+        return (long) (rateMeterMap.get(type).getOneMinuteRate() /
+                       countMeterMap.get(type).getOneMinuteRate());
     }
 
     /**

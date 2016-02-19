@@ -22,14 +22,11 @@ import java.util.Objects;
 import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Represents a resource path which specifies a resource which can be measured
  * as a discrete unit. A VLAN ID and a MPLS label of a link are examples of the resource.
- * <p>
- * Note: This class is exposed to the public, but intended to be used in the resource API
- * implementation only. It is not for resource API user.
- * </p>
  */
 @Beta
 public final class DiscreteResource implements Resource {
@@ -48,27 +45,39 @@ public final class DiscreteResource implements Resource {
         return id;
     }
 
-    /**
-     * The user of this methods must receive the return value as the correct type.
-     * Otherwise, this methods throws an exception.
-     *
-     * @param <T> type of the return value
-     * @return the volume of this resource
-     */
-    @SuppressWarnings("unchecked")
     @Override
-    // TODO: consider receiving Class<T> as an argument. Which approach is convenient?
-    public <T> T volume() {
-        return (T) last();
+    public boolean isTypeOf(Class<?> type) {
+        checkNotNull(type);
+
+        if (isRoot()) {
+            return false;
+        }
+
+        return type.isAssignableFrom(id.components().get(id.components().size() - 1).getClass());
     }
 
     @Override
-    public boolean isTypeOf(Class<?> ancestorType) {
+    public boolean isSubTypeOf(Class<?> ancestor) {
+        checkNotNull(ancestor);
+
         return id.components().stream()
                 .map(Object::getClass)
-                .filter(x -> x.equals(ancestorType))
+                .filter(x -> x.equals(ancestor))
                 .findAny()
                 .isPresent();
+    }
+
+    @Override
+    public <T> Optional<T> valueAs(Class<T> type) {
+        checkNotNull(type);
+
+        if (!isTypeOf(type)) {
+            return Optional.empty();
+        }
+
+        @SuppressWarnings("unchecked")
+        T value = (T) id.components().get(id.components().size() - 1);
+        return Optional.of(value);
     }
 
     @Override
@@ -77,6 +86,10 @@ public final class DiscreteResource implements Resource {
             return null;
         }
         return id.components().get(id.components().size() - 1);
+    }
+
+    private boolean isRoot() {
+        return id.equals(ResourceId.ROOT);
     }
 
     @Override
@@ -119,7 +132,6 @@ public final class DiscreteResource implements Resource {
     public String toString() {
         return MoreObjects.toStringHelper(this)
                 .add("id", id)
-                .add("volume", volume())
                 .toString();
     }
 }

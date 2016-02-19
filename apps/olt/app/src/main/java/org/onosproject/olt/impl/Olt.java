@@ -60,6 +60,7 @@ import org.onosproject.olt.AccessDeviceListener;
 import org.onosproject.olt.AccessDeviceService;
 import org.slf4j.Logger;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -147,9 +148,10 @@ public class Olt
 
         oltData.keySet().stream()
                 .flatMap(did -> deviceService.getPorts(did).stream())
-                .filter(p -> oltData.get(p.element().id()).uplink() != p.number())
+                .filter(p -> !oltData.get(p.element().id()).uplink().equals(p.number()))
                 .filter(p -> p.isEnabled())
-                .forEach(p -> installFilteringObjectives((DeviceId) p.element().id(), p));
+                .forEach(p -> processFilteringObjectives((DeviceId) p.element().id(),
+                                                         p.number(), true));
 
         deviceService.addListener(deviceListener);
 
@@ -158,6 +160,7 @@ public class Olt
 
     @Deactivate
     public void deactivate() {
+        deviceService.removeListener(deviceListener);
         networkConfig.removeListener(configListener);
         networkConfig.unregisterConfigFactory(configFactory);
         log.info("Stopped");
@@ -230,6 +233,7 @@ public class Olt
                                            deviceId,
                                            deviceVlan,
                                            subscriberVlan));
+                processFilteringObjectives(deviceId, subscriberPort, true);
             } else if (downStatus != null) {
                 log.error("Subscriber with vlan {} on device {} " +
                                   "on port {} failed downstream uninstallation: {}",
@@ -252,7 +256,7 @@ public class Olt
         CompletableFuture<ObjectiveError> upFuture = new CompletableFuture();
 
         TrafficSelector upstream = DefaultTrafficSelector.builder()
-                .matchVlanId((defaultVlan.isPresent()) ? defaultVlan.get() : DEFAULT_VLAN)
+                .matchVlanId(defaultVlan.orElse(DEFAULT_VLAN))
                 .matchInPort(subscriberPort)
                 .build();
 
@@ -272,7 +276,7 @@ public class Olt
 
         TrafficTreatment downstreamTreatment = DefaultTrafficTreatment.builder()
                 .popVlan()
-                .setVlanId((defaultVlan.isPresent()) ? defaultVlan.get() : DEFAULT_VLAN)
+                .setVlanId(defaultVlan.orElse(DEFAULT_VLAN))
                 .setOutput(subscriberPort)
                 .build();
 
@@ -331,6 +335,8 @@ public class Olt
                                            deviceId,
                                            deviceVlan,
                                            subscriberVlan));
+
+                processFilteringObjectives(deviceId, subscriberPort, false);
             } else if (downStatus != null) {
                 log.error("Subscriber with vlan {} on device {} " +
                                   "on port {} failed downstream installation: {}",
@@ -344,10 +350,11 @@ public class Olt
 
     }
 
-    private void installFilteringObjectives(DeviceId devId, Port port) {
-        FilteringObjective eapol = DefaultFilteringObjective.builder()
-                .permit()
-                .withKey(Criteria.matchInPort(port.number()))
+    private void processFilteringObjectives(DeviceId devId, PortNumber port, boolean install) {
+        DefaultFilteringObjective.Builder builder = DefaultFilteringObjective.builder();
+
+        FilteringObjective eapol = (install ? builder.permit() : builder.deny())
+                .withKey(Criteria.matchInPort(port))
                 .addCondition(Criteria.matchEthType(EthType.EtherType.EAPOL.ethType()))
                 .withMeta(DefaultTrafficTreatment.builder()
                                   .setOutput(PortNumber.CONTROLLER).build())
@@ -383,9 +390,9 @@ public class Olt
                 //TODO: Port handling and bookkeeping should be inproved once
                 // olt firmware handles correct behaviour.
                 case PORT_ADDED:
-                    if (oltData.get(devId).uplink() != event.port().number() &&
-                                            event.port().isEnabled()) {
-                        installFilteringObjectives(devId, event.port());
+                    if (!oltData.get(devId).uplink().equals(event.port().number()) &&
+                            event.port().isEnabled()) {
+                        processFilteringObjectives(devId, event.port().number(), true);
                     }
                     break;
                 case PORT_REMOVED:
@@ -393,8 +400,20 @@ public class Olt
                     unprovisionSubscriber(devId, olt.uplink(),
                                           event.port().number(),
                                           olt.vlan());
+                    if (!oltData.get(devId).uplink().equals(event.port().number()) &&
+                            event.port().isEnabled()) {
+                        processFilteringObjectives(devId, event.port().number(), false);
+                    }
                     break;
                 case PORT_UPDATED:
+                    if (oltData.get(devId).uplink().equals(event.port().number())) {
+                        break;
+                    }
+                    if (event.port().isEnabled()) {
+                        processFilteringObjectives(devId, event.port().number(), true);
+                    } else {
+                        processFilteringObjectives(devId, event.port().number(), false);
+                    }
                     break;
                 case DEVICE_ADDED:
                     post(new AccessDeviceEvent(
@@ -419,7 +438,6 @@ public class Olt
                     break;
                 case DEVICE_UPDATED:
                 case DEVICE_SUSPENDED:
-
                 case PORT_STATS_UPDATED:
                 default:
                     return;
@@ -439,6 +457,7 @@ public class Olt
                                 networkConfig.getConfig((DeviceId) event.subject(), CONFIG_CLASS);
                         if (config != null) {
                             oltData.put(config.getOlt().deviceId(), config.getOlt());
+                            provisionDefaultFlows((DeviceId) event.subject());
                         }
                     }
                     break;
@@ -448,6 +467,17 @@ public class Olt
                     break;
             }
         }
+    }
+
+    private void provisionDefaultFlows(DeviceId deviceId) {
+        List<Port> ports = deviceService.getPorts(deviceId);
+
+        ports.stream()
+                .filter(p -> !oltData.get(p.element().id()).uplink().equals(p.number()))
+                .filter(p -> p.isEnabled())
+                .forEach(p -> processFilteringObjectives((DeviceId) p.element().id(),
+                                                         p.number(), true));
+
     }
 
 }

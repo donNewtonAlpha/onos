@@ -24,21 +24,29 @@ import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.onlab.packet.EthType;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.IGMP;
+import org.onlab.packet.IGMPMembership;
+import org.onlab.packet.IGMPQuery;
 import org.onlab.packet.IPv4;
 import org.onlab.packet.Ip4Address;
 import org.onlab.packet.IpAddress;
 import org.onlab.packet.IpPrefix;
+import org.onlab.util.SafeRecurringTask;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.Port;
 import org.onosproject.net.PortNumber;
+import org.onosproject.net.config.ConfigFactory;
+import org.onosproject.net.config.NetworkConfigEvent;
+import org.onosproject.net.config.NetworkConfigListener;
 import org.onosproject.net.config.NetworkConfigRegistry;
+import org.onosproject.net.config.basics.SubjectFactories;
 import org.onosproject.net.device.DeviceEvent;
 import org.onosproject.net.device.DeviceListener;
 import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.flow.DefaultTrafficTreatment;
+import org.onosproject.net.flow.TrafficTreatment;
 import org.onosproject.net.flow.criteria.Criteria;
 import org.onosproject.net.flowobjective.DefaultFilteringObjective;
 import org.onosproject.net.flowobjective.FilteringObjective;
@@ -48,6 +56,7 @@ import org.onosproject.net.flowobjective.ObjectiveContext;
 import org.onosproject.net.flowobjective.ObjectiveError;
 import org.onosproject.net.mcast.McastRoute;
 import org.onosproject.net.mcast.MulticastRouteService;
+import org.onosproject.net.packet.DefaultOutboundPacket;
 import org.onosproject.net.packet.InboundPacket;
 import org.onosproject.net.packet.PacketContext;
 import org.onosproject.net.packet.PacketProcessor;
@@ -56,9 +65,16 @@ import org.onosproject.olt.AccessDeviceConfig;
 import org.onosproject.olt.AccessDeviceData;
 import org.slf4j.Logger;
 
+import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
+import static org.onlab.util.Tools.groupedThreads;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**
@@ -66,13 +82,28 @@ import static org.slf4j.LoggerFactory.getLogger;
  */
 @Component(immediate = true)
 public class IgmpSnoop {
+
+
     private final Logger log = getLogger(getClass());
 
+    private static final String DEST_MAC = "01:00:5E:00:00:01";
+    private static final String DEST_IP = "224.0.0.1";
+
+    private static final int DEFAULT_QUERY_PERIOD_SECS = 60;
+    private static final byte DEFAULT_IGMP_RESP_CODE = 0;
     private static final String DEFAULT_MCAST_ADDR = "224.0.0.0/4";
 
     @Property(name = "multicastAddress",
-            label = "Define the multicast base raneg to listen to")
+            label = "Define the multicast base range to listen to")
     private String multicastAddress = DEFAULT_MCAST_ADDR;
+
+    @Property(name = "queryPeriod", intValue = DEFAULT_QUERY_PERIOD_SECS,
+            label = "Delay in seconds between successive query runs")
+    private int queryPeriod = DEFAULT_QUERY_PERIOD_SECS;
+
+    @Property(name = "maxRespCode", byteValue = DEFAULT_IGMP_RESP_CODE,
+            label = "Maximum time allowed before sending a responding report")
+    private byte maxRespCode = DEFAULT_IGMP_RESP_CODE;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected FlowObjectiveService flowObjectiveService;
@@ -92,17 +123,45 @@ public class IgmpSnoop {
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected DeviceService deviceService;
 
+
+    private ScheduledFuture<?> queryTask;
+    private final ScheduledExecutorService queryService =
+            Executors.newSingleThreadScheduledExecutor(groupedThreads("onos/igmp-query",
+                                                                      "membership-query"));
+
     private Map<DeviceId, AccessDeviceData> oltData = new ConcurrentHashMap<>();
 
     private DeviceListener deviceListener = new InternalDeviceListener();
     private IgmpPacketProcessor processor = new IgmpPacketProcessor();
     private static ApplicationId appId;
 
+    private InternalNetworkConfigListener configListener =
+            new InternalNetworkConfigListener();
+
+    private static final Class<AccessDeviceConfig> CONFIG_CLASS =
+            AccessDeviceConfig.class;
+
+    private ConfigFactory<DeviceId, AccessDeviceConfig> configFactory =
+            new ConfigFactory<DeviceId, AccessDeviceConfig>(
+                    SubjectFactories.DEVICE_SUBJECT_FACTORY, CONFIG_CLASS, "accessDevice") {
+                @Override
+                public AccessDeviceConfig createConfig() {
+                    return new AccessDeviceConfig();
+                }
+            };
+
+
+    private ByteBuffer queryPacket;
+
+
     @Activate
     public void activate() {
         appId = coreService.registerApplication("org.onosproject.igmp");
 
         packetService.addProcessor(processor, PacketProcessor.director(1));
+
+        networkConfig.registerConfigFactory(configFactory);
+        networkConfig.addListener(configListener);
 
         networkConfig.getSubjects(DeviceId.class, AccessDeviceConfig.class).forEach(
                 subject -> {
@@ -111,11 +170,26 @@ public class IgmpSnoop {
                     if (config != null) {
                         AccessDeviceData data = config.getOlt();
                         oltData.put(data.deviceId(), data);
+
                     }
                 }
         );
 
+        oltData.keySet().stream()
+                .flatMap(did -> deviceService.getPorts(did).stream())
+                .filter(p -> !oltData.get(p.element().id()).uplink().equals(p.number()))
+                .filter(p -> p.isEnabled())
+                .forEach(p -> processFilterObjective((DeviceId) p.element().id(), p, false));
+
         deviceService.addListener(deviceListener);
+
+        queryPacket = buildQueryPacket();
+
+        queryTask = queryService.scheduleWithFixedDelay(
+                SafeRecurringTask.wrap(this::querySubscribers),
+                0,
+                queryPeriod,
+                TimeUnit.SECONDS);
 
         log.info("Started");
     }
@@ -125,6 +199,10 @@ public class IgmpSnoop {
         packetService.removeProcessor(processor);
         processor = null;
         deviceService.removeListener(deviceListener);
+        networkConfig.removeListener(configListener);
+        networkConfig.unregisterConfigFactory(configFactory);
+        queryTask.cancel(true);
+        queryService.shutdownNow();
         log.info("Stopped");
     }
 
@@ -160,16 +238,72 @@ public class IgmpSnoop {
         flowObjectiveService.filter(devId, igmp);
     }
 
-    private void processQuery(IGMP pkt, ConnectPoint location) {
-        pkt.getGroups().forEach(group -> group.getSources().forEach(src -> {
+    private void processMembership(IGMP pkt, ConnectPoint location) {
+        pkt.getGroups().forEach(group -> {
 
-            McastRoute route = new McastRoute(src,
+            if (!(group instanceof IGMPMembership)) {
+                log.warn("Wrong group type in IGMP membership");
+                return;
+            }
+
+            IGMPMembership membership = (IGMPMembership) group;
+
+            McastRoute route = new McastRoute(IpAddress.valueOf("0.0.0.0"),
                                               group.getGaddr(),
                                               McastRoute.Type.IGMP);
-            multicastService.add(route);
-            multicastService.addSink(route, location);
 
-        }));
+            if (membership.getRecordType() == IGMPMembership.MODE_IS_INCLUDE ||
+                    membership.getRecordType() == IGMPMembership.CHANGE_TO_INCLUDE_MODE) {
+
+
+                multicastService.add(route);
+                multicastService.addSink(route, location);
+
+            } else if (membership.getRecordType() == IGMPMembership.MODE_IS_EXCLUDE ||
+                    membership.getRecordType() == IGMPMembership.CHANGE_TO_EXCLUDE_MODE) {
+                multicastService.removeSink(route, location);
+                // TODO remove route if all sinks are gone
+            }
+
+        });
+    }
+
+    private ByteBuffer buildQueryPacket() {
+        IGMP igmp = new IGMP();
+        igmp.setIgmpType(IGMP.TYPE_IGMPV3_MEMBERSHIP_QUERY);
+        igmp.setMaxRespCode(maxRespCode);
+
+        IGMPQuery query = new IGMPQuery(IpAddress.valueOf("0.0.0.0"), 0);
+        igmp.addGroup(query);
+
+        IPv4 ip = new IPv4();
+        ip.setDestinationAddress(DEST_IP);
+        ip.setProtocol(IPv4.PROTOCOL_IGMP);
+        ip.setSourceAddress("192.168.1.1");
+        ip.setTtl((byte) 1);
+        ip.setPayload(igmp);
+
+        Ethernet eth = new Ethernet();
+        eth.setDestinationMACAddress(DEST_MAC);
+        eth.setSourceMACAddress("DE:AD:BE:EF:BA:11");
+        eth.setEtherType(Ethernet.TYPE_IPV4);
+
+        eth.setPayload(ip);
+
+        return ByteBuffer.wrap(eth.serialize());
+    }
+
+    private void querySubscribers() {
+        oltData.keySet().stream()
+                .flatMap(did -> deviceService.getPorts(did).stream())
+                .filter(p -> !oltData.get(p.element().id()).uplink().equals(p.number()))
+                .filter(p -> p.isEnabled())
+                .forEach(p -> {
+                    TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                            .setOutput(p.number()).build();
+                    packetService.emit(new DefaultOutboundPacket((DeviceId) p.element().id(),
+                                                                 treatment, queryPacket));
+                });
     }
 
     /**
@@ -226,27 +360,26 @@ public class IgmpSnoop {
             switch (igmp.getIgmpType()) {
 
                 case IGMP.TYPE_IGMPV3_MEMBERSHIP_REPORT:
-                    IGMPProcessMembership.processMembership(igmp, pkt.receivedFrom());
+                    processMembership(igmp, pkt.receivedFrom());
                     break;
 
                 case IGMP.TYPE_IGMPV3_MEMBERSHIP_QUERY:
-                    processQuery(igmp, pkt.receivedFrom());
+                    log.debug("Received a membership query {} from {}",
+                              igmp, pkt.receivedFrom());
                     break;
 
                 case IGMP.TYPE_IGMPV1_MEMBERSHIP_REPORT:
                 case IGMP.TYPE_IGMPV2_MEMBERSHIP_REPORT:
                 case IGMP.TYPE_IGMPV2_LEAVE_GROUP:
-                    log.debug("IGMP version 1 & 2 message types are not currently supported. Message type: " +
-                                      igmp.getIgmpType());
+                    log.debug("IGMP version 1 & 2 message types are not currently supported. Message type: {}",
+                              igmp.getIgmpType());
                     break;
-
                 default:
-                    log.debug("Unkown IGMP message type: " + igmp.getIgmpType());
+                    log.debug("Unknown IGMP message type: {}", igmp.getIgmpType());
                     break;
             }
         }
     }
-
 
 
     private class InternalDeviceListener implements DeviceListener {
@@ -274,18 +407,51 @@ public class IgmpSnoop {
                     }
                     break;
                 case PORT_REMOVED:
-                    processFilterObjective(event.subject().id(), event.port(), false);
+                    processFilterObjective(event.subject().id(), event.port(), true);
                     break;
                 default:
                     log.warn("Unknown device event {}", event.type());
                     break;
             }
-
         }
 
         @Override
         public boolean isRelevant(DeviceEvent event) {
             return oltData.containsKey(event.subject().id());
         }
+    }
+
+    private class InternalNetworkConfigListener implements NetworkConfigListener {
+        @Override
+        public void event(NetworkConfigEvent event) {
+            switch (event.type()) {
+
+                case CONFIG_ADDED:
+                case CONFIG_UPDATED:
+                    if (event.configClass().equals(CONFIG_CLASS)) {
+                        AccessDeviceConfig config =
+                                networkConfig.getConfig((DeviceId) event.subject(), CONFIG_CLASS);
+                        if (config != null) {
+                            oltData.put(config.getOlt().deviceId(), config.getOlt());
+                            provisionDefaultFlows((DeviceId) event.subject());
+                        }
+                    }
+                    break;
+                case CONFIG_UNREGISTERED:
+                case CONFIG_REMOVED:
+                default:
+                    break;
+            }
+        }
+    }
+
+    private void provisionDefaultFlows(DeviceId deviceId) {
+        List<Port> ports = deviceService.getPorts(deviceId);
+
+        ports.stream()
+                .filter(p -> !oltData.get(p.element().id()).uplink().equals(p.number()))
+                .filter(p -> p.isEnabled())
+                .forEach(p -> processFilterObjective((DeviceId) p.element().id(), p, false));
+
     }
 }
