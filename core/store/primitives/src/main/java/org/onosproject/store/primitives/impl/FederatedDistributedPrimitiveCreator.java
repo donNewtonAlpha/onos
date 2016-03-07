@@ -22,8 +22,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
-import org.apache.commons.lang.StringUtils;
-import org.onlab.util.Tools;
 import org.onosproject.cluster.PartitionId;
 import org.onosproject.store.primitives.DistributedPrimitiveCreator;
 import org.onosproject.store.service.AsyncAtomicCounter;
@@ -34,6 +32,7 @@ import org.onosproject.store.service.AsyncLeaderElector;
 import org.onosproject.store.service.DistributedQueue;
 import org.onosproject.store.service.Serializer;
 
+import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -47,7 +46,6 @@ import com.google.common.primitives.Bytes;
  * distributed primitives to a collection of other {@link DistributedPrimitiveCreator creators}.
  */
 public class FederatedDistributedPrimitiveCreator implements DistributedPrimitiveCreator {
-
     private final TreeMap<PartitionId, DistributedPrimitiveCreator> members;
     private final List<PartitionId> sortedMemberPartitionIds;
 
@@ -93,7 +91,15 @@ public class FederatedDistributedPrimitiveCreator implements DistributedPrimitiv
 
     @Override
     public AsyncLeaderElector newAsyncLeaderElector(String name) {
-        return getCreator(name).newAsyncLeaderElector(name);
+        checkNotNull(name);
+        Map<PartitionId, AsyncLeaderElector> leaderElectors =
+                Maps.transformValues(members,
+                                     partition -> partition.newAsyncLeaderElector(name));
+        Hasher<String> hasher = topic -> {
+            long hashCode = HashCode.fromBytes(topic.getBytes(Charsets.UTF_8)).asLong();
+            return sortedMemberPartitionIds.get(Hashing.consistentHash(hashCode, members.size()));
+        };
+        return new PartitionedAsyncLeaderElector(name, leaderElectors, hasher);
     }
 
     @Override
@@ -120,8 +126,7 @@ public class FederatedDistributedPrimitiveCreator implements DistributedPrimitiv
      * @return primitive creator
      */
     private DistributedPrimitiveCreator getCreator(String name) {
-        long hashCode = HashCode.fromBytes(Tools.getBytesUtf8(StringUtils.leftPad(name, 8))).asLong();
-        int index = Hashing.consistentHash(hashCode, members.size());
+        int index = Hashing.consistentHash(name.hashCode(), members.size());
         return members.get(sortedMemberPartitionIds.get(index));
     }
 }

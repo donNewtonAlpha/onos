@@ -21,7 +21,7 @@ import java.util.Set;
 
 import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
 import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.ParsableDataType;
+import org.onosproject.yangutils.utils.YangConstructType;
 
 /*
  * Reference RFC 6020.
@@ -36,7 +36,11 @@ import org.onosproject.yangutils.parser.ParsableDataType;
  */
 public class YangBits implements Parsable {
 
+    // Bits information set.
     private Set<YangBit> bitSet;
+
+    // BITS name.
+    private String bitsName;
 
     /**
      * Create a YANG bits type object.
@@ -46,7 +50,7 @@ public class YangBits implements Parsable {
     }
 
     /**
-     * Get the bit set.
+     * Returns the bit set.
      *
      * @return the bit set
      */
@@ -55,7 +59,7 @@ public class YangBits implements Parsable {
     }
 
     /**
-     * set the bit set.
+     * Set the bit set.
      *
      * @param bitSet the bit set
      */
@@ -66,10 +70,14 @@ public class YangBits implements Parsable {
     /**
      * Add bit info.
      *
-     * @param bitInfo the bit Info to add.
+     * @param bitInfo the bit information to be added
+     * @throws DataModelException due to violation in data model rules
      */
-    public void addBitInfo(YangBit bitInfo) {
-        getBitSet().add(bitInfo);
+    public void addBitInfo(YangBit bitInfo) throws DataModelException {
+        if (!getBitSet().add(bitInfo)) {
+            throw new DataModelException("YANG file error: Duplicate identifier detected, same as bit \""
+                    + bitInfo.getBitName() + "\"");
+        }
     }
 
     /**
@@ -77,15 +85,35 @@ public class YangBits implements Parsable {
      *
      * @return ParsedDataType returns BITS_DATA
      */
-    public ParsableDataType getParsableDataType() {
-        return ParsableDataType.BITS_DATA;
+    @Override
+    public YangConstructType getYangConstructType() {
+        return YangConstructType.BITS_DATA;
+    }
+
+    /**
+     * Returns the bits name.
+     *
+     * @return name of the bits
+     */
+    public String getBitsName() {
+        return bitsName;
+    }
+
+    /**
+     * Set bits name.
+     *
+     * @param bitsName bit name to be set
+     */
+    public void setBitsName(String bitsName) {
+        this.bitsName = bitsName;
     }
 
     /**
      * Validate the data on entering the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnEntry() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
     }
@@ -93,8 +121,9 @@ public class YangBits implements Parsable {
     /**
      * Validate the data on exiting the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnExit() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
     }

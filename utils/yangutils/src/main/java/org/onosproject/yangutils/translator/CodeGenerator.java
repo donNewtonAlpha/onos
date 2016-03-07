@@ -16,6 +16,8 @@
 
 package org.onosproject.yangutils.translator;
 
+import java.io.IOException;
+
 /**
  * Abstraction of an entity which provides Code generator functionalities.
  */
@@ -23,12 +25,16 @@ public interface CodeGenerator {
 
     /**
      * Traverse the schema of application and generate corresponding code.
+     *
+     * @throws IOException when fails to translate the data model tree
      */
-    void generateJavaCodeEntry();
+    void generateJavaCodeEntry() throws IOException;
 
     /**
      * Traverse the schema of application and generate corresponding code.
+     *
+     * @throws IOException when fails to generate java code
      */
-    void generateJavaCodeExit();
+    void generateJavaCodeExit() throws IOException;
 
 }

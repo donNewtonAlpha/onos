@@ -33,18 +33,18 @@ public enum ListenerErrorLocation {
     /**
      * Returns the message corresponding to listener error location.
      *
-     * @param errorLocation enum value for type of error.
-     * @return message corresponding to listener error location.
+     * @param errorLocation enum value for type of error
+     * @return message corresponding to listener error location
      */
     public static String getErrorLocationMessage(ListenerErrorLocation errorLocation) {
 
         switch (errorLocation) {
-        case ENTRY:
-            return "before";
-        case EXIT:
-            return "after";
-        default:
-            return "during";
+            case ENTRY:
+                return "before";
+            case EXIT:
+                return "after";
+            default:
+                return "during";
         }
     }
 }

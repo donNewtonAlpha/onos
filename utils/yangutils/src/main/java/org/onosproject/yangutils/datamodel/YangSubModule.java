@@ -15,12 +15,14 @@
  */
 package org.onosproject.yangutils.datamodel;
 
+import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
+import static org.onosproject.yangutils.datamodel.utils.DataModelUtils.detectCollidingChildUtil;
+import org.onosproject.yangutils.parser.Parsable;
+import org.onosproject.yangutils.translator.CachedFileHandle;
+import org.onosproject.yangutils.utils.YangConstructType;
+
 import java.util.LinkedList;
 import java.util.List;
-
-import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
-import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.ParsableDataType;
 
 /*
  *  Reference RFC 6020.
@@ -73,7 +75,7 @@ import org.onosproject.yangutils.parser.ParsableDataType;
  * Data model node to maintain information defined in YANG sub-module.
  */
 public class YangSubModule extends YangNode
-        implements YangLeavesHolder, YangDesc, YangReference, Parsable {
+        implements YangLeavesHolder, YangDesc, YangReference, Parsable, CollisionDetector {
 
     /**
      * Name of sub module.
@@ -114,13 +116,11 @@ public class YangSubModule extends YangNode
     /**
      * List of leaves at root level in the sub-module.
      */
-    @SuppressWarnings("rawtypes")
     private List<YangLeaf> listOfLeaf;
 
     /**
      * List of leaf-lists at root level in the sub-module.
      */
-    @SuppressWarnings("rawtypes")
     private List<YangLeafList> listOfLeafList;
 
     /**
@@ -144,22 +144,31 @@ public class YangSubModule extends YangNode
     private byte version;
 
     /**
+     * package of the generated java code.
+     */
+    private String pkg;
+
+    /**
      * Create a sub module node.
      */
     public YangSubModule() {
         super(YangNodeType.SUB_MODULE_NODE);
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.datamodel.YangNode#getName()
+    /**
+     * Get the YANG name of the sub module.
+     *
+     * @return YANG name of the sub module
      */
     @Override
     public String getName() {
         return name;
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.datamodel.YangNode#setName(java.lang.String)
+    /**
+     * Set YANG name of the sub module.
+     *
+     * @param subModuleName YANG name of the sub module
      */
     @Override
     public void setName(String subModuleName) {
@@ -178,7 +187,7 @@ public class YangSubModule extends YangNode
     /**
      * Set the module info.
      *
-     * @param belongsTo module info to set.
+     * @param belongsTo module info to set
      */
     public void setBelongsTo(YangBelongsTo belongsTo) {
         this.belongsTo = belongsTo;
@@ -187,7 +196,7 @@ public class YangSubModule extends YangNode
     /**
      * Get the contact.
      *
-     * @return the contact.
+     * @return the contact
      */
     public String getContact() {
         return contact;
@@ -205,8 +214,9 @@ public class YangSubModule extends YangNode
     /**
      * Get the description.
      *
-     * @return the description.
+     * @return the description
      */
+    @Override
     public String getDescription() {
         return description;
     }
@@ -214,8 +224,9 @@ public class YangSubModule extends YangNode
     /**
      * Set the description.
      *
-     * @param description set the description.
+     * @param description set the description
      */
+    @Override
     public void setDescription(String description) {
         this.description = description;
     }
@@ -223,7 +234,7 @@ public class YangSubModule extends YangNode
     /**
      * Get the list of imported modules.
      *
-     * @return the list of imported modules.
+     * @return the list of imported modules
      */
     public List<YangImport> getImportList() {
         return importList;
@@ -232,7 +243,7 @@ public class YangSubModule extends YangNode
     /**
      * prevent setting the import list from outside.
      *
-     * @param importList the import list to set.
+     * @param importList the import list to set
      */
     private void setImportList(List<YangImport> importList) {
         this.importList = importList;
@@ -241,7 +252,7 @@ public class YangSubModule extends YangNode
     /**
      * Add the imported module information to the import list.
      *
-     * @param importedModule module being imported.
+     * @param importedModule module being imported
      */
     public void addImportedInfo(YangImport importedModule) {
 
@@ -257,7 +268,7 @@ public class YangSubModule extends YangNode
     /**
      * Get the list of included sub modules.
      *
-     * @return the included list of sub modules.
+     * @return the included list of sub modules
      */
     public List<YangInclude> getIncludeList() {
         return includeList;
@@ -266,7 +277,7 @@ public class YangSubModule extends YangNode
     /**
      * Set the list of included sub modules.
      *
-     * @param includeList the included list to set.
+     * @param includeList the included list to set
      */
     private void setIncludeList(List<YangInclude> includeList) {
         this.includeList = includeList;
@@ -275,7 +286,7 @@ public class YangSubModule extends YangNode
     /**
      * Add the included sub module information to the include list.
      *
-     * @param includeModule submodule being included.
+     * @param includeModule submodule being included
      */
     public void addIncludedInfo(YangInclude includeModule) {
 
@@ -290,9 +301,9 @@ public class YangSubModule extends YangNode
     /**
      * Get the list of leaves.
      *
-     * @return the list of leaves.
+     * @return the list of leaves
      */
-    @SuppressWarnings("rawtypes")
+    @Override
     public List<YangLeaf> getListOfLeaf() {
         return listOfLeaf;
     }
@@ -300,9 +311,8 @@ public class YangSubModule extends YangNode
     /**
      * Set the list of leaves.
      *
-     * @param leafsList the list of leaf to set.
+     * @param leafsList the list of leaf to set
      */
-    @SuppressWarnings("rawtypes")
     private void setListOfLeaf(List<YangLeaf> leafsList) {
         listOfLeaf = leafsList;
     }
@@ -310,10 +320,10 @@ public class YangSubModule extends YangNode
     /**
      * Add a leaf.
      *
-     * @param leaf the leaf to be added.
+     * @param leaf the leaf to be added
      */
-    @SuppressWarnings("rawtypes")
-    public void addLeaf(YangLeaf<?> leaf) {
+    @Override
+    public void addLeaf(YangLeaf leaf) {
         if (getListOfLeaf() == null) {
             setListOfLeaf(new LinkedList<YangLeaf>());
         }
@@ -324,9 +334,9 @@ public class YangSubModule extends YangNode
     /**
      * Get the list of leaf-list.
      *
-     * @return the list of leaf-list.
+     * @return the list of leaf-list
      */
-    @SuppressWarnings("rawtypes")
+    @Override
     public List<YangLeafList> getListOfLeafList() {
         return listOfLeafList;
     }
@@ -334,9 +344,8 @@ public class YangSubModule extends YangNode
     /**
      * Set the list of leaf-list.
      *
-     * @param listOfLeafList the list of leaf-list to set.
+     * @param listOfLeafList the list of leaf-list to set
      */
-    @SuppressWarnings("rawtypes")
     private void setListOfLeafList(List<YangLeafList> listOfLeafList) {
         this.listOfLeafList = listOfLeafList;
     }
@@ -344,10 +353,10 @@ public class YangSubModule extends YangNode
     /**
      * Add a leaf-list.
      *
-     * @param leafList the leaf-list to be added.
+     * @param leafList the leaf-list to be added
      */
-    @SuppressWarnings("rawtypes")
-    public void addLeafList(YangLeafList<?> leafList) {
+    @Override
+    public void addLeafList(YangLeafList leafList) {
         if (getListOfLeafList() == null) {
             setListOfLeafList(new LinkedList<YangLeafList>());
         }
@@ -358,7 +367,7 @@ public class YangSubModule extends YangNode
     /**
      * Get the sub-modules organization.
      *
-     * @return the organization.
+     * @return the organization
      */
     public String getOrganization() {
         return organization;
@@ -367,7 +376,7 @@ public class YangSubModule extends YangNode
     /**
      * Set the sub-modules organization.
      *
-     * @param org the organization to set.
+     * @param org the organization to set
      */
     public void setOrganization(String org) {
         organization = org;
@@ -376,8 +385,9 @@ public class YangSubModule extends YangNode
     /**
      * Get the textual reference.
      *
-     * @return the reference.
+     * @return the reference
      */
+    @Override
     public String getReference() {
         return reference;
     }
@@ -385,8 +395,9 @@ public class YangSubModule extends YangNode
     /**
      * Set the textual reference.
      *
-     * @param reference the reference to set.
+     * @param reference the reference to set
      */
+    @Override
     public void setReference(String reference) {
         this.reference = reference;
     }
@@ -394,7 +405,7 @@ public class YangSubModule extends YangNode
     /**
      * Get the revision.
      *
-     * @return the revision.
+     * @return the revision
      */
     public YangRevision getRevision() {
         return revision;
@@ -403,7 +414,7 @@ public class YangSubModule extends YangNode
     /**
      * Set the revision.
      *
-     * @param revision the revision to set.
+     * @param revision the revision to set
      */
     public void setRevision(YangRevision revision) {
         this.revision = revision;
@@ -412,7 +423,7 @@ public class YangSubModule extends YangNode
     /**
      * Get the version.
      *
-     * @return the version.
+     * @return the version
      */
     public byte getVersion() {
         return version;
@@ -421,7 +432,7 @@ public class YangSubModule extends YangNode
     /**
      * Set the version.
      *
-     * @param version the version to set.
+     * @param version the version to set
      */
     public void setVersion(byte version) {
         this.version = version;
@@ -430,17 +441,19 @@ public class YangSubModule extends YangNode
     /**
      * Returns the type of the parsed data.
      *
-     * @return returns SUB_MODULE_DATA.
+     * @return returns SUB_MODULE_DATA
      */
-    public ParsableDataType getParsableDataType() {
-        return ParsableDataType.SUB_MODULE_DATA;
+    @Override
+    public YangConstructType getYangConstructType() {
+        return YangConstructType.SUB_MODULE_DATA;
     }
 
     /**
      * Validate the data on entering the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnEntry() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
     }
@@ -448,43 +461,70 @@ public class YangSubModule extends YangNode
     /**
      * Validate the data on exiting the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnExit() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.translator.CodeGenerator#generateJavaCodeEntry()
+    /**
+     * Generates java code for sub-module.
      */
+    @Override
     public void generateJavaCodeEntry() {
         // TODO Auto-generated method stub
-
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.translator.CodeGenerator#generateJavaCodeExit()
+    /**
+     * Free resources used to generate code.
      */
+    @Override
     public void generateJavaCodeExit() {
         // TODO Auto-generated method stub
 
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.datamodel.YangNode#getPackage()
+    /**
+     * Get the mapped java package.
+     *
+     * @return the java package
      */
     @Override
     public String getPackage() {
+        return pkg;
+    }
+
+    /**
+     * Set the mapped java package.
+     *
+     * @param pakg the package to set
+     */
+    @Override
+    public void setPackage(String pakg) {
+        pkg = pakg;
+    }
+
+    @Override
+    public CachedFileHandle getFileHandle() {
         // TODO Auto-generated method stub
         return null;
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.datamodel.YangNode#setPackage(java.lang.String)
-     */
     @Override
-    public void setPackage(String pkg) {
+    public void setFileHandle(CachedFileHandle fileHandle) {
         // TODO Auto-generated method stub
 
+    }
+
+    @Override
+    public void detectCollidingChild(String identifierName, YangConstructType dataType) throws DataModelException {
+        // Asks helper to detect colliding child.
+        detectCollidingChildUtil(identifierName, dataType, this);
+    }
+
+    @Override
+    public void detectSelfCollision(String identifierName, YangConstructType dataType) throws DataModelException {
+        // Not required as module doesn't have any parent.
     }
 }

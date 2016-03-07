@@ -26,6 +26,7 @@ import org.apache.felix.scr.annotations.Property;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.onlab.packet.Ethernet;
+import org.onlab.util.SharedExecutors;
 import org.onlab.util.Tools;
 import org.onosproject.cfg.ComponentConfigService;
 import org.onosproject.cluster.ClusterMetadata;
@@ -784,44 +785,46 @@ public class LldpLinkProvider extends AbstractProvider implements LinkProvider {
 
         @Override
         public void event(NetworkConfigEvent event) {
-            if (event.configClass() == LinkDiscoveryFromDevice.class &&
-                CONFIG_CHANGED.contains(event.type())) {
+            SharedExecutors.getPoolThreadExecutor().execute(() -> {
+                if (event.configClass() == LinkDiscoveryFromDevice.class &&
+                        CONFIG_CHANGED.contains(event.type())) {
 
-                if (event.subject() instanceof DeviceId) {
-                    final DeviceId did = (DeviceId) event.subject();
-                    Device device = deviceService.getDevice(did);
-                    updateDevice(device).ifPresent(ld -> updatePorts(ld, did));
-                }
-
-            } else if (event.configClass() == LinkDiscoveryFromPort.class &&
-                       CONFIG_CHANGED.contains(event.type())) {
-
-                if (event.subject() instanceof ConnectPoint) {
-                    ConnectPoint cp = (ConnectPoint) event.subject();
-                    if (cp.elementId() instanceof DeviceId) {
-                        final DeviceId did = (DeviceId) cp.elementId();
+                    if (event.subject() instanceof DeviceId) {
+                        final DeviceId did = (DeviceId) event.subject();
                         Device device = deviceService.getDevice(did);
-                        Port port = deviceService.getPort(did, cp.port());
-                        updateDevice(device).ifPresent(ld -> updatePort(ld, port));
+                        updateDevice(device).ifPresent(ld -> updatePorts(ld, did));
                     }
+
+                } else if (event.configClass() == LinkDiscoveryFromPort.class &&
+                        CONFIG_CHANGED.contains(event.type())) {
+
+                    if (event.subject() instanceof ConnectPoint) {
+                        ConnectPoint cp = (ConnectPoint) event.subject();
+                        if (cp.elementId() instanceof DeviceId) {
+                            final DeviceId did = (DeviceId) cp.elementId();
+                            Device device = deviceService.getDevice(did);
+                            Port port = deviceService.getPort(did, cp.port());
+                            updateDevice(device).ifPresent(ld -> updatePort(ld, port));
+                        }
+                    }
+
+                } else if (event.configClass() == FingerprintProbeFromDevice.class &&
+                        CONFIG_CHANGED.contains(event.type())) {
+
+                    if (event.subject() instanceof DeviceId) {
+                        final DeviceId did = (DeviceId) event.subject();
+                        Device device = deviceService.getDevice(did);
+                        updateDevice(device);
+                    }
+
+                } else if (event.configClass().equals(SuppressionConfig.class) &&
+                        (event.type() == NetworkConfigEvent.Type.CONFIG_ADDED ||
+                                event.type() == NetworkConfigEvent.Type.CONFIG_UPDATED)) {
+                    SuppressionConfig cfg = cfgRegistry.getConfig(appId, SuppressionConfig.class);
+                    reconfigureSuppressionRules(cfg);
+                    log.trace("Network config reconfigured");
                 }
-
-            } else if (event.configClass() == FingerprintProbeFromDevice.class &&
-                    CONFIG_CHANGED.contains(event.type())) {
-
-                if (event.subject() instanceof DeviceId) {
-                    final DeviceId did = (DeviceId) event.subject();
-                    Device device = deviceService.getDevice(did);
-                    updateDevice(device);
-                }
-
-            } else if (event.configClass().equals(SuppressionConfig.class) &&
-                (event.type() == NetworkConfigEvent.Type.CONFIG_ADDED ||
-                 event.type() == NetworkConfigEvent.Type.CONFIG_UPDATED)) {
-                SuppressionConfig cfg = cfgRegistry.getConfig(appId, SuppressionConfig.class);
-                reconfigureSuppressionRules(cfg);
-                log.trace("Network config reconfigured");
-            }
+            });
         }
     }
 }

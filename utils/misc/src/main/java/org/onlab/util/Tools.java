@@ -15,10 +15,11 @@
  */
 package org.onlab.util;
 
-import static java.nio.file.Files.delete;
-import static java.nio.file.Files.walkFileTree;
-import static org.onlab.util.GroupedThreadFactory.groupedThreadFactory;
-import static org.slf4j.LoggerFactory.getLogger;
+import com.google.common.base.Charsets;
+import com.google.common.base.Strings;
+import com.google.common.primitives.UnsignedLongs;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.slf4j.Logger;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -54,12 +55,10 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-import org.slf4j.Logger;
-
-import com.google.common.base.Charsets;
-import com.google.common.base.Strings;
-import com.google.common.primitives.UnsignedLongs;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import static java.nio.file.Files.delete;
+import static java.nio.file.Files.walkFileTree;
+import static org.onlab.util.GroupedThreadFactory.groupedThreadFactory;
+import static org.slf4j.LoggerFactory.getLogger;
 
 /**
  * Miscellaneous utility methods.
@@ -100,10 +99,31 @@ public abstract class Tools {
      * @return thread factory
      */
     public static ThreadFactory groupedThreads(String groupName, String pattern) {
+        return groupedThreads(groupName, pattern, log);
+    }
+
+    /**
+     * Returns a thread factory that produces threads named according to the
+     * supplied name pattern and from the specified thread-group. The thread
+     * group name is expected to be specified in slash-delimited format, e.g.
+     * {@code onos/intent}. The thread names will be produced by converting
+     * the thread group name into dash-delimited format and pre-pended to the
+     * specified pattern. If a logger is specified, it will use the logger to
+     * print out the exception if it has any.
+     *
+     * @param groupName group name in slash-delimited format to indicate hierarchy
+     * @param pattern   name pattern
+     * @param logger    logger
+     * @return thread factory
+     */
+    public static ThreadFactory groupedThreads(String groupName, String pattern, Logger logger) {
+        if (logger == null) {
+            return groupedThreads(groupName, pattern);
+        }
         return new ThreadFactoryBuilder()
                 .setThreadFactory(groupedThreadFactory(groupName))
                 .setNameFormat(groupName.replace(GroupedThreadFactory.DELIMITER, "-") + "-" + pattern)
-                .setUncaughtExceptionHandler((t, e) -> log.error("Uncaught exception on " + t.getName(), e))
+                .setUncaughtExceptionHandler((t, e) -> logger.error("Uncaught exception on " + t.getName(), e))
                 .build();
     }
 

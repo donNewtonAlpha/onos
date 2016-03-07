@@ -18,7 +18,7 @@ package org.onosproject.yangutils.datamodel;
 
 import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
 import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.ParsableDataType;
+import org.onosproject.yangutils.utils.YangConstructType;
 
 /*
  * Reference:RFC 6020.
@@ -61,7 +61,12 @@ public class YangType<T> implements Parsable {
      */
     private YangDataTypes dataType;
 
-    private T dataTypeInfo;
+    /**
+     * Additional information about data type, example restriction info, named
+     * values, etc. The extra information is based on the data type. Based on
+     * the data type, the extended info can vary.
+     */
+    private T dataTypeExtendedInfo;
 
     /**
      * Default constructor.
@@ -72,7 +77,7 @@ public class YangType<T> implements Parsable {
     /**
      * Get the name of data type.
      *
-     * @return the name of data type.
+     * @return the name of data type
      */
     public String getDataTypeName() {
         return dataTypeName;
@@ -90,7 +95,7 @@ public class YangType<T> implements Parsable {
     /**
      * Get the type of data.
      *
-     * @return the data type.
+     * @return the data type
      */
     public YangDataTypes getDataType() {
         return dataType;
@@ -99,7 +104,7 @@ public class YangType<T> implements Parsable {
     /**
      * Set the type of data.
      *
-     * @param dataType data type.
+     * @param dataType data type
      */
     public void setDataType(YangDataTypes dataType) {
         this.dataType = dataType;
@@ -108,10 +113,10 @@ public class YangType<T> implements Parsable {
     /**
      * Get the data type meta data.
      *
-     * @return the data type meta data.
+     * @return the data type meta data
      */
-    public T getDataTypeInfo() {
-        return dataTypeInfo;
+    public T getDataTypeExtendedInfo() {
+        return dataTypeExtendedInfo;
     }
 
     /**
@@ -119,24 +124,26 @@ public class YangType<T> implements Parsable {
      *
      * @param dataTypeInfo the meta data to set
      */
-    public void setDataTypeInfo(T dataTypeInfo) {
-        this.dataTypeInfo = dataTypeInfo;
+    public void setDataTypeExtendedInfo(T dataTypeInfo) {
+        this.dataTypeExtendedInfo = dataTypeInfo;
     }
 
     /**
      * Returns the type of the parsed data.
      *
-     * @return returns TYPE_DATA.
+     * @return returns TYPE_DATA
      */
-    public ParsableDataType getParsableDataType() {
-        return ParsableDataType.TYPE_DATA;
+    @Override
+    public YangConstructType getYangConstructType() {
+        return YangConstructType.TYPE_DATA;
     }
 
     /**
      * Validate the data on entering the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnEntry() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
 
@@ -145,8 +152,9 @@ public class YangType<T> implements Parsable {
     /**
      * Validate the data on exiting the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnExit() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
 

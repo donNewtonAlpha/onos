@@ -59,19 +59,21 @@
         <module>igmp</module>
         <module>pim</module>
         <module>mlb</module>
-        <module>openstackswitching</module>
         <module>pathpainter</module>
         <module>drivermatrix</module>
         <module>cpman</module>
         <module>events</module>
         <module>vrouter</module>
-        <module>openstackrouting</module>
         <module>tor</module>
         <module>virtual-gigapower</module>
         <module>oneping</module>
         <module>phase1</module>
         <module>testing-app</module>
-        <module>translation</module>
+        <module>cordmcast</module>
+        <module>vpls</module>
+        <module>openstacknode</module>
+        <module>openstacknetworking</module>
+        <module>openstackinterface</module>
   </modules>
 
     <properties>

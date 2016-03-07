@@ -15,14 +15,15 @@
  */
 package org.onosproject.codec.impl;
 
-import static org.onlab.util.Tools.nullIsIllegal;
-
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.onlab.packet.IpAddress;
 import org.onlab.packet.MacAddress;
 import org.onlab.packet.MplsLabel;
 import org.onlab.packet.TpPort;
 import org.onlab.packet.VlanId;
 import org.onlab.util.HexString;
+import org.onosproject.core.DefaultGroupId;
+import org.onosproject.core.GroupId;
 import org.onosproject.net.ChannelSpacing;
 import org.onosproject.net.GridType;
 import org.onosproject.net.Lambda;
@@ -37,7 +38,7 @@ import org.onosproject.net.flow.instructions.L2ModificationInstruction;
 import org.onosproject.net.flow.instructions.L3ModificationInstruction;
 import org.onosproject.net.flow.instructions.L4ModificationInstruction;
 
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import static org.onlab.util.Tools.nullIsIllegal;
 
 /**
  * Decoding portion of the instruction codec.
@@ -257,8 +258,15 @@ public final class DecodeInstructionCodecHelper {
                                                            + " is not supported");
             }
             return Instructions.createOutput(portNumber);
-        } else if (type.equals(Instruction.Type.DROP.name())) {
-            return Instructions.createDrop();
+        } else if (type.equals(Instruction.Type.NOACTION.name())) {
+            return Instructions.createNoAction();
+        } else if (type.equals(Instruction.Type.TABLE.name())) {
+            return Instructions.transition(nullIsIllegal(json.get(InstructionCodec.TABLE_ID)
+                    .asInt(), InstructionCodec.TABLE_ID + InstructionCodec.MISSING_MEMBER_MESSAGE));
+        } else if (type.equals(Instruction.Type.GROUP.name())) {
+            GroupId groupId = new DefaultGroupId(nullIsIllegal(json.get(InstructionCodec.GROUP_ID)
+                    .asInt(), InstructionCodec.GROUP_ID + InstructionCodec.MISSING_MEMBER_MESSAGE));
+            return Instructions.createGroup(groupId);
         } else if (type.equals(Instruction.Type.L0MODIFICATION.name())) {
             return decodeL0();
         } else if (type.equals(Instruction.Type.L1MODIFICATION.name())) {
@@ -273,5 +281,4 @@ public final class DecodeInstructionCodecHelper {
         throw new IllegalArgumentException("Instruction type "
                 + type + " is not supported");
     }
-
 }

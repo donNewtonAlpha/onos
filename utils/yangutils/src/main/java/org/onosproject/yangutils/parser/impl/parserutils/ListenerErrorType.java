@@ -21,22 +21,26 @@ package org.onosproject.yangutils.parser.impl.parserutils;
  */
 public enum ListenerErrorType {
     /**
-     * Represents the parent holder in parsable stack for given YANG construct is invalid.
+     * Represents the parent holder in parsable stack for given YANG construct
+     * is invalid.
      */
     INVALID_HOLDER(),
 
     /**
-     * Represents the parent holder in parsable stack for given YANG construct is missing.
+     * Represents the parent holder in parsable stack for given YANG construct
+     * is missing.
      */
     MISSING_HOLDER(),
 
     /**
-     * Represents the current holder in parsable stack for given YANG construct is missing.
+     * Represents the current holder in parsable stack for given YANG construct
+     * is missing.
      */
     MISSING_CURRENT_HOLDER(),
 
     /**
-     * Represents that the child in parsable stack for given YANG construct is invalid.
+     * Represents that the child in parsable stack for given YANG construct is
+     * invalid.
      */
     INVALID_CHILD(),
 
@@ -46,6 +50,21 @@ public enum ListenerErrorType {
     INVALID_CARDINALITY(),
 
     /**
+     * Represents that the entry is duplicate.
+     */
+    DUPLICATE_ENTRY(),
+
+    /**
+     * Represents that the content is invalid.
+     */
+    INVALID_CONTENT(),
+
+    /**
+     * Represents that the identifier collision is detected.
+     */
+    IDENTIFIER_COLLISION(),
+
+    /**
      * Represents that some of earlier parsed data is not handled correctly.
      */
     UNHANDLED_PARSED_DATA();
@@ -53,26 +72,32 @@ public enum ListenerErrorType {
     /**
      * Returns the message corresponding to listener error type.
      *
-     * @param errorType enum value for type of error.
-     * @return message corresponding to listener error type.
+     * @param errorType enum value for type of error
+     * @return message corresponding to listener error type
      */
     public static String getErrorType(ListenerErrorType errorType) {
 
         switch (errorType) {
-        case INVALID_HOLDER:
-            return "Invalid holder for";
-        case MISSING_HOLDER:
-            return "Missing holder at";
-        case MISSING_CURRENT_HOLDER:
-            return "Missing";
-        case INVALID_CHILD:
-            return "Invalid child in";
-        case INVALID_CARDINALITY:
-            return "Invalid cardinality in";
-        case UNHANDLED_PARSED_DATA:
-            return "Unhandled parsed data at";
-        default:
-            return "Problem in";
+            case INVALID_HOLDER:
+                return "Invalid holder for";
+            case MISSING_HOLDER:
+                return "Missing holder at";
+            case MISSING_CURRENT_HOLDER:
+                return "Missing";
+            case INVALID_CHILD:
+                return "Invalid child in";
+            case INVALID_CARDINALITY:
+                return "Invalid cardinality in";
+            case DUPLICATE_ENTRY:
+                return "Duplicate";
+            case INVALID_CONTENT:
+                return "Invalid content in";
+            case IDENTIFIER_COLLISION:
+                return "Identifier collision detected for";
+            case UNHANDLED_PARSED_DATA:
+                return "Unhandled parsed data at";
+            default:
+                return "Problem in";
         }
     }
 }

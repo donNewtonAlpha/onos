@@ -19,14 +19,16 @@ package org.onosproject.yangutils.parser.impl.listeners;
 import org.onosproject.yangutils.datamodel.YangModule;
 import org.onosproject.yangutils.datamodel.YangSubModule;
 import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.ParsableDataType;
 import org.onosproject.yangutils.parser.antlrgencode.GeneratedYangParser;
 import org.onosproject.yangutils.parser.exceptions.ParserException;
 import org.onosproject.yangutils.parser.impl.TreeWalkListener;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorLocation;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorMessageConstruction;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation;
+
+import static org.onosproject.yangutils.utils.YangConstructType.VERSION_DATA;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorLocation.ENTRY;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorMessageConstruction.constructListenerErrorMessage;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.INVALID_HOLDER;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.MISSING_HOLDER;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation.checkStackIsNotEmpty;
 
 /*
  * Reference: RFC6020 and YANG ANTLR Grammar
@@ -73,24 +75,21 @@ public final class VersionListener {
     }
 
     /**
-     * It is called when parser receives an input matching the grammar
-     * rule (version), perform validations and update the data model
-     * tree.
+     * It is called when parser receives an input matching the grammar rule
+     * (version), perform validations and update the data model tree.
      *
-     * @param listener Listener's object.
-     * @param ctx context object of the grammar rule.
+     * @param listener Listener's object
+     * @param ctx context object of the grammar rule
      */
     public static void processVersionEntry(TreeWalkListener listener,
                                            GeneratedYangParser.YangVersionStatementContext ctx) {
 
         // Check for stack to be non empty.
-        ListenerValidation
-                .checkStackIsNotEmpty(listener, ListenerErrorType.MISSING_HOLDER, ParsableDataType.VERSION_DATA,
-                                      String.valueOf(ctx.INTEGER().getText()), ListenerErrorLocation.ENTRY);
+        checkStackIsNotEmpty(listener, MISSING_HOLDER, VERSION_DATA, ctx.INTEGER().getText(), ENTRY);
 
         Integer version = Integer.valueOf(ctx.INTEGER().getText());
         if (!isVersionValid(version)) {
-            ParserException parserException = new ParserException("Input version not supported");
+            ParserException parserException = new ParserException("YANG file error: Input version not supported");
             parserException.setLine(ctx.INTEGER().getSymbol().getLine());
             parserException.setCharPosition(ctx.INTEGER().getSymbol().getCharPositionInLine());
             throw parserException;
@@ -98,7 +97,7 @@ public final class VersionListener {
 
         // Obtain the node of the stack.
         Parsable tmpNode = listener.getParsedDataStack().peek();
-        switch (tmpNode.getParsableDataType()) {
+        switch (tmpNode.getYangConstructType()) {
         case MODULE_DATA: {
             YangModule module = (YangModule) tmpNode;
             module.setVersion((byte) 1);
@@ -110,10 +109,8 @@ public final class VersionListener {
             break;
         }
         default:
-            throw new ParserException(ListenerErrorMessageConstruction.
-                    constructListenerErrorMessage(ListenerErrorType.INVALID_HOLDER,
-                            ParsableDataType.VERSION_DATA, String.valueOf(ctx.INTEGER().getText()),
-                            ListenerErrorLocation.ENTRY));
+            throw new ParserException(constructListenerErrorMessage(INVALID_HOLDER, VERSION_DATA,
+                                                                    ctx.INTEGER().getText(), ENTRY));
         }
     }
 

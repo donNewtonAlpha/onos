@@ -17,7 +17,7 @@ package org.onosproject.yangutils.datamodel;
 
 import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
 import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.ParsableDataType;
+import org.onosproject.yangutils.utils.YangConstructType;
 
 /*
  *  Reference:RFC 6020.
@@ -86,8 +86,9 @@ public class YangRevision implements YangDesc, YangReference, Parsable {
     /**
      * Get the description.
      *
-     * @return the description.
+     * @return the description
      */
+    @Override
     public String getDescription() {
         return description;
     }
@@ -95,8 +96,9 @@ public class YangRevision implements YangDesc, YangReference, Parsable {
     /**
      * Set the description.
      *
-     * @param description set the description.
+     * @param description set the description
      */
+    @Override
     public void setDescription(String description) {
         this.description = description;
     }
@@ -104,8 +106,9 @@ public class YangRevision implements YangDesc, YangReference, Parsable {
     /**
      * Get the textual reference.
      *
-     * @return the reference.
+     * @return the reference
      */
+    @Override
     public String getReference() {
         return reference;
     }
@@ -113,8 +116,9 @@ public class YangRevision implements YangDesc, YangReference, Parsable {
     /**
      * Set the textual reference.
      *
-     * @param reference the reference to set.
+     * @param reference the reference to set
      */
+    @Override
     public void setReference(String reference) {
         this.reference = reference;
     }
@@ -122,17 +126,19 @@ public class YangRevision implements YangDesc, YangReference, Parsable {
     /**
      * Returns the type of the parsed data.
      *
-     * @return returns REVISION_DATA.
+     * @return returns REVISION_DATA
      */
-    public ParsableDataType getParsableDataType() {
-        return ParsableDataType.REVISION_DATA;
+    @Override
+    public YangConstructType getYangConstructType() {
+        return YangConstructType.REVISION_DATA;
     }
 
     /**
      * Validate the data on entering the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnEntry() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
 
@@ -141,8 +147,9 @@ public class YangRevision implements YangDesc, YangReference, Parsable {
     /**
      * Validate the data on exiting the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnExit() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
 

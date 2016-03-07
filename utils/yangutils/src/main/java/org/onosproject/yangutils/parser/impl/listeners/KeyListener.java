@@ -17,15 +17,20 @@
 package org.onosproject.yangutils.parser.impl.listeners;
 
 import org.onosproject.yangutils.datamodel.YangList;
+import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
 import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.ParsableDataType;
 import org.onosproject.yangutils.parser.antlrgencode.GeneratedYangParser;
 import org.onosproject.yangutils.parser.exceptions.ParserException;
 import org.onosproject.yangutils.parser.impl.TreeWalkListener;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorLocation;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorMessageConstruction;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation;
+
+import static org.onosproject.yangutils.utils.YangConstructType.KEY_DATA;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorLocation.ENTRY;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorMessageConstruction.constructListenerErrorMessage;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorMessageConstruction.constructExtendedListenerErrorMessage;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.INVALID_HOLDER;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.UNHANDLED_PARSED_DATA;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.MISSING_HOLDER;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation.checkStackIsNotEmpty;
 
 /*
  * Reference: RFC6020 and YANG ANTLR Grammar
@@ -54,16 +59,14 @@ public final class KeyListener {
      * rule (key), perform validations and updates the data model
      * tree.
      *
-     * @param listener listener's object.
-     * @param ctx context object of the grammar rule.
+     * @param listener listener's object
+     * @param ctx context object of the grammar rule
      */
     public static void processKeyEntry(TreeWalkListener listener,
                                          GeneratedYangParser.KeyStatementContext ctx) {
 
         // Check for stack to be non empty.
-        ListenerValidation.checkStackIsNotEmpty(listener, ListenerErrorType.MISSING_HOLDER,
-                ParsableDataType.KEY_DATA, String.valueOf(ctx.string().getText()),
-                ListenerErrorLocation.ENTRY);
+        checkStackIsNotEmpty(listener, MISSING_HOLDER, KEY_DATA, ctx.string().getText(), ENTRY);
 
         Parsable tmpData = listener.getParsedDataStack().peek();
         if (listener.getParsedDataStack().peek() instanceof YangList) {
@@ -72,17 +75,24 @@ public final class KeyListener {
             if (tmpKeyValue.contains(" ")) {
                 String[] keyValues = tmpKeyValue.split(" ");
                 for (String keyValue : keyValues) {
-                    yangList.addKey(keyValue);
+                    try {
+                        yangList.addKey(keyValue);
+                    } catch (DataModelException e) {
+                        throw new ParserException(constructExtendedListenerErrorMessage(UNHANDLED_PARSED_DATA, KEY_DATA,
+                                ctx.string().getText(), ENTRY, e.getMessage()));
+                    }
                 }
             } else {
-                yangList.addKey(tmpKeyValue);
+                try {
+                    yangList.addKey(tmpKeyValue);
+                } catch (DataModelException e) {
+                    throw new ParserException(constructExtendedListenerErrorMessage(UNHANDLED_PARSED_DATA, KEY_DATA,
+                            ctx.string().getText(), ENTRY, e.getMessage()));
+                }
             }
         } else {
-            throw new ParserException(ListenerErrorMessageConstruction
-                    .constructListenerErrorMessage(ListenerErrorType.INVALID_HOLDER,
-                            ParsableDataType.KEY_DATA,
-                            String.valueOf(ctx.string().getText()),
-                            ListenerErrorLocation.ENTRY));
+            throw new ParserException(constructListenerErrorMessage(INVALID_HOLDER, KEY_DATA, ctx.string().getText(),
+                            ENTRY));
         }
     }
 }

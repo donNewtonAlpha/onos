@@ -18,7 +18,7 @@ package org.onosproject.store.primitives.resources.impl;
 import static org.onosproject.store.service.MapEvent.Type.INSERT;
 import static org.onosproject.store.service.MapEvent.Type.REMOVE;
 import static org.onosproject.store.service.MapEvent.Type.UPDATE;
-import io.atomix.copycat.client.session.Session;
+import io.atomix.copycat.server.session.ServerSession;
 import io.atomix.copycat.server.Commit;
 import io.atomix.copycat.server.Snapshottable;
 import io.atomix.copycat.server.StateMachineExecutor;
@@ -318,12 +318,15 @@ public class AtomixConsistentMapState extends ResourceStateMachine implements Se
      */
     protected void listen(Commit<? extends Listen> commit) {
         Long sessionId = commit.session().id();
-        listeners.put(sessionId, commit);
+        if (listeners.putIfAbsent(sessionId, commit) != null) {
+            commit.close();
+            return;
+        }
         commit.session()
                 .onStateChange(
                         state -> {
-                            if (state == Session.State.CLOSED
-                                    || state == Session.State.EXPIRED) {
+                            if (state == ServerSession.State.CLOSED
+                                    || state == ServerSession.State.EXPIRED) {
                                 Commit<? extends Listen> listener = listeners.remove(sessionId);
                                 if (listener != null) {
                                     listener.close();
@@ -337,10 +340,9 @@ public class AtomixConsistentMapState extends ResourceStateMachine implements Se
      *
      * @param commit unlisten commit
      */
-    protected void unlisten(
-            Commit<? extends Unlisten> commit) {
+    protected void unlisten(Commit<? extends Unlisten> commit) {
         try {
-            Commit<? extends Listen> listener = listeners.remove(commit.session());
+            Commit<? extends Listen> listener = listeners.remove(commit.session().id());
             if (listener != null) {
                 listener.close();
             }
@@ -503,21 +505,21 @@ public class AtomixConsistentMapState extends ResourceStateMachine implements Se
     }
 
     @Override
-    public void register(Session session) {
+    public void register(ServerSession session) {
     }
 
     @Override
-    public void unregister(Session session) {
+    public void unregister(ServerSession session) {
         closeListener(session.id());
     }
 
     @Override
-    public void expire(Session session) {
+    public void expire(ServerSession session) {
         closeListener(session.id());
     }
 
     @Override
-    public void close(Session session) {
+    public void close(ServerSession session) {
         closeListener(session.id());
     }
 

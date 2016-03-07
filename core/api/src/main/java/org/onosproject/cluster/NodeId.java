@@ -15,14 +15,19 @@
  */
 package org.onosproject.cluster;
 
-import java.util.Objects;
+import org.onlab.util.Identifier;
 
 /**
  * Controller cluster identity.
  */
-public class NodeId implements Comparable<NodeId> {
+public final class NodeId extends Identifier<String> implements Comparable<NodeId> {
 
-    private final String id;
+    /**
+     * Constructor for serialization.
+     */
+    private NodeId() {
+        super("");
+    }
 
     /**
      * Creates a new cluster node identifier from the specified string.
@@ -30,34 +35,21 @@ public class NodeId implements Comparable<NodeId> {
      * @param id string identifier
      */
     public NodeId(String id) {
-        this.id = id;
+        super(id);
     }
 
-    @Override
-    public int hashCode() {
-        return id.hashCode();
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj) {
-            return true;
-        }
-        if (obj instanceof NodeId) {
-            final NodeId other = (NodeId) obj;
-            return Objects.equals(this.id, other.id);
-        }
-        return false;
-    }
-
-    @Override
-    public String toString() {
-        return id;
+    /**
+     * Creates a new cluster node identifier from the specified string.
+     *
+     * @param id string identifier
+     * @return node id
+     */
+    public static NodeId nodeId(String id) {
+        return new NodeId(id);
     }
 
     @Override
     public int compareTo(NodeId that) {
-        return this.id.compareTo(that.id);
+        return identifier.compareTo(that.identifier);
     }
-
 }

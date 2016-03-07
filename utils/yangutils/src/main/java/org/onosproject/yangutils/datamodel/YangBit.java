@@ -18,7 +18,9 @@ package org.onosproject.yangutils.datamodel;
 
 import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
 import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.ParsableDataType;
+import org.onosproject.yangutils.utils.YangConstructType;
+
+import java.util.Objects;
 
 /*-
  *  The "bit" statement, which is a sub-statement to the "type" statement,
@@ -57,7 +59,7 @@ public class YangBit implements YangCommonInfo, Parsable {
     private String description;
 
     /**
-     * reference info of the bit field.
+     * Reference info of the bit field.
      */
     private String reference;
 
@@ -67,7 +69,7 @@ public class YangBit implements YangCommonInfo, Parsable {
     private YangStatusType status;
 
     /**
-     * position of the bit whose name bit is described.
+     * Position of the bit whose name bit is described.
      */
     private int position;
 
@@ -79,9 +81,9 @@ public class YangBit implements YangCommonInfo, Parsable {
     }
 
     /**
-     * Get the bit name.
+     * Returns bit name.
      *
-     * @return the bit name.
+     * @return the bit name
      */
     public String getBitName() {
         return bitName;
@@ -90,17 +92,18 @@ public class YangBit implements YangCommonInfo, Parsable {
     /**
      * Set the bit name.
      *
-     * @param bitName the bit name to set.
+     * @param bitName the bit name to set
      */
     public void setBitName(String bitName) {
         this.bitName = bitName;
     }
 
     /**
-     * Get the description.
+     * Returns description.
      *
-     * @return the description.
+     * @return the description
      */
+    @Override
     public String getDescription() {
         return description;
     }
@@ -108,17 +111,19 @@ public class YangBit implements YangCommonInfo, Parsable {
     /**
      * Set the description.
      *
-     * @param description set the description.
+     * @param description set the description
      */
+    @Override
     public void setDescription(String description) {
         this.description = description;
     }
 
     /**
-     * Get the textual reference.
+     * Returns textual reference.
      *
-     * @return the reference.
+     * @return the reference
      */
+    @Override
     public String getReference() {
         return reference;
     }
@@ -126,17 +131,19 @@ public class YangBit implements YangCommonInfo, Parsable {
     /**
      * Set the textual reference.
      *
-     * @param reference the reference to set.
+     * @param reference the reference to set
      */
+    @Override
     public void setReference(String reference) {
         this.reference = reference;
     }
 
     /**
-     * Get the status.
+     * Returns status.
      *
-     * @return the status.
+     * @return the status
      */
+    @Override
     public YangStatusType getStatus() {
         return status;
     }
@@ -144,14 +151,15 @@ public class YangBit implements YangCommonInfo, Parsable {
     /**
      * Set the status.
      *
-     * @param status the status to set.
+     * @param status the status to set
      */
+    @Override
     public void setStatus(YangStatusType status) {
         this.status = status;
     }
 
     /**
-     * Get the bit position.
+     * Returns bit position.
      *
      * @return the position
      */
@@ -162,7 +170,7 @@ public class YangBit implements YangCommonInfo, Parsable {
     /**
      * Set the bit position.
      *
-     * @param position the position to set.
+     * @param position the position to set
      */
     public void setPosition(int position) {
         this.position = position;
@@ -173,15 +181,34 @@ public class YangBit implements YangCommonInfo, Parsable {
      *
      * @return ParsedDataType returns BIT_DATA
      */
-    public ParsableDataType getParsableDataType() {
-        return ParsableDataType.BIT_DATA;
+    @Override
+    public YangConstructType getYangConstructType() {
+        return YangConstructType.BIT_DATA;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj instanceof YangBit) {
+            final YangBit other = (YangBit) obj;
+            return Objects.equals(this.bitName, other.bitName);
+        }
+        return false;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(this.bitName);
     }
 
     /**
      * Validate the data on entering the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnEntry() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
     }
@@ -189,8 +216,9 @@ public class YangBit implements YangCommonInfo, Parsable {
     /**
      * Validate the data on exiting the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnExit() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
     }

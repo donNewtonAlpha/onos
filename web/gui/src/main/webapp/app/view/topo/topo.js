@@ -28,15 +28,15 @@
         'onosRemote'
     ];
 
-    // references to injected services etc.
-    var $scope, $log, $cookies, fs, ks, zs, gs, ms, sus, flash, wss, ps,
-        tds, tes, tfs, tps, tis, tss, tls, tts, tos, fltr, ttbs, ttip, tov;
+    // references to injected services
+    var $scope, $log, $cookies, fs, ks, zs, gs, ms, sus, flash, wss, ps, th,
+        tds, tes, tfs, tps, tis, tss, tls, tts, tos, fltr, ttbs, tspr, ttip, tov;
 
     // DOM elements
     var ovtopo, svg, defs, zoomLayer, mapG, spriteG, forceG, noDevsLayer;
 
     // Internal state
-    var zoomer, actionMap;
+    var zoomer, actionMap, themeListener;
 
     // --- Short Cut Keys ------------------------------------------------
 
@@ -345,25 +345,92 @@
         }
     };
 
+    var tintOn = 0,
+        shadeFlip = 0,
+        shadePalette = {
+        light: {
+            sea: 'aliceblue',
+            land: 'white',
+            outline: '#ddd'
+        },
+        dark: {
+            sea: '#001830',
+            land: '#232331',
+            outline: '#3a3a3a'
+        }
+    };
+
+    function shading() {
+        return tintOn ? {
+            palette: shadePalette[th.theme()],
+            flip: shadeFlip
+        } : '';
+    }
 
     function setUpMap($loc) {
-        var s1 = $loc.search().mapid,
-            s2 = ps.getPrefs('topo_mapid'),
-            mapId = s1 || (s2 && s2.id) || 'usa',
+        var qp = $loc.search(),
+            pr = ps.getPrefs('topo_mapid'),
+            mi1 = qp.mapid,
+            mi2 = pr && pr.id,
+            mapId = mi1 || mi2 || 'usa',
+            ms1 = qp.mapscale,
+            ms2 = pr && pr.scale,
+            mapScale = ms1 || ms2 || 1,
+            t1 = qp.tint,
+            t2 = pr && pr.tint,
+            tint = t1 || t2 || 'off',
             promise,
-            cfilter,
-            opts;
+            cfilter;
+
+        tintOn = tint === 'on' ? 1 : 0;
+
+        $log.debug('setUpMap() mapId:', mapId, ', mapScale:', mapScale,
+                   ', tint:', tint);
 
         mapG = zoomLayer.append('g').attr('id', 'topo-map');
         if (mapId === 'usa') {
-            promise = ms.loadMapInto(mapG, '*continental_us');
+            shadeFlip = 0;
+            promise = ms.loadMapInto(mapG, '*continental_us', {
+                adjustScale: mapScale,
+                shading: shading()
+            });
+        } else if (mapId === 'bayarea') {
+            shadeFlip = 1;
+            promise = ms.loadMapInto(mapG, '*bayarea', {
+                objectTag: 'bayareaGEO',
+                adjustScale: mapScale,
+                shading: shading()
+            });
+        } else if (mapId === 'taiwan') {
+            shadeFlip = 0;
+            promise = ms.loadMapInto(mapG, '*taiwan', {
+                objectTag: 'taiwan',
+                adjustScale: mapScale,
+                shading: shading()
+            })
         } else {
-            ps.setPrefs('topo_mapid', {id:mapId});
+            shadeFlip = 0;
             cfilter = countryFilters[mapId] || countryFilters.world;
-            opts = { countryFilter: cfilter };
-            promise = ms.loadMapRegionInto(mapG, opts);
+            promise = ms.loadMapRegionInto(mapG, {
+                countryFilter: cfilter,
+                adjustScale: mapScale,
+                shading: shading()
+            });
         }
+        ps.setPrefs('topo_mapid', { id: mapId, scale: mapScale, tint: tint });
         return promise;
+    }
+
+    // set up theme listener to re-shade the map when required.
+    function mapShader(on) {
+        if (on) {
+            themeListener = th.addListener(function () {
+                ms.reshade(shading());
+            });
+        } else {
+            th.removeListener(themeListener);
+            themeListener = null;
+        }
     }
 
     function opacifyMap(b) {
@@ -438,7 +505,8 @@
         .controller('OvTopoCtrl', ['$scope', '$log', '$location', '$timeout',
             '$cookies', 'FnService', 'MastService', 'KeyService', 'ZoomService',
             'GlyphService', 'MapService', 'SvgUtilService', 'FlashService',
-            'WebSocketService', 'PrefsService', 'TopoDialogService',
+            'WebSocketService', 'PrefsService', 'ThemeService',
+            'TopoDialogService',
             'TopoEventService', 'TopoForceService', 'TopoPanelService',
             'TopoInstService', 'TopoSelectService', 'TopoLinkService',
             'TopoTrafficService', 'TopoObliqueService', 'TopoFilterService',
@@ -446,9 +514,10 @@
             'TopoOverlayService',
 
         function (_$scope_, _$log_, $loc, $timeout, _$cookies_, _fs_, mast, _ks_,
-                  _zs_, _gs_, _ms_, _sus_, _flash_, _wss_, _ps_, _tds_, _tes_,
+                  _zs_, _gs_, _ms_, _sus_, _flash_, _wss_, _ps_, _th_,
+                  _tds_, _tes_,
                   _tfs_, _tps_, _tis_, _tss_, _tls_, _tts_, _tos_, _fltr_,
-                  _ttbs_, tspr, _ttip_, _tov_) {
+                  _ttbs_, _tspr_, _ttip_, _tov_) {
             var params = $loc.search(),
                 projection,
                 dim,
@@ -474,6 +543,7 @@
             flash = _flash_;
             wss = _wss_;
             ps = _ps_;
+            th = _th_;
             tds = _tds_;
             tes = _tes_;
             tfs = _tfs_;
@@ -488,6 +558,7 @@
             tos = _tos_;
             fltr = _fltr_;
             ttbs = _ttbs_;
+            tspr = _tspr_;
             ttip = _ttip_;
             tov = _tov_;
 
@@ -513,6 +584,7 @@
                 tis.destroyInst();
                 tfs.destroyForce();
                 ttbs.destroyToolbar();
+                mapShader(false);
             });
 
             // svg layer and initialization of components
@@ -538,6 +610,7 @@
                     flash.enable(false);
                     toggleMap(prefsState.bg);
                     flash.enable(true);
+                    mapShader(true);
 
                     // now we have the map projection, we are ready for
                     //  the server to send us device/host data...
@@ -547,6 +620,7 @@
                     restoreSummaryFromPrefs();
                 }
             );
+            tes.bindHandlers();
             setUpSprites($loc, tspr);
 
             forceG = zoomLayer.append('g').attr('id', 'topo-force');

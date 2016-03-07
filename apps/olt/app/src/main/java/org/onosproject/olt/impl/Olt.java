@@ -16,18 +16,21 @@
 package org.onosproject.olt.impl;
 
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
+import org.apache.felix.scr.annotations.Modified;
+import org.apache.felix.scr.annotations.Property;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.apache.felix.scr.annotations.Service;
 import org.onlab.packet.EthType;
 import org.onlab.packet.VlanId;
+import org.onosproject.cfg.ComponentConfigService;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.event.AbstractListenerManager;
+import org.onosproject.mastership.MastershipService;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.Port;
@@ -58,17 +61,24 @@ import org.onosproject.olt.AccessDeviceData;
 import org.onosproject.olt.AccessDeviceEvent;
 import org.onosproject.olt.AccessDeviceListener;
 import org.onosproject.olt.AccessDeviceService;
+import org.onosproject.store.serializers.KryoNamespaces;
+import org.onosproject.store.service.Serializer;
+import org.onosproject.store.service.StorageService;
+import org.osgi.service.component.ComponentContext;
 import org.slf4j.Logger;
 
+import java.util.Dictionary;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
+import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import static com.google.common.base.Strings.isNullOrEmpty;
+import static org.onlab.util.Tools.get;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -80,10 +90,17 @@ import static org.slf4j.LoggerFactory.getLogger;
 public class Olt
         extends AbstractListenerManager<AccessDeviceEvent, AccessDeviceListener>
         implements AccessDeviceService {
+
+    private static final short DEFAULT_VLAN = 0;
+    private static final String SUBSCRIBERS = "existing-subscribers";
+
     private final Logger log = getLogger(getClass());
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected FlowObjectiveService flowObjectiveService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected MastershipService mastershipService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected DeviceService deviceService;
@@ -94,11 +111,19 @@ public class Olt
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected NetworkConfigRegistry networkConfig;
 
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected ComponentConfigService componentConfigService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected StorageService storageService;
+
+    @Property(name = "defaultVlan", intValue = DEFAULT_VLAN,
+            label = "Default VLAN RG<->ONU traffic")
+    private int defaultVlan = DEFAULT_VLAN;
+
     private final DeviceListener deviceListener = new InternalDeviceListener();
 
     private ApplicationId appId;
-
-    private static final VlanId DEFAULT_VLAN = VlanId.vlanId((short) 0);
 
     private ExecutorService oltInstallers = Executors.newFixedThreadPool(4,
                                                                          groupedThreads("onos/olt-service",
@@ -106,10 +131,7 @@ public class Olt
 
     private Map<DeviceId, AccessDeviceData> oltData = new ConcurrentHashMap<>();
 
-    private Map<ConnectPoint, Set<ForwardingObjective.Builder>> objectives =
-            Maps.newConcurrentMap();
-
-    private Map<ConnectPoint, VlanId> subscribers = Maps.newConcurrentMap();
+    private Map<ConnectPoint, VlanId> subscribers;
 
     private InternalNetworkConfigListener configListener =
             new InternalNetworkConfigListener();
@@ -127,8 +149,10 @@ public class Olt
 
 
     @Activate
-    public void activate() {
+    public void activate(ComponentContext context) {
+        modified(context);
         appId = coreService.registerApplication("org.onosproject.olt");
+        componentConfigService.registerProperties(getClass());
 
         eventDispatcher.addSink(AccessDeviceEvent.class, listenerRegistry);
 
@@ -153,6 +177,11 @@ public class Olt
                 .forEach(p -> processFilteringObjectives((DeviceId) p.element().id(),
                                                          p.number(), true));
 
+        subscribers = storageService.<ConnectPoint, VlanId>consistentMapBuilder()
+                .withName(SUBSCRIBERS)
+                .withSerializer(Serializer.using(KryoNamespaces.API))
+                .build().asJavaMap();
+
         deviceService.addListener(deviceListener);
 
         log.info("Started with Application ID {}", appId.id());
@@ -160,10 +189,23 @@ public class Olt
 
     @Deactivate
     public void deactivate() {
+        componentConfigService.unregisterProperties(getClass(), false);
         deviceService.removeListener(deviceListener);
         networkConfig.removeListener(configListener);
         networkConfig.unregisterConfigFactory(configFactory);
         log.info("Stopped");
+    }
+
+    @Modified
+    public void modified(ComponentContext context) {
+        Dictionary<?, ?> properties = context != null ? context.getProperties() : new Properties();
+
+        try {
+            String s = get(properties, "defaultVlan");
+            defaultVlan = isNullOrEmpty(s) ? DEFAULT_VLAN : Integer.parseInt(s.trim());
+        } catch (Exception e) {
+            defaultVlan = DEFAULT_VLAN;
+        }
     }
 
     @Override
@@ -188,44 +230,61 @@ public class Olt
             return;
         }
 
-        unprovisionSubscriber(olt.deviceId(), olt.uplink(), port.port(), olt.vlan());
+        VlanId subscriberVlan = subscribers.remove(port);
+
+        if (subscriberVlan == null) {
+            log.warn("Unknown subscriber at location {}", port);
+            return;
+        }
+
+        unprovisionSubscriber(olt.deviceId(), olt.uplink(), port.port(), subscriberVlan,
+                              olt.vlan(), olt.defaultVlan());
 
     }
 
-    private void unprovisionSubscriber(DeviceId deviceId, PortNumber uplink,
-                                       PortNumber subscriberPort, VlanId deviceVlan) {
+    @Override
+    public Map<DeviceId, AccessDeviceData> fetchOlts() {
+        return Maps.newHashMap(oltData);
+    }
 
-        //FIXME: This method is slightly ugly but it'll do until we have a better
-        // way to remove flows from the flow store.
+    private void unprovisionSubscriber(DeviceId deviceId, PortNumber uplink,
+                                       PortNumber subscriberPort, VlanId subscriberVlan,
+                                       VlanId deviceVlan, Optional<VlanId> defaultVlan) {
 
         CompletableFuture<ObjectiveError> downFuture = new CompletableFuture();
         CompletableFuture<ObjectiveError> upFuture = new CompletableFuture();
 
-        ConnectPoint cp = new ConnectPoint(deviceId, subscriberPort);
-
-        VlanId subscriberVlan = subscribers.remove(cp);
-
-        Set<ForwardingObjective.Builder> fwds = objectives.remove(cp);
-
-        if (fwds == null || fwds.size() != 2) {
-            log.warn("Unknown or incomplete subscriber at {}", cp);
-            return;
-        }
+        ForwardingObjective.Builder upFwd = upBuilder(uplink, subscriberPort,
+                                                      subscriberVlan, deviceVlan,
+                                                      defaultVlan);
+        ForwardingObjective.Builder downFwd = downBuilder(uplink, subscriberPort,
+                                                          subscriberVlan, deviceVlan,
+                                                          defaultVlan);
 
 
-        fwds.stream().forEach(
-                fwd -> flowObjectiveService.forward(deviceId,
-                                                    fwd.remove(new ObjectiveContext() {
-                                                        @Override
-                                                        public void onSuccess(Objective objective) {
-                                                            upFuture.complete(null);
-                                                        }
+        flowObjectiveService.forward(deviceId, upFwd.remove(new ObjectiveContext() {
+            @Override
+            public void onSuccess(Objective objective) {
+                upFuture.complete(null);
+            }
 
-                                                        @Override
-                                                        public void onError(Objective objective, ObjectiveError error) {
-                                                            upFuture.complete(error);
-                                                        }
-                                                    })));
+            @Override
+            public void onError(Objective objective, ObjectiveError error) {
+                upFuture.complete(error);
+            }
+        }));
+
+        flowObjectiveService.forward(deviceId, downFwd.remove(new ObjectiveContext() {
+            @Override
+            public void onSuccess(Objective objective) {
+                downFuture.complete(null);
+            }
+
+            @Override
+            public void onError(Objective objective, ObjectiveError error) {
+                downFuture.complete(error);
+            }
+        }));
 
         upFuture.thenAcceptBothAsync(downFuture, (upStatus, downStatus) -> {
             if (upStatus == null && downStatus == null) {
@@ -233,7 +292,6 @@ public class Olt
                                            deviceId,
                                            deviceVlan,
                                            subscriberVlan));
-                processFilteringObjectives(deviceId, subscriberPort, true);
             } else if (downStatus != null) {
                 log.error("Subscriber with vlan {} on device {} " +
                                   "on port {} failed downstream uninstallation: {}",
@@ -255,54 +313,17 @@ public class Olt
         CompletableFuture<ObjectiveError> downFuture = new CompletableFuture();
         CompletableFuture<ObjectiveError> upFuture = new CompletableFuture();
 
-        TrafficSelector upstream = DefaultTrafficSelector.builder()
-                .matchVlanId(defaultVlan.orElse(DEFAULT_VLAN))
-                .matchInPort(subscriberPort)
-                .build();
-
-        TrafficSelector downstream = DefaultTrafficSelector.builder()
-                .matchVlanId(deviceVlan)
-                .matchInPort(uplinkPort)
-                .matchInnerVlanId(subscriberVlan)
-                .build();
-
-        TrafficTreatment upstreamTreatment = DefaultTrafficTreatment.builder()
-                .pushVlan()
-                .setVlanId(subscriberVlan)
-                .pushVlan()
-                .setVlanId(deviceVlan)
-                .setOutput(uplinkPort)
-                .build();
-
-        TrafficTreatment downstreamTreatment = DefaultTrafficTreatment.builder()
-                .popVlan()
-                .setVlanId(defaultVlan.orElse(DEFAULT_VLAN))
-                .setOutput(subscriberPort)
-                .build();
+        ForwardingObjective.Builder upFwd = upBuilder(uplinkPort, subscriberPort,
+                                                      subscriberVlan, deviceVlan,
+                                                      defaultVlan);
 
 
-        ForwardingObjective.Builder upFwd = DefaultForwardingObjective.builder()
-                .withFlag(ForwardingObjective.Flag.VERSATILE)
-                .withPriority(1000)
-                .makePermanent()
-                .withSelector(upstream)
-                .fromApp(appId)
-                .withTreatment(upstreamTreatment);
-
-
-        ForwardingObjective.Builder downFwd = DefaultForwardingObjective.builder()
-                .withFlag(ForwardingObjective.Flag.VERSATILE)
-                .withPriority(1000)
-                .makePermanent()
-                .withSelector(downstream)
-                .fromApp(appId)
-                .withTreatment(downstreamTreatment);
+        ForwardingObjective.Builder downFwd = downBuilder(uplinkPort, subscriberPort,
+                                                          subscriberVlan, deviceVlan,
+                                                          defaultVlan);
 
         ConnectPoint cp = new ConnectPoint(deviceId, subscriberPort);
-
         subscribers.put(cp, subscriberVlan);
-        objectives.put(cp, Sets.newHashSet(upFwd, downFwd));
-
 
         flowObjectiveService.forward(deviceId, upFwd.add(new ObjectiveContext() {
             @Override
@@ -315,7 +336,6 @@ public class Olt
                 upFuture.complete(error);
             }
         }));
-
 
         flowObjectiveService.forward(deviceId, downFwd.add(new ObjectiveContext() {
             @Override
@@ -336,7 +356,6 @@ public class Olt
                                            deviceVlan,
                                            subscriberVlan));
 
-                processFilteringObjectives(deviceId, subscriberPort, false);
             } else if (downStatus != null) {
                 log.error("Subscriber with vlan {} on device {} " +
                                   "on port {} failed downstream installation: {}",
@@ -350,7 +369,64 @@ public class Olt
 
     }
 
+    private ForwardingObjective.Builder downBuilder(PortNumber uplinkPort,
+                                                    PortNumber subscriberPort,
+                                                    VlanId subscriberVlan,
+                                                    VlanId deviceVlan,
+                                                    Optional<VlanId> defaultVlan) {
+        TrafficSelector downstream = DefaultTrafficSelector.builder()
+                .matchVlanId(deviceVlan)
+                .matchInPort(uplinkPort)
+                .matchInnerVlanId(subscriberVlan)
+                .build();
+
+        TrafficTreatment downstreamTreatment = DefaultTrafficTreatment.builder()
+                .popVlan()
+                .setVlanId(defaultVlan.orElse(VlanId.vlanId((short) this.defaultVlan)))
+                .setOutput(subscriberPort)
+                .build();
+
+        return DefaultForwardingObjective.builder()
+                .withFlag(ForwardingObjective.Flag.VERSATILE)
+                .withPriority(1000)
+                .makePermanent()
+                .withSelector(downstream)
+                .fromApp(appId)
+                .withTreatment(downstreamTreatment);
+    }
+
+    private ForwardingObjective.Builder upBuilder(PortNumber uplinkPort,
+                                                  PortNumber subscriberPort,
+                                                  VlanId subscriberVlan,
+                                                  VlanId deviceVlan,
+                                                  Optional<VlanId> defaultVlan) {
+        TrafficSelector upstream = DefaultTrafficSelector.builder()
+                .matchVlanId(defaultVlan.orElse(VlanId.vlanId((short) this.defaultVlan)))
+                .matchInPort(subscriberPort)
+                .build();
+
+
+        TrafficTreatment upstreamTreatment = DefaultTrafficTreatment.builder()
+                .pushVlan()
+                .setVlanId(subscriberVlan)
+                .pushVlan()
+                .setVlanId(deviceVlan)
+                .setOutput(uplinkPort)
+                .build();
+
+        return DefaultForwardingObjective.builder()
+                .withFlag(ForwardingObjective.Flag.VERSATILE)
+                .withPriority(1000)
+                .makePermanent()
+                .withSelector(upstream)
+                .fromApp(appId)
+                .withTreatment(upstreamTreatment);
+    }
+
     private void processFilteringObjectives(DeviceId devId, PortNumber port, boolean install) {
+        if (!mastershipService.isLocalMaster(devId)) {
+            return;
+        }
         DefaultFilteringObjective.Builder builder = DefaultFilteringObjective.builder();
 
         FilteringObjective eapol = (install ? builder.permit() : builder.deny())
@@ -397,9 +473,11 @@ public class Olt
                     break;
                 case PORT_REMOVED:
                     AccessDeviceData olt = oltData.get(devId);
+                    VlanId vlan = subscribers.get(new ConnectPoint(devId,
+                                                                   event.port().number()));
                     unprovisionSubscriber(devId, olt.uplink(),
                                           event.port().number(),
-                                          olt.vlan());
+                                          vlan, olt.vlan(), olt.defaultVlan());
                     if (!oltData.get(devId).uplink().equals(event.port().number()) &&
                             event.port().isEnabled()) {
                         processFilteringObjectives(devId, event.port().number(), false);
@@ -419,6 +497,7 @@ public class Olt
                     post(new AccessDeviceEvent(
                             AccessDeviceEvent.Type.DEVICE_CONNECTED, devId,
                             null, null));
+                    provisionDefaultFlows(devId);
                     break;
                 case DEVICE_REMOVED:
                     post(new AccessDeviceEvent(
@@ -452,24 +531,35 @@ public class Olt
 
                 case CONFIG_ADDED:
                 case CONFIG_UPDATED:
-                    if (event.configClass().equals(CONFIG_CLASS)) {
-                        AccessDeviceConfig config =
-                                networkConfig.getConfig((DeviceId) event.subject(), CONFIG_CLASS);
-                        if (config != null) {
-                            oltData.put(config.getOlt().deviceId(), config.getOlt());
-                            provisionDefaultFlows((DeviceId) event.subject());
-                        }
+
+                    AccessDeviceConfig config =
+                            networkConfig.getConfig((DeviceId) event.subject(), CONFIG_CLASS);
+                    if (config != null) {
+                        oltData.put(config.getOlt().deviceId(), config.getOlt());
+                        provisionDefaultFlows((DeviceId) event.subject());
                     }
+
                     break;
+                case CONFIG_REGISTERED:
                 case CONFIG_UNREGISTERED:
+                    break;
                 case CONFIG_REMOVED:
+                    oltData.remove(event.subject());
                 default:
                     break;
             }
         }
+
+        @Override
+        public boolean isRelevant(NetworkConfigEvent event) {
+            return event.configClass().equals(CONFIG_CLASS);
+        }
     }
 
     private void provisionDefaultFlows(DeviceId deviceId) {
+        if (!mastershipService.isLocalMaster(deviceId)) {
+            return;
+        }
         List<Port> ports = deviceService.getPorts(deviceId);
 
         ports.stream()

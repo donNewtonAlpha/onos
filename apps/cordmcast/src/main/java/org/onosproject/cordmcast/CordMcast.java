@@ -15,11 +15,16 @@
  */
 package org.onosproject.cordmcast;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.sun.jersey.api.client.Client;
+import com.sun.jersey.api.client.ClientHandlerException;
 import com.sun.jersey.api.client.WebResource;
 import com.sun.jersey.api.client.filter.HTTPBasicAuthFilter;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
@@ -32,9 +37,16 @@ import org.onlab.packet.IpAddress;
 import org.onlab.packet.VlanId;
 import org.onosproject.cfg.ComponentConfigService;
 import org.onosproject.codec.CodecService;
+import org.onosproject.codec.JsonCodec;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.net.ConnectPoint;
+import org.onosproject.net.DeviceId;
+import org.onosproject.net.config.ConfigFactory;
+import org.onosproject.net.config.NetworkConfigEvent;
+import org.onosproject.net.config.NetworkConfigListener;
+import org.onosproject.net.config.NetworkConfigRegistry;
+import org.onosproject.net.config.basics.SubjectFactories;
 import org.onosproject.net.flow.DefaultTrafficSelector;
 import org.onosproject.net.flow.DefaultTrafficTreatment;
 import org.onosproject.net.flow.TrafficSelector;
@@ -46,48 +58,53 @@ import org.onosproject.net.flowobjective.NextObjective;
 import org.onosproject.net.flowobjective.Objective;
 import org.onosproject.net.flowobjective.ObjectiveContext;
 import org.onosproject.net.flowobjective.ObjectiveError;
-import org.onosproject.net.group.GroupService;
 import org.onosproject.net.mcast.McastEvent;
 import org.onosproject.net.mcast.McastListener;
 import org.onosproject.net.mcast.McastRoute;
 import org.onosproject.net.mcast.McastRouteInfo;
 import org.onosproject.net.mcast.MulticastRouteService;
+import org.onosproject.olt.AccessDeviceConfig;
+import org.onosproject.olt.AccessDeviceData;
 import org.onosproject.rest.AbstractWebResource;
 import org.osgi.service.component.ComponentContext;
 import org.slf4j.Logger;
 
+import javax.ws.rs.core.MediaType;
+import java.io.IOException;
 import java.util.Dictionary;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.net.MediaType.JSON_UTF_8;
 import static org.onlab.util.Tools.get;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**
- * CORD multicast provisoning application. Operates by listening to
+ * CORD multicast provisioning application. Operates by listening to
  * events on the multicast rib and provisioning groups to program multicast
  * flows on the dataplane.
  */
 @Component(immediate = true)
 public class CordMcast {
 
-    private static final int DEFAULT_PRIORITY = 1000;
+
+    private static final int DEFAULT_REST_TIMEOUT_MS = 2000;
+    private static final int DEFAULT_PRIORITY = 500;
     private static final short DEFAULT_MCAST_VLAN = 4000;
     private static final String DEFAULT_SYNC_HOST = "10.90.0.8:8181";
     private static final String DEFAULT_USER = "karaf";
     private static final String DEFAULT_PASSWORD = "karaf";
+    private static final boolean DEFAULT_VLAN_ENABLED = true;
 
     private final Logger log = getLogger(getClass());
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected MulticastRouteService mcastService;
-
-    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected GroupService groupService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected FlowObjectiveService flowObjectiveService;
@@ -101,13 +118,15 @@ public class CordMcast {
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected ComponentConfigService componentConfigService;
 
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected NetworkConfigRegistry networkConfig;
+
     protected McastListener listener = new InternalMulticastListener();
+    private InternalNetworkConfigListener configListener =
+            new InternalNetworkConfigListener();
 
     //TODO: move this to a ec map
     private Map<IpAddress, Integer> groups = Maps.newConcurrentMap();
-
-    //TODO: move this to distributed atomic long
-    private AtomicInteger channels = new AtomicInteger(0);
 
     private ApplicationId appId;
 
@@ -115,9 +134,9 @@ public class CordMcast {
             label = "VLAN for multicast traffic")
     private int mcastVlan = DEFAULT_MCAST_VLAN;
 
-    @Property(name = "vlanEnabled", boolValue = false,
-            label = "Use vlan for multicast traffic")
-    private boolean vlanEnabled = false;
+    @Property(name = "vlanEnabled", boolValue = DEFAULT_VLAN_ENABLED,
+            label = "Use vlan for multicast traffic?")
+    private boolean vlanEnabled = DEFAULT_VLAN_ENABLED;
 
     @Property(name = "priority", intValue = DEFAULT_PRIORITY,
             label = "Priority for multicast rules")
@@ -137,29 +156,67 @@ public class CordMcast {
 
     private String fabricOnosUrl;
 
+    private Map<DeviceId, AccessDeviceData> oltData = new ConcurrentHashMap<>();
+
+    private static final Class<AccessDeviceConfig> CONFIG_CLASS =
+            AccessDeviceConfig.class;
+
+    private ConfigFactory<DeviceId, AccessDeviceConfig> configFactory =
+            new ConfigFactory<DeviceId, AccessDeviceConfig>(
+                    SubjectFactories.DEVICE_SUBJECT_FACTORY, CONFIG_CLASS, "accessDevice") {
+                @Override
+                public AccessDeviceConfig createConfig() {
+                    return new AccessDeviceConfig();
+                }
+            };
+
     @Activate
-    public void activate() {
-        appId = coreService.registerApplication("org.onosproject.cordmcast");
+    public void activate(ComponentContext context) {
         componentConfigService.registerProperties(getClass());
+        modified(context);
+
+        appId = coreService.registerApplication("org.onosproject.cordmcast");
+
+
+        clearRemoteRoutes();
+
+        networkConfig.registerConfigFactory(configFactory);
+        networkConfig.addListener(configListener);
+
+        networkConfig.getSubjects(DeviceId.class, AccessDeviceConfig.class).forEach(
+                subject -> {
+                    AccessDeviceConfig config = networkConfig.getConfig(subject, AccessDeviceConfig.class);
+                    if (config != null) {
+                        AccessDeviceData data = config.getOlt();
+                        oltData.put(data.deviceId(), data);
+                    }
+                }
+        );
+
+
         mcastService.addListener(listener);
 
-        fabricOnosUrl = "http://" + syncHost + "/onos/v1/mcast";
+        mcastService.getRoutes().stream()
+                .map(r -> new ImmutablePair<>(r, mcastService.fetchSinks(r)))
+                .filter(pair -> pair.getRight() != null && !pair.getRight().isEmpty())
+                .forEach(pair -> pair.getRight().forEach(sink -> provisionGroup(pair.getLeft(),
+                                                                                sink)));
 
-        //TODO: obtain all existing mcast routes
         log.info("Started");
     }
 
     @Deactivate
     public void deactivate() {
-        componentConfigService.unregisterProperties(getClass(), true);
+        componentConfigService.unregisterProperties(getClass(), false);
         mcastService.removeListener(listener);
+        networkConfig.unregisterConfigFactory(configFactory);
+        networkConfig.removeListener(configListener);
         log.info("Stopped");
     }
 
     @Modified
     public void modified(ComponentContext context) {
         Dictionary<?, ?> properties = context != null ? context.getProperties() : new Properties();
-
 
         try {
             String s = get(properties, "username");
@@ -172,12 +229,12 @@ public class CordMcast {
             mcastVlan = isNullOrEmpty(s) ? DEFAULT_MCAST_VLAN : Short.parseShort(s.trim());
 
             s = get(properties, "vlanEnabled");
-            vlanEnabled = isNullOrEmpty(s) || Boolean.parseBoolean(s.trim());
+            vlanEnabled = isNullOrEmpty(s) ? DEFAULT_VLAN_ENABLED : Boolean.parseBoolean(s.trim());
 
             s = get(properties, "priority");
             priority = isNullOrEmpty(s) ? DEFAULT_PRIORITY : Integer.parseInt(s.trim());
 
-            s = get(properties, syncHost);
+            s = get(properties, "syncHost");
             syncHost = isNullOrEmpty(s) ? DEFAULT_SYNC_HOST : s.trim();
         } catch (Exception e) {
             user = DEFAULT_USER;
@@ -187,13 +244,17 @@ public class CordMcast {
             vlanEnabled = false;
             priority = DEFAULT_PRIORITY;
         }
+        fabricOnosUrl = createRemoteUrl(syncHost);
+    }
 
-
+    private static String createRemoteUrl(String remoteHost) {
+        return "http://" + remoteHost + "/onos/v1/mcast";
     }
 
     private class InternalMulticastListener implements McastListener {
         @Override
         public void event(McastEvent event) {
+            McastRouteInfo info = event.subject();
             switch (event.type()) {
                 case ROUTE_ADDED:
                     break;
@@ -202,7 +263,11 @@ public class CordMcast {
                 case SOURCE_ADDED:
                     break;
                 case SINK_ADDED:
-                    provisionGroup(event.subject());
+                    if (!info.sink().isPresent()) {
+                        log.warn("No sink given after sink added event: {}", info);
+                        return;
+                    }
+                    provisionGroup(info.route(), info.sink().get());
                     break;
                 case SINK_REMOVED:
                     unprovisionGroup(event.subject());
@@ -215,7 +280,7 @@ public class CordMcast {
 
     private void unprovisionGroup(McastRouteInfo info) {
         if (info.sinks().isEmpty()) {
-            removeSyncedRoute(info);
+            removeRemoteRoute(info.route());
         }
 
         if (!info.sink().isPresent()) {
@@ -248,21 +313,25 @@ public class CordMcast {
         flowObjectiveService.next(loc.deviceId(), next);
     }
 
-    private void provisionGroup(McastRouteInfo info) {
-        if (!info.sink().isPresent()) {
-            log.warn("No sink given after sink added event: {}", info);
+    private void provisionGroup(McastRoute route, ConnectPoint sink) {
+        checkNotNull(route, "Route cannot be null");
+        checkNotNull(sink, "Sink cannot be null");
+
+        AccessDeviceData oltInfo = oltData.get(sink.deviceId());
+
+        if (oltInfo == null) {
+            log.warn("Unknown OLT device : {}", sink.deviceId());
             return;
         }
-        ConnectPoint loc = info.sink().get();
 
         final AtomicBoolean sync = new AtomicBoolean(false);
 
-        Integer nextId = groups.computeIfAbsent(info.route().group(), (g) -> {
-            Integer id = allocateId();
+        Integer nextId = groups.computeIfAbsent(route.group(), (g) -> {
+            Integer id = flowObjectiveService.allocateNextId();
 
             NextObjective next = DefaultNextObjective.builder()
                     .fromApp(appId)
-                    .addTreatment(DefaultTrafficTreatment.builder().setOutput(loc.port()).build())
+                    .addTreatment(DefaultTrafficTreatment.builder().setOutput(sink.port()).build())
                     .withType(NextObjective.Type.BROADCAST)
                     .withId(id)
                     .add(new ObjectiveContext() {
@@ -281,17 +350,16 @@ public class CordMcast {
                         }
                     });
 
-            flowObjectiveService.next(loc.deviceId(), next);
+            flowObjectiveService.next(sink.deviceId(), next);
 
             TrafficSelector.Builder mcast = DefaultTrafficSelector.builder()
+                    .matchInPort(oltInfo.uplink())
                     .matchEthType(Ethernet.TYPE_IPV4)
                     .matchIPDst(g.toIpPrefix());
-
 
             if (vlanEnabled) {
                 mcast.matchVlanId(VlanId.vlanId((short) mcastVlan));
             }
-
 
             ForwardingObjective fwd = DefaultForwardingObjective.builder()
                     .fromApp(appId)
@@ -314,17 +382,17 @@ public class CordMcast {
                         }
                     });
 
-            flowObjectiveService.forward(loc.deviceId(), fwd);
+            flowObjectiveService.forward(sink.deviceId(), fwd);
 
             sync.set(true);
 
-           return id;
+            return id;
         });
 
         if (!sync.get()) {
             NextObjective next = DefaultNextObjective.builder()
                     .fromApp(appId)
-                    .addTreatment(DefaultTrafficTreatment.builder().setOutput(loc.port()).build())
+                    .addTreatment(DefaultTrafficTreatment.builder().setOutput(sink.port()).build())
                     .withType(NextObjective.Type.BROADCAST)
                     .withId(nextId)
                     .addToExisting(new ObjectiveContext() {
@@ -343,54 +411,129 @@ public class CordMcast {
                         }
                     });
 
-            flowObjectiveService.next(loc.deviceId(), next);
+            flowObjectiveService.next(sink.deviceId(), next);
         }
 
-        if (sync.get()) {
-            syncRoute(info);
-        }
+
+        addRemoteRoute(route);
     }
 
-    private void syncRoute(McastRouteInfo info) {
+    private void addRemoteRoute(McastRoute route) {
+        checkNotNull(route);
         if (syncHost == null) {
             log.warn("No host configured for synchronization; route will be dropped");
             return;
         }
 
-        log.debug("Sending route to other ONOS: {}", info.route());
+        log.debug("Sending route {} to other ONOS {}", route, fabricOnosUrl);
 
         WebResource.Builder builder = getClientBuilder(fabricOnosUrl);
 
         ObjectNode json = codecService.getCodec(McastRoute.class)
-                .encode(info.route(), new AbstractWebResource());
-        builder.post(json.toString());
+                .encode(route, new AbstractWebResource());
+
+        try {
+            builder.post(json.toString());
+        } catch (ClientHandlerException e) {
+            log.warn("Unable to send route to remote controller: {}", e.getMessage());
+        }
     }
 
-    private void removeSyncedRoute(McastRouteInfo info) {
+    private void removeRemoteRoute(McastRoute route) {
         if (syncHost == null) {
             log.warn("No host configured for synchronization; route will be dropped");
             return;
         }
 
-        log.debug("Removing route from other ONOS: {}", info.route());
+        log.debug("Removing route {} from other ONOS {}", route, fabricOnosUrl);
 
         WebResource.Builder builder = getClientBuilder(fabricOnosUrl);
 
         ObjectNode json = codecService.getCodec(McastRoute.class)
-                .encode(info.route(), new AbstractWebResource());
-        builder.delete(json.toString());
+                .encode(route, new AbstractWebResource());
+        try {
+            builder.delete(json.toString());
+        } catch (ClientHandlerException e) {
+            log.warn("Unable to delete route from remote controller: {}", e.getMessage());
+        }
     }
 
-    private Integer allocateId() {
-        return channels.getAndIncrement();
+    private void clearRemoteRoutes() {
+        if (syncHost == null) {
+            log.warn("No host configured for synchronization");
+            return;
+        }
+
+        log.debug("Clearing remote multicast routes from {}", fabricOnosUrl);
+
+        WebResource.Builder builder = getClientBuilder(fabricOnosUrl);
+        List<McastRoute> mcastRoutes = Lists.newArrayList();
+
+        try {
+            String response = builder
+                    .accept(MediaType.APPLICATION_JSON_TYPE)
+                    .get(String.class);
+
+            JsonCodec<McastRoute> routeCodec = codecService.getCodec(McastRoute.class);
+            ObjectMapper mapper = new ObjectMapper();
+
+
+            ObjectNode node = (ObjectNode) mapper.readTree(response);
+            ArrayNode list = (ArrayNode) node.path("routes");
+
+            list.forEach(n -> mcastRoutes.add(
+                    routeCodec.decode((ObjectNode) n, new AbstractWebResource())));
+
+        } catch (ClientHandlerException e) {
+            log.warn("Unable to clear routes from remote controller: {}", e.getMessage());
+        } catch (IOException e) {
+            log.warn("Error clearing remote routes", e);
+        }
+
+        mcastRoutes.forEach(this::removeRemoteRoute);
     }
 
     private WebResource.Builder getClientBuilder(String uri) {
         Client client = Client.create();
+        client.setConnectTimeout(DEFAULT_REST_TIMEOUT_MS);
+        client.setReadTimeout(DEFAULT_REST_TIMEOUT_MS);
         client.addFilter(new HTTPBasicAuthFilter(user, password));
         WebResource resource = client.resource(uri);
         return resource.accept(JSON_UTF_8.toString())
                 .type(JSON_UTF_8.toString());
+    }
+
+    private class InternalNetworkConfigListener implements NetworkConfigListener {
+        @Override
+        public void event(NetworkConfigEvent event) {
+            switch (event.type()) {
+
+                case CONFIG_ADDED:
+                case CONFIG_UPDATED:
+                    AccessDeviceConfig config =
+                            networkConfig.getConfig((DeviceId) event.subject(), CONFIG_CLASS);
+                    if (config != null) {
+                        oltData.put(config.getOlt().deviceId(), config.getOlt());
+                    }
+
+                    break;
+                case CONFIG_REGISTERED:
+                case CONFIG_UNREGISTERED:
+                    break;
+                case CONFIG_REMOVED:
+                    oltData.remove(event.subject());
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        @Override
+        public boolean isRelevant(NetworkConfigEvent event) {
+            return event.configClass().equals(CONFIG_CLASS);
+        }
+
+
     }
 
 }

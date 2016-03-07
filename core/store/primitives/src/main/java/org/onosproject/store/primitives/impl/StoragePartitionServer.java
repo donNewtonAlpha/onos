@@ -31,16 +31,13 @@ import io.atomix.resource.ServiceLoaderResourceResolver;
 
 import java.io.File;
 import java.util.Collection;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
-import org.onosproject.cluster.NodeId;
 import org.onosproject.store.service.PartitionInfo;
 import org.slf4j.Logger;
 
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
 
 /**
  * {@link StoragePartition} server.
@@ -80,7 +77,7 @@ public class StoragePartitionServer implements Managed<StoragePartitionServer> {
                 return CompletableFuture.completedFuture(null);
             }
             synchronized (this) {
-                server = server();
+                server = buildServer(partition.getMemberAddresses());
             }
             serverOpenFuture = server.open();
         } else {
@@ -97,25 +94,33 @@ public class StoragePartitionServer implements Managed<StoragePartitionServer> {
 
     @Override
     public CompletableFuture<Void> close() {
-        // We do not close the server because doing so is equivalent to this node
-        // leaving the cluster and we don't want that here.
-        // The Raft protocol should take care of servers leaving unannounced.
-        return CompletableFuture.completedFuture(null);
+        /**
+         * CopycatServer#kill just shuts down the server and does not result
+         * in any cluster membership changes.
+         */
+        return server.kill();
     }
 
-    private CopycatServer server() {
+    /**
+     * Closes the server and exits the partition.
+     * @return future that is completed when the operation is complete
+     */
+    public CompletableFuture<Void> closeAndExit() {
+        return server.close();
+    }
+
+    private CopycatServer buildServer(Collection<Address> clusterMembers) {
         ResourceTypeResolver resourceResolver = new ServiceLoaderResourceResolver();
         ResourceRegistry registry = new ResourceRegistry();
         resourceTypes.forEach(registry::register);
         resourceResolver.resolve(registry);
-        CopycatServer server = CopycatServer.builder(localAddress, partition.getMemberAddresses())
+        CopycatServer server = CopycatServer.builder(localAddress, clusterMembers)
                 .withName("partition-" + partition.getId())
                 .withSerializer(serializer.clone())
                 .withTransport(transport.get())
                 .withStateMachine(() -> new ResourceManagerState(registry))
                 .withStorage(Storage.builder()
-                         // FIXME: StorageLevel should be DISK
-                        .withStorageLevel(StorageLevel.MEMORY)
+                        .withStorageLevel(StorageLevel.DISK)
                         .withCompactionThreads(1)
                         .withDirectory(dataFolder)
                         .withMaxEntriesPerSegment(MAX_ENTRIES_PER_LOG_SEGMENT)
@@ -125,8 +130,16 @@ public class StoragePartitionServer implements Managed<StoragePartitionServer> {
         return server;
     }
 
-    public Set<NodeId> configuredMembers() {
-        return Sets.newHashSet(partition.getMembers());
+    public CompletableFuture<Void> join(Collection<Address> otherMembers) {
+        server = buildServer(otherMembers);
+
+        return server.open().whenComplete((r, e) -> {
+            if (e == null) {
+                log.info("Successfully joined partition {}", partition.getId());
+            } else {
+                log.info("Failed to join partition {}", partition.getId(), e);
+            }
+        }).thenApply(v -> null);
     }
 
     @Override

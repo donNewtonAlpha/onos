@@ -106,11 +106,7 @@ public class DefaultSingleTablePipeline extends AbstractHandlerBehaviour impleme
 
     @Override
     public void forward(ForwardingObjective fwd) {
-        if (fwd.flag() != ForwardingObjective.Flag.VERSATILE) {
-            throw new UnsupportedOperationException(
-                    "Only VERSATILE is supported.");
-        }
-
+        // Deal with SPECIFIC and VERSATILE in the same manner.
         TrafficSelector selector = fwd.selector();
         TrafficTreatment treatment = fwd.treatment();
         if ((fwd.treatment().deferred().size() == 0) &&
@@ -118,7 +114,7 @@ public class DefaultSingleTablePipeline extends AbstractHandlerBehaviour impleme
                 (fwd.treatment().tableTransition() == null) &&
                 (!fwd.treatment().clearedDeferred())) {
             TrafficTreatment.Builder flowTreatment = DefaultTrafficTreatment.builder();
-            flowTreatment.add(Instructions.createDrop());
+            flowTreatment.add(Instructions.createNoAction());
             treatment = flowTreatment.build();
         }
 

@@ -473,7 +473,7 @@ public class RoutingRulePopulator {
         for (Port port : srManager.deviceService.getPorts(deviceId)) {
             ConnectPoint cp = new ConnectPoint(deviceId, port.number());
             // TODO: Handles dynamic port events when we are ready for dynamic config
-            if (!srManager.deviceConfiguration.excludedPorts().contains(cp) &&
+            if (!srManager.deviceConfiguration.suppressSubnet().contains(cp) &&
                     port.isEnabled()) {
                 Ip4Prefix portSubnet = config.getPortSubnet(deviceId, port.number());
                 VlanId assignedVlan = (portSubnet == null)
@@ -558,12 +558,16 @@ public class RoutingRulePopulator {
      */
     public void populateSubnetBroadcastRule(DeviceId deviceId) {
         config.getSubnets(deviceId).forEach(subnet -> {
+            if (subnet.prefixLength() == 0 ||
+                    subnet.prefixLength() == IpPrefix.MAX_INET_MASK_LENGTH) {
+                return;
+            }
             int nextId = srManager.getSubnetNextObjectiveId(deviceId, subnet);
             VlanId vlanId = srManager.getSubnetAssignedVlanId(deviceId, subnet);
 
             if (nextId < 0 || vlanId == null) {
-                log.error("Cannot install subnet broadcast rule in dev:{} due"
-                        + "to vlanId:{} or nextId:{}", vlanId, nextId);
+                log.error("Cannot install subnet {} broadcast rule in dev:{} due"
+                        + "to vlanId:{} or nextId:{}", subnet, deviceId, vlanId, nextId);
                 return;
             }
 

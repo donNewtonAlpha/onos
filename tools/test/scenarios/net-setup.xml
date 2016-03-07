@@ -34,13 +34,13 @@
         <step name="Wait-For-Mininet" requires="Start-Mininet"
               exec="onos-mininet wait 10"/>
 
-        <step name="Check-Summary" requires="Wait-For-Mininet"
-              exec="onos-check-summary ${OC1} [0-9]* 25 140 0"/>
+        <step name="Check-Summary" requires="~Wait-For-Mininet"
+              exec="onos-check-summary ${OC1} [0-9]* 25 140 25"/>
 
         <step name="Balance-Masters" requires="~Check-Summary" if="${OC2}"
               exec="onos ${OC1} balance-masters"/>
 
-        <step name="Check-Flows" requires="~Balance-Masters,~Check-Summary" delay="10"
+        <step name="Check-Flows" requires="~Balance-Masters,~Check-Summary" delay="5"
               exec="onos-check-flows ${OC1}"/>
     </group>
 </scenario>

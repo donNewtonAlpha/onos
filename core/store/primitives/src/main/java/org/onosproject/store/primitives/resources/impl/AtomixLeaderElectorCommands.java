@@ -32,8 +32,8 @@ import io.atomix.catalyst.serializer.SerializableTypeResolver;
 import io.atomix.catalyst.serializer.Serializer;
 import io.atomix.catalyst.serializer.SerializerRegistry;
 import io.atomix.catalyst.util.Assert;
-import io.atomix.copycat.client.Command;
-import io.atomix.copycat.client.Query;
+import io.atomix.copycat.Command;
+import io.atomix.copycat.Query;
 
 /**
  * {@link AtomixLeaderElector} resource state machine operations.
@@ -291,17 +291,19 @@ public final class AtomixLeaderElectorCommands {
     }
 
     /**
-     * Command for administratively anointing a node as leader.
+     * Command for administratively changing the leadership state for a node.
      */
     @SuppressWarnings("serial")
-    public static class Anoint extends ElectionCommand<Boolean> {
+    public abstract static class ElectionChangeCommand<V> extends ElectionCommand<V>  {
         private String topic;
         private NodeId nodeId;
 
-        public Anoint() {
+        ElectionChangeCommand() {
+            topic = null;
+            nodeId = null;
         }
 
-        public Anoint(String topic, NodeId nodeId) {
+        public ElectionChangeCommand(String topic, NodeId nodeId) {
             this.topic = topic;
             this.nodeId = nodeId;
         }
@@ -346,6 +348,75 @@ public final class AtomixLeaderElectorCommands {
     }
 
     /**
+     * Command for administratively anoint a node as leader.
+     */
+    @SuppressWarnings("serial")
+    public static class Anoint extends ElectionChangeCommand<Boolean> {
+
+        private Anoint() {
+        }
+
+        public Anoint(String topic, NodeId nodeId) {
+            super(topic, nodeId);
+        }
+    }
+
+    /**
+     * Command for administratively promote a node as top candidate.
+     */
+    @SuppressWarnings("serial")
+    public static class Promote extends ElectionChangeCommand<Boolean> {
+
+        private Promote() {
+        }
+
+        public Promote(String topic, NodeId nodeId) {
+            super(topic, nodeId);
+        }
+    }
+
+    /**
+     * Command for administratively evicting a node from all leadership topics.
+     */
+    @SuppressWarnings("serial")
+    public static class Evict extends ElectionCommand<Void> {
+        private NodeId nodeId;
+
+        public Evict() {
+        }
+
+        public Evict(NodeId nodeId) {
+            this.nodeId = nodeId;
+        }
+
+        /**
+         * Returns the node identifier.
+         *
+         * @return The nodeId
+         */
+        public NodeId nodeId() {
+            return nodeId;
+        }
+
+        @Override
+        public String toString() {
+            return MoreObjects.toStringHelper(getClass())
+                    .add("nodeId", nodeId)
+                    .toString();
+        }
+
+        @Override
+        public void writeObject(BufferOutput<?> buffer, Serializer serializer) {
+            buffer.writeString(nodeId.toString());
+        }
+
+        @Override
+        public void readObject(BufferInput<?> buffer, Serializer serializer) {
+            nodeId = new NodeId(buffer.readString());
+        }
+    }
+
+    /**
      * Map command type resolver.
      */
     public static class TypeResolver implements SerializableTypeResolver {
@@ -359,6 +430,8 @@ public final class AtomixLeaderElectorCommands {
             registry.register(GetLeadership.class, -866);
             registry.register(Listen.class, -867);
             registry.register(Unlisten.class, -868);
+            registry.register(Promote.class, -869);
+            registry.register(Evict.class, -870);
         }
     }
 }

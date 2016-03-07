@@ -15,6 +15,7 @@
  */
 package org.onosproject.pim.impl;
 
+import com.google.common.collect.ImmutableList;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.IPv4;
 import org.onlab.packet.Ip4Address;
@@ -22,6 +23,7 @@ import org.onlab.packet.IpAddress;
 import org.onlab.packet.IpPrefix;
 import org.onlab.packet.MacAddress;
 import org.onlab.packet.PIM;
+import org.onlab.packet.pim.PIMAddrUnicast;
 import org.onlab.packet.pim.PIMHello;
 import org.onlab.packet.pim.PIMHelloOption;
 import org.onlab.packet.pim.PIMJoinPrune;
@@ -30,16 +32,18 @@ import org.onosproject.incubator.net.intf.Interface;
 import org.onosproject.net.flow.DefaultTrafficTreatment;
 import org.onosproject.net.flow.TrafficTreatment;
 import org.onosproject.net.host.InterfaceIpAddress;
+import org.onosproject.net.mcast.McastRoute;
 import org.onosproject.net.packet.DefaultOutboundPacket;
 import org.onosproject.net.packet.PacketService;
 import org.slf4j.Logger;
 
 import java.nio.ByteBuffer;
 import java.util.Collection;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -54,6 +58,9 @@ import static org.slf4j.LoggerFactory.getLogger;
 public final class PIMInterface {
 
     private final Logger log = getLogger(getClass());
+
+    private static final int JOIN_PERIOD = 60;
+    private static final double HOLD_TIME_MULTIPLIER = 3.5;
 
     private final PacketService packetService;
 
@@ -80,7 +87,9 @@ public final class PIMInterface {
     private IpAddress drIpaddress;
 
     // A map of all our PIM neighbors keyed on our neighbors IP address
-    private Map<IpAddress, PIMNeighbor> pimNeighbors = new HashMap<>();
+    private Map<IpAddress, PIMNeighbor> pimNeighbors = new ConcurrentHashMap<>();
+
+    private Map<McastRoute, RouteData> routes = new ConcurrentHashMap<>();
 
     /**
      * Create a PIMInterface from an ONOS Interface.
@@ -151,8 +160,8 @@ public final class PIMInterface {
      *
      * @return a set of Ip Addresses on this interface
      */
-    public Set<InterfaceIpAddress> getIpAddresses() {
-        return onosInterface.ipAddresses();
+    public List<InterfaceIpAddress> getIpAddresses() {
+        return onosInterface.ipAddressesList();
     }
 
     /**
@@ -161,12 +170,12 @@ public final class PIMInterface {
      * @return the choosen IP address or null if none
      */
     public IpAddress getIpAddress() {
-        if (onosInterface.ipAddresses().isEmpty()) {
+        if (onosInterface.ipAddressesList().isEmpty()) {
             return null;
         }
 
         IpAddress ipaddr = null;
-        for (InterfaceIpAddress ifipaddr : onosInterface.ipAddresses()) {
+        for (InterfaceIpAddress ifipaddr : onosInterface.ipAddressesList()) {
             ipaddr = ifipaddr.ipAddress();
             break;
         }
@@ -215,7 +224,11 @@ public final class PIMInterface {
      * @return PIM neighbors
      */
     public Collection<PIMNeighbor> getNeighbors() {
-        return pimNeighbors.values();
+        return ImmutableList.copyOf(pimNeighbors.values());
+    }
+
+    public Collection<McastRoute> getRoutes() {
+        return routes.keySet();
     }
 
     /**
@@ -284,6 +297,9 @@ public final class PIMInterface {
      * @param ethPkt the Ethernet packet header
      */
     public void processHello(Ethernet ethPkt) {
+        if (log.isTraceEnabled()) {
+            log.trace("Received a PIM hello packet");
+        }
 
         // We'll need to save our neighbors MAC address
         MacAddress nbrmac = ethPkt.getSourceMAC();
@@ -402,6 +418,67 @@ public final class PIMInterface {
 
     }
 
+    public void addRoute(McastRoute route, IpAddress nextHop, MacAddress nextHopMac) {
+        RouteData data = new RouteData(nextHop, nextHopMac);
+        routes.put(route, data);
+
+        sendJoinPrune(route, data, true);
+    }
+
+    public void removeRoute(McastRoute route) {
+        RouteData data = routes.remove(route);
+
+        if (data != null) {
+            sendJoinPrune(route, data, false);
+        }
+    }
+
+    public void sendJoins() {
+        routes.entrySet().forEach(entry -> {
+            if (entry.getValue().timestamp + TimeUnit.SECONDS.toMillis(JOIN_PERIOD) >
+                    System.currentTimeMillis()) {
+                return;
+            }
+
+            sendJoinPrune(entry.getKey(), entry.getValue(), true);
+        });
+    }
+
+    private void sendJoinPrune(McastRoute route, RouteData data, boolean join) {
+        PIMJoinPrune jp = new PIMJoinPrune();
+
+        jp.addJoinPrune(route.source().toIpPrefix(), route.group().toIpPrefix(), join);
+        jp.setHoldTime(join ? (short) Math.floor(JOIN_PERIOD * HOLD_TIME_MULTIPLIER) : 0);
+        jp.setUpstreamAddr(new PIMAddrUnicast(data.ipAddress.toString()));
+
+        PIM pim = new PIM();
+        pim.setPIMType(PIM.TYPE_JOIN_PRUNE_REQUEST);
+        pim.setPayload(jp);
+
+        IPv4 ipv4 = new IPv4();
+        ipv4.setDestinationAddress(PIM.PIM_ADDRESS.getIp4Address().toInt());
+        ipv4.setSourceAddress(getIpAddress().getIp4Address().toInt());
+        ipv4.setProtocol(IPv4.PROTOCOL_PIM);
+        ipv4.setTtl((byte) 1);
+        ipv4.setDiffServ((byte) 0xc0);
+        ipv4.setPayload(pim);
+
+        Ethernet eth = new Ethernet();
+        eth.setSourceMACAddress(onosInterface.mac());
+        eth.setDestinationMACAddress(MacAddress.valueOf("01:00:5E:00:00:0d"));
+        eth.setEtherType(Ethernet.TYPE_IPV4);
+        eth.setPayload(ipv4);
+
+        TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                .setOutput(onosInterface.connectPoint().port())
+                .build();
+
+        packetService.emit(new DefaultOutboundPacket(onosInterface.connectPoint().deviceId(),
+                treatment, ByteBuffer.wrap(eth.serialize())));
+
+        data.timestamp = System.currentTimeMillis();
+    }
+
     /**
      * Returns a builder for a PIM interface.
      *
@@ -513,5 +590,17 @@ public final class PIMInterface {
                     propagationDelay, overrideInterval, packetService);
         }
 
+    }
+
+    private static class RouteData {
+        public final IpAddress ipAddress;
+        public final MacAddress macAddress;
+        public long timestamp;
+
+        public RouteData(IpAddress ip, MacAddress mac) {
+            this.ipAddress = ip;
+            this.macAddress = mac;
+            timestamp = System.currentTimeMillis();
+        }
     }
 }

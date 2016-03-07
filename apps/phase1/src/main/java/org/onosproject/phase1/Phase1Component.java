@@ -60,7 +60,7 @@ public class Phase1Component{
 
 
     static ApplicationId appId;
-    static final DeviceId torId = DeviceId.deviceId("of:000000000000da7a");
+    static final DeviceId torId = DeviceId.deviceId("of:0000000000000111");
 
 
 
@@ -75,10 +75,15 @@ public class Phase1Component{
 
         GroupFinder.initiate(appId, groupService);
 
+        //OLT Test
+
+        NetworkElements elements = new NetworkElements(flowRuleService, groupService, appId, torId);
+        elements.twoWayVlanFlow(VlanId.vlanId((short)5), PortNumber.portNumber(1), PortNumber.portNumber(11), torId,41000, false );
+
 
         //Creation of the network objects
         
-        LinkedList<Integer> oltVlans = new LinkedList<>();
+       /* LinkedList<Integer> oltVlans = new LinkedList<>();
         LinkedList<Integer> vm1Vlans = new LinkedList<>();
         LinkedList<Integer> vm2Vlans = new LinkedList<>();
 
@@ -118,7 +123,7 @@ public class Phase1Component{
         elements.addElement(primaryQuaggaInstance);
         elements.addElement(secondaryQuaggaInstance);
 
-        elements.update();
+        elements.update();*/
 
         //Limitation for now, single tor
         //TODO: 2 tors

@@ -15,12 +15,11 @@
  */
 package org.onosproject.yangutils.datamodel;
 
-import java.util.LinkedList;
-import java.util.List;
-
 import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
 import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.ParsableDataType;
+import org.onosproject.yangutils.translator.CachedFileHandle;
+import org.onosproject.yangutils.utils.YangConstructType;
+import static org.onosproject.yangutils.utils.YangConstructType.CHOICE_DATA;
 
 /*-
  * Reference RFC 6020.
@@ -60,17 +59,12 @@ import org.onosproject.yangutils.parser.ParsableDataType;
 /**
  * Data model node to maintain information defined in YANG choice.
  */
-public class YangChoice extends YangNode implements YangCommonInfo, Parsable {
+public class YangChoice extends YangNode implements YangCommonInfo, Parsable, CollisionDetector {
 
     /**
      * Name of choice.
      */
     private String name;
-
-    /**
-     * List of cases for the current choice.
-     */
-    private List<YangCase> caseList;
 
     /**
      * If the choice represents config data.
@@ -104,7 +98,7 @@ public class YangChoice extends YangNode implements YangCommonInfo, Parsable {
     private String defaultCase;
 
     /**
-     * Description.
+     * Description of choice.
      */
     private String description;
 
@@ -130,7 +124,7 @@ public class YangChoice extends YangNode implements YangCommonInfo, Parsable {
     private String mandatory;
 
     /**
-     * reference of the choice.
+     * Reference of the choice.
      */
     private String reference;
 
@@ -140,13 +134,15 @@ public class YangChoice extends YangNode implements YangCommonInfo, Parsable {
     private YangStatusType status;
 
     /**
-     * Create a Choice node.
+     * Create a choice node.
      */
     public YangChoice() {
         super(YangNodeType.CHOICE_NODE);
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     *
      * @see org.onosproject.yangutils.datamodel.YangNode#getName()
      */
     @Override
@@ -154,8 +150,11 @@ public class YangChoice extends YangNode implements YangCommonInfo, Parsable {
         return name;
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.datamodel.YangNode#setName(java.lang.String)
+    /*
+     * (non-Javadoc)
+     *
+     * @see
+     * org.onosproject.yangutils.datamodel.YangNode#setName(java.lang.String)
      */
     @Override
     public void setName(String name) {
@@ -163,40 +162,9 @@ public class YangChoice extends YangNode implements YangCommonInfo, Parsable {
     }
 
     /**
-     * Get the list of cases.
-     *
-     * @return the case list
-     */
-    public List<YangCase> getCaseList() {
-        return caseList;
-    }
-
-    /**
-     * Set the list of cases.
-     *
-     * @param caseList list of cases.
-     */
-    private void setCaseList(List<YangCase> caseList) {
-        this.caseList = caseList;
-    }
-
-    /**
-     * Add a case.
-     *
-     * @param newCase new case for the choice
-     */
-    public void addCase(YangCase newCase) {
-        if (getCaseList() == null) {
-            setCaseList(new LinkedList<YangCase>());
-        }
-
-        getCaseList().add(newCase);
-    }
-
-    /**
      * Get config flag.
      *
-     * @return the config flag.
+     * @return the config flag
      */
     public boolean isConfig() {
         return isConfig;
@@ -205,7 +173,7 @@ public class YangChoice extends YangNode implements YangCommonInfo, Parsable {
     /**
      * Set config flag.
      *
-     * @param isCfg the config flag.
+     * @param isCfg the config flag
      */
     public void setConfig(boolean isCfg) {
         isConfig = isCfg;
@@ -214,7 +182,7 @@ public class YangChoice extends YangNode implements YangCommonInfo, Parsable {
     /**
      * Get the default case.
      *
-     * @return the default case.
+     * @return the default case
      */
     public String getDefaultCase() {
         return defaultCase;
@@ -232,7 +200,7 @@ public class YangChoice extends YangNode implements YangCommonInfo, Parsable {
     /**
      * Get the mandatory status.
      *
-     * @return the mandatory status.
+     * @return the mandatory status
      */
     public String getMandatory() {
         return mandatory;
@@ -241,7 +209,7 @@ public class YangChoice extends YangNode implements YangCommonInfo, Parsable {
     /**
      * Set the mandatory status.
      *
-     * @param mandatory the mandatory status.
+     * @param mandatory the mandatory status
      */
     public void setMandatory(String mandatory) {
         this.mandatory = mandatory;
@@ -250,8 +218,9 @@ public class YangChoice extends YangNode implements YangCommonInfo, Parsable {
     /**
      * Get the description.
      *
-     * @return the description.
+     * @return the description
      */
+    @Override
     public String getDescription() {
         return description;
     }
@@ -259,8 +228,9 @@ public class YangChoice extends YangNode implements YangCommonInfo, Parsable {
     /**
      * Set the description.
      *
-     * @param description set the description.
+     * @param description set the description
      */
+    @Override
     public void setDescription(String description) {
         this.description = description;
     }
@@ -268,8 +238,9 @@ public class YangChoice extends YangNode implements YangCommonInfo, Parsable {
     /**
      * Get the textual reference.
      *
-     * @return the reference.
+     * @return the reference
      */
+    @Override
     public String getReference() {
         return reference;
     }
@@ -277,8 +248,9 @@ public class YangChoice extends YangNode implements YangCommonInfo, Parsable {
     /**
      * Set the textual reference.
      *
-     * @param reference the reference to set.
+     * @param reference the reference to set
      */
+    @Override
     public void setReference(String reference) {
         this.reference = reference;
     }
@@ -286,8 +258,9 @@ public class YangChoice extends YangNode implements YangCommonInfo, Parsable {
     /**
      * Get the status.
      *
-     * @return the status.
+     * @return the status
      */
+    @Override
     public YangStatusType getStatus() {
         return status;
     }
@@ -295,8 +268,9 @@ public class YangChoice extends YangNode implements YangCommonInfo, Parsable {
     /**
      * Set the status.
      *
-     * @param status the status to set.
+     * @param status the status to set
      */
+    @Override
     public void setStatus(YangStatusType status) {
         this.status = status;
     }
@@ -306,15 +280,17 @@ public class YangChoice extends YangNode implements YangCommonInfo, Parsable {
      *
      * @return returns CHOICE_DATA
      */
-    public ParsableDataType getParsableDataType() {
-        return ParsableDataType.CHOICE_DATA;
+    @Override
+    public YangConstructType getYangConstructType() {
+        return YangConstructType.CHOICE_DATA;
     }
 
     /**
      * Validate the data on entering the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnEntry() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
     }
@@ -322,13 +298,16 @@ public class YangChoice extends YangNode implements YangCommonInfo, Parsable {
     /**
      * Validate the data on exiting the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnExit() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     *
      * @see org.onosproject.yangutils.datamodel.YangNode#getPackage()
      */
     @Override
@@ -337,8 +316,11 @@ public class YangChoice extends YangNode implements YangCommonInfo, Parsable {
         return null;
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.datamodel.YangNode#setPackage(java.lang.String)
+    /*
+     * (non-Javadoc)
+     *
+     * @see
+     * org.onosproject.yangutils.datamodel.YangNode#setPackage(java.lang.String)
      */
     @Override
     public void setPackage(String pkg) {
@@ -346,19 +328,72 @@ public class YangChoice extends YangNode implements YangCommonInfo, Parsable {
 
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.translator.CodeGenerator#generateJavaCodeEntry()
+    /*
+     * (non-Javadoc)
+     *
+     * @see
+     * org.onosproject.yangutils.translator.CodeGenerator#generateJavaCodeEntry(
+     * )
      */
+    @Override
     public void generateJavaCodeEntry() {
         // TODO Auto-generated method stub
 
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.translator.CodeGenerator#generateJavaCodeExit()
+    /*
+     * (non-Javadoc)
+     *
+     * @see
+     * org.onosproject.yangutils.translator.CodeGenerator#generateJavaCodeExit()
      */
+    @Override
     public void generateJavaCodeExit() {
         // TODO Auto-generated method stub
 
+    }
+
+    @Override
+    public CachedFileHandle getFileHandle() {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public void setFileHandle(CachedFileHandle fileHandle) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void detectCollidingChild(String identifierName, YangConstructType dataType) throws DataModelException {
+
+        YangNode node = this.getChild();
+        while ((node != null)) {
+            if (node instanceof CollisionDetector) {
+                ((CollisionDetector) node).detectSelfCollision(identifierName, dataType);
+            }
+            node = node.getNextSibling();
+        }
+    }
+
+    @Override
+    public void detectSelfCollision(String identifierName, YangConstructType dataType) throws DataModelException {
+
+        if (dataType == CHOICE_DATA) {
+            if (this.getName().equals(identifierName)) {
+                throw new DataModelException("YANG file error: Identifier collision detected in choice \"" +
+                        this.getName() + "\"");
+            }
+            return;
+        }
+
+        YangNode node = this.getChild();
+        while ((node != null)) {
+            if (node instanceof CollisionDetector) {
+                ((CollisionDetector) node).detectSelfCollision(identifierName, dataType);
+            }
+            node = node.getNextSibling();
+        }
     }
 }

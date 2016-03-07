@@ -17,7 +17,7 @@ package org.onosproject.yangutils.datamodel;
 
 import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
 import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.ParsableDataType;
+import org.onosproject.yangutils.utils.YangConstructType;
 
 /*
  *  Reference:RFC 6020.
@@ -76,6 +76,7 @@ public class YangImport implements Parsable {
 
     /**
      * Reference:RFC 6020.
+     *
      * The import's "revision-date" statement is used to specify the exact
      * version of the module to import. The "revision-date" statement MUST match
      * the most recent "revision" statement in the imported module. organization
@@ -93,7 +94,7 @@ public class YangImport implements Parsable {
     /**
      * Get the imported module name.
      *
-     * @return the module name.
+     * @return the module name
      */
     public String getModuleName() {
         return name;
@@ -112,7 +113,7 @@ public class YangImport implements Parsable {
      * Get the prefix used to identify the entities from the imported module.
      *
      * @return the prefix used to identify the entities from the imported
-     *         module.
+     *         module
      */
     public String getPrefixId() {
         return prefixId;
@@ -121,7 +122,7 @@ public class YangImport implements Parsable {
     /**
      * Set prefix identifier.
      *
-     * @param prefixId set the prefix identifier of the imported module.
+     * @param prefixId set the prefix identifier of the imported module
      */
     public void setPrefixId(String prefixId) {
         this.prefixId = prefixId;
@@ -130,7 +131,7 @@ public class YangImport implements Parsable {
     /**
      * Get the revision of the imported module.
      *
-     * @return the revision of the imported module.
+     * @return the revision of the imported module
      */
     public String getRevision() {
         return revision;
@@ -139,7 +140,7 @@ public class YangImport implements Parsable {
     /**
      * Set the revision of the imported module.
      *
-     * @param rev set the revision of the imported module.
+     * @param rev set the revision of the imported module
      */
     public void setRevision(String rev) {
         revision = rev;
@@ -150,8 +151,9 @@ public class YangImport implements Parsable {
      *
      * @return returns IMPORT_DATA
      */
-    public ParsableDataType getParsableDataType() {
-        return ParsableDataType.IMPORT_DATA;
+    @Override
+    public YangConstructType getYangConstructType() {
+        return YangConstructType.IMPORT_DATA;
     }
 
     /**
@@ -159,6 +161,7 @@ public class YangImport implements Parsable {
      *
      * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnEntry() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
 
@@ -169,6 +172,7 @@ public class YangImport implements Parsable {
      *
      * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnExit() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
 

@@ -16,6 +16,8 @@
 
 package org.onosproject.yangutils.parser.impl;
 
+import java.io.IOException;
+
 import org.antlr.v4.runtime.ANTLRFileStream;
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.CommonTokenStream;
@@ -28,23 +30,19 @@ import org.onosproject.yangutils.parser.antlrgencode.GeneratedYangParser;
 import org.onosproject.yangutils.parser.exceptions.ParserException;
 import org.onosproject.yangutils.parser.impl.parserutils.ParseTreeErrorListener;
 
-import java.io.IOException;
-
 /**
  * Manages file parsing, parse tree creation and data model tree creation
  * corresponding to an input YANG file.
  */
 public class YangUtilsParserManager implements YangUtilsParser {
 
-    public static final int SUB_STATEMENT_CARDINALITY = 1;
-
     @Override
     public YangNode getDataModel(String yangFile) throws IOException, ParserException {
 
         /**
-          * Create a char stream that reads from YANG file. Throws an exception
-          * in case input YANG file is either null or non existent.
-          */
+         * Create a char stream that reads from YANG file. Throws an exception
+         * in case input YANG file is either null or non existent.
+         */
         ANTLRInputStream input = null;
         try {
             input = new ANTLRFileStream(yangFile);
@@ -88,9 +86,9 @@ public class YangUtilsParserManager implements YangUtilsParser {
         TreeWalkListener treeWalker = new TreeWalkListener();
 
         /**
-          * Walk parse tree, provide call backs to methods in listener and
-          * build data model tree.
-          */
+         * Walk parse tree, provide call backs to methods in listener and build
+         * data model tree.
+         */
         try {
             walker.walk(treeWalker, tree);
         } catch (ParserException listenerException) {

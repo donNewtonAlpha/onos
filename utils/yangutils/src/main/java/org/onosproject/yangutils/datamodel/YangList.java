@@ -16,12 +16,14 @@
 
 package org.onosproject.yangutils.datamodel;
 
+import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
+import static org.onosproject.yangutils.datamodel.utils.DataModelUtils.detectCollidingChildUtil;
+import org.onosproject.yangutils.parser.Parsable;
+import org.onosproject.yangutils.translator.CachedFileHandle;
+import org.onosproject.yangutils.utils.YangConstructType;
+
 import java.util.LinkedList;
 import java.util.List;
-
-import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
-import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.ParsableDataType;
 
 /*-
  *  The "list" statement is used to define an interior data node in the
@@ -66,17 +68,17 @@ import org.onosproject.yangutils.parser.ParsableDataType;
  * List data represented in YANG.
  */
 public class YangList extends YangNode
-        implements YangLeavesHolder, YangCommonInfo, Parsable {
+        implements YangLeavesHolder, YangCommonInfo, Parsable, CollisionDetector {
 
     /**
-     * name of the YANG list.
+     * Name of the YANG list.
      */
     private String name;
 
     /**
      * If list maintains config data.
      */
-    private boolean isConfig;
+    private Boolean isConfig;
 
     /**
      * Description of list.
@@ -113,16 +115,16 @@ public class YangList extends YangNode
     /**
      * List of leaves.
      */
-    @SuppressWarnings("rawtypes")
     private List<YangLeaf> listOfLeaf;
 
     /**
      * List of leaf-lists.
      */
-    @SuppressWarnings("rawtypes")
     private List<YangLeafList> listOfLeafList;
 
     /**
+     * Reference RFC 6020.
+     *
      * The "max-elements" statement, which is optional, takes as an argument a
      * positive integer or the string "unbounded", which puts a constraint on
      * valid list entries. A valid leaf-list or list always has at most
@@ -130,9 +132,11 @@ public class YangList extends YangNode
      *
      * If no "max-elements" statement is present, it defaults to "unbounded".
      */
-    private int maxElelements;
+    private int maxElements = Integer.MAX_VALUE;
 
     /**
+     * Reference RFC 6020.
+     *
      * The "min-elements" statement, which is optional, takes as an argument a
      * non-negative integer that puts a constraint on valid list entries. A
      * valid leaf-list or list MUST have at least min-elements entries.
@@ -148,7 +152,7 @@ public class YangList extends YangNode
      *
      * o Otherwise, it is enforced if the ancestor node exists.
      */
-    private int minElements;
+    private int minElements = 0;
 
     /**
      * reference.
@@ -159,27 +163,34 @@ public class YangList extends YangNode
      * Status of the node.
      */
 
-    private YangStatusType status;
+    private YangStatusType status = YangStatusType.CURRENT;
+
+    /**
+     * Package of the generated java code.
+     */
+    private String pkg;
 
     /**
      * Constructor.
-     *
-     * @param type list node
      */
-    public YangList(YangNodeType type) {
-        super(type);
+    public YangList() {
+        super(YangNodeType.LIST_NODE);
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.datamodel.YangNode#getName()
+    /**
+     * Get the YANG list name.
+     *
+     * @return YANG list name
      */
     @Override
     public String getName() {
         return name;
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.datamodel.YangNode#setName(java.lang.String)
+    /**
+     * Set the YANG list name.
+     *
+     * @param name YANG list name
      */
     @Override
     public void setName(String name) {
@@ -191,14 +202,14 @@ public class YangList extends YangNode
      *
      * @return the isConfig
      */
-    public boolean isConfig() {
+    public Boolean isConfig() {
         return isConfig;
     }
 
     /**
      * Set the config flag.
      *
-     * @param isCfg the config flag.
+     * @param isCfg the config flag
      */
     public void setConfig(boolean isCfg) {
         isConfig = isCfg;
@@ -207,8 +218,9 @@ public class YangList extends YangNode
     /**
      * Get the description.
      *
-     * @return the description.
+     * @return the description
      */
+    @Override
     public String getDescription() {
         return description;
     }
@@ -216,8 +228,9 @@ public class YangList extends YangNode
     /**
      * Set the description.
      *
-     * @param description set the description.
+     * @param description set the description
      */
+    @Override
     public void setDescription(String description) {
         this.description = description;
     }
@@ -225,7 +238,7 @@ public class YangList extends YangNode
     /**
      * Get the list of key field names.
      *
-     * @return the list of key field names.
+     * @return the list of key field names
      */
     public List<String> getKeyList() {
         return keyList;
@@ -234,7 +247,7 @@ public class YangList extends YangNode
     /**
      * Set the list of key field names.
      *
-     * @param keyList the list of key field names.
+     * @param keyList the list of key field names
      */
     private void setKeyList(List<String> keyList) {
         this.keyList = keyList;
@@ -244,10 +257,16 @@ public class YangList extends YangNode
      * Add a key field name.
      *
      * @param key key field name.
+     * @throws DataModelException a violation of data model rules
      */
-    public void addKey(String key) {
+    public void addKey(String key) throws DataModelException {
         if (getKeyList() == null) {
             setKeyList(new LinkedList<String>());
+        }
+
+        if (getKeyList().contains(key)) {
+            throw new DataModelException("A leaf identifier must not appear more than once in the\n" +
+                    "   key");
         }
 
         getKeyList().add(key);
@@ -256,9 +275,9 @@ public class YangList extends YangNode
     /**
      * Get the list of leaves.
      *
-     * @return the list of leaves.
+     * @return the list of leaves
      */
-    @SuppressWarnings("rawtypes")
+    @Override
     public List<YangLeaf> getListOfLeaf() {
         return listOfLeaf;
     }
@@ -266,9 +285,8 @@ public class YangList extends YangNode
     /**
      * Set the list of leaves.
      *
-     * @param leafsList the list of leaf to set.
+     * @param leafsList the list of leaf to set
      */
-    @SuppressWarnings("rawtypes")
     private void setListOfLeaf(List<YangLeaf> leafsList) {
         listOfLeaf = leafsList;
     }
@@ -276,10 +294,10 @@ public class YangList extends YangNode
     /**
      * Add a leaf.
      *
-     * @param leaf the leaf to be added.
+     * @param leaf the leaf to be added
      */
-    @SuppressWarnings("rawtypes")
-    public void addLeaf(YangLeaf<?> leaf) {
+    @Override
+    public void addLeaf(YangLeaf leaf) {
         if (getListOfLeaf() == null) {
             setListOfLeaf(new LinkedList<YangLeaf>());
         }
@@ -290,9 +308,9 @@ public class YangList extends YangNode
     /**
      * Get the list of leaf-list.
      *
-     * @return the list of leaf-list.
+     * @return the list of leaf-list
      */
-    @SuppressWarnings("rawtypes")
+    @Override
     public List<YangLeafList> getListOfLeafList() {
         return listOfLeafList;
     }
@@ -300,9 +318,8 @@ public class YangList extends YangNode
     /**
      * Set the list of leaf-list.
      *
-     * @param listOfLeafList the list of leaf-list to set.
+     * @param listOfLeafList the list of leaf-list to set
      */
-    @SuppressWarnings("rawtypes")
     private void setListOfLeafList(List<YangLeafList> listOfLeafList) {
         this.listOfLeafList = listOfLeafList;
     }
@@ -310,10 +327,10 @@ public class YangList extends YangNode
     /**
      * Add a leaf-list.
      *
-     * @param leafList the leaf-list to be added.
+     * @param leafList the leaf-list to be added
      */
-    @SuppressWarnings("rawtypes")
-    public void addLeafList(YangLeafList<?> leafList) {
+    @Override
+    public void addLeafList(YangLeafList leafList) {
         if (getListOfLeafList() == null) {
             setListOfLeafList(new LinkedList<YangLeafList>());
         }
@@ -324,25 +341,25 @@ public class YangList extends YangNode
     /**
      * Get the max elements.
      *
-     * @return the max elements.
+     * @return the max elements
      */
-    public int getMaxElelements() {
-        return maxElelements;
+    public int getMaxElements() {
+        return maxElements;
     }
 
     /**
      * Set the max elements.
      *
-     * @param maxElelements the max elements.
+     * @param max the max elements
      */
-    public void setMaxElelements(int maxElelements) {
-        this.maxElelements = maxElelements;
+    public void setMaxElements(int max) {
+        maxElements = max;
     }
 
     /**
      * Get the minimum elements.
      *
-     * @return the minimum elements.
+     * @return the minimum elements
      */
     public int getMinElements() {
         return minElements;
@@ -351,7 +368,7 @@ public class YangList extends YangNode
     /**
      * Set the minimum elements.
      *
-     * @param minElements the minimum elements.
+     * @param minElements the minimum elements
      */
     public void setMinElements(int minElements) {
         this.minElements = minElements;
@@ -360,8 +377,9 @@ public class YangList extends YangNode
     /**
      * Get the textual reference.
      *
-     * @return the reference.
+     * @return the reference
      */
+    @Override
     public String getReference() {
         return reference;
     }
@@ -369,8 +387,9 @@ public class YangList extends YangNode
     /**
      * Set the textual reference.
      *
-     * @param reference the reference to set.
+     * @param reference the reference to set
      */
+    @Override
     public void setReference(String reference) {
         this.reference = reference;
     }
@@ -378,8 +397,9 @@ public class YangList extends YangNode
     /**
      * Get the status.
      *
-     * @return the status.
+     * @return the status
      */
+    @Override
     public YangStatusType getStatus() {
         return status;
     }
@@ -387,8 +407,9 @@ public class YangList extends YangNode
     /**
      * Set the status.
      *
-     * @param status the status to set.
+     * @param status the status to set
      */
+    @Override
     public void setStatus(YangStatusType status) {
         this.status = status;
     }
@@ -396,17 +417,19 @@ public class YangList extends YangNode
     /**
      * Returns the type of the parsed data.
      *
-     * @return returns LIST_DATA.
+     * @return returns LIST_DATA
      */
-    public ParsableDataType getParsableDataType() {
-        return ParsableDataType.LIST_DATA;
+    @Override
+    public YangConstructType getYangConstructType() {
+        return YangConstructType.LIST_DATA;
     }
 
     /**
      * Validate the data on entering the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnEntry() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
     }
@@ -414,43 +437,252 @@ public class YangList extends YangNode
     /**
      * Validate the data on exiting the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnExit() throws DataModelException {
-        // TODO auto-generated method stub, to be implemented by parser
+        List<String> keys = getKeyList();
+        List<YangLeaf> leaves = getListOfLeaf();
+        List<YangLeafList> leafLists = getListOfLeafList();
+
+        setDefaultConfigValueToChild(leaves, leafLists);
+        validateConfig(leaves, leafLists);
+
+        /* A list must have atleast one key leaf if config is true */
+        if (isConfig
+                && (keys == null || leaves == null && leafLists == null)) {
+            throw new DataModelException("A list must have atleast one key leaf if config is true;");
+        } else if (keys != null) {
+            if (leaves != null) {
+                validateLeafKey(leaves, keys);
+            }
+
+            if (leafLists != null) {
+                validateLeafListKey(leafLists, keys);
+            }
+        }
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.translator.CodeGenerator#generateJavaCodeEntry()
+    /**
+     * Sets the config's value to all leaf if leaf's config statement is not
+     * specified.
+     *
+     * @param leaves list of leaf attributes of YANG list
+     * @param leafLists list of leaf-list attributes of YANG list
      */
+    private void setDefaultConfigValueToChild(List<YangLeaf> leaves, List<YangLeafList> leafLists) {
+
+        /*
+         * If "config" is not specified, the default is the same as the parent
+         * schema node's "config" value.
+         */
+        if (leaves != null) {
+            for (YangLeaf leaf : leaves) {
+                if (leaf.isConfig() == null) {
+                    leaf.setConfig(isConfig);
+                }
+            }
+        }
+
+        /*
+         * If "config" is not specified, the default is the same as the parent
+         * schema node's "config" value.
+         */
+        if (leafLists != null) {
+            for (YangLeafList leafList : leafLists) {
+                if (leafList.isConfig() == null) {
+                    leafList.setConfig(isConfig);
+                }
+            }
+        }
+    }
+
+    /**
+     * Validates config statement of YANG list.
+     *
+     * @param leaves list of leaf attributes of YANG list
+     * @param leafLists list of leaf-list attributes of YANG list
+     * @throws DataModelException a violation of data model rules
+     */
+    private void validateConfig(List<YangLeaf> leaves, List<YangLeafList> leafLists) throws DataModelException {
+
+        /*
+         * If a node has "config" set to "false", no node underneath it can have
+         * "config" set to "true".
+         */
+        if (!isConfig && leaves != null) {
+            for (YangLeaf leaf : leaves) {
+                if (leaf.isConfig()) {
+                    throw new DataModelException("If a list has \"config\" set to \"false\", no node underneath " +
+                            "it can have \"config\" set to \"true\".");
+                }
+            }
+        }
+
+        if (!isConfig && leafLists != null) {
+            for (YangLeafList leafList : leafLists) {
+                if (leafList.isConfig()) {
+                    throw new DataModelException("If a list has \"config\" set to \"false\", no node underneath " +
+                            "it can have \"config\" set to \"true\".");
+                }
+            }
+        }
+    }
+
+    /**
+     * Validates key statement of list.
+     *
+     * @param leaves list of leaf attributes of list
+     * @param keys list of key attributes of list
+     * @throws DataModelException a violation of data model rules
+     */
+    private void validateLeafKey(List<YangLeaf> leaves, List<String> keys) throws DataModelException {
+        boolean leafFound = false;
+        List<YangLeaf> keyLeaves = new LinkedList<>();
+
+        /*
+         * 1. Leaf identifier must refer to a child leaf of the list 2. A leaf
+         * that is part of the key must not be the built-in type "empty".
+         */
+        for (String key : keys) {
+            for (YangLeaf leaf : leaves) {
+                if (key.equals(leaf.getLeafName())) {
+                    if (leaf.getDataType().getDataType() == YangDataTypes.EMPTY) {
+                        throw new DataModelException(" A leaf that is part of the key must not be the built-in " +
+                                "type \"empty\".");
+                    }
+                    leafFound = true;
+                    keyLeaves.add(leaf);
+                    break;
+                }
+            }
+            if (!leafFound) {
+                throw new DataModelException("Leaf identifier must refer to a child leaf of the list");
+            }
+            leafFound = false;
+        }
+
+        /*
+         * All key leafs in a list MUST have the same value for their "config"
+         * as the list itself.
+         */
+        for (YangLeaf keyLeaf : keyLeaves) {
+            if (isConfig != keyLeaf.isConfig()) {
+                throw new DataModelException("All key leafs in a list must have the same value for their" +
+                        " \"config\" as the list itself.");
+            }
+        }
+    }
+
+    /**
+     * Validates key statement of list.
+     *
+     * @param leafLists list of leaf-list attributes of list
+     * @param keys list of key attributes of list
+     * @throws DataModelException a violation of data model rules
+     */
+    private void validateLeafListKey(List<YangLeafList> leafLists, List<String> keys) throws DataModelException {
+        boolean leafFound = false;
+        List<YangLeafList> keyLeafLists = new LinkedList<>();
+
+        /*
+         * 1. Leaf identifier must refer to a child leaf of the list 2. A leaf
+         * that is part of the key must not be the built-in type "empty".
+         */
+        for (String key : keys) {
+            for (YangLeafList leafList : leafLists) {
+                if (key.equals(leafList.getLeafName())) {
+                    if (leafList.getDataType().getDataType() == YangDataTypes.EMPTY) {
+                        throw new DataModelException(" A leaf-list that is part of the key must not be the built-in " +
+                                "type \"empty\".");
+                    }
+                    leafFound = true;
+                    keyLeafLists.add(leafList);
+                    break;
+                }
+            }
+            if (!leafFound) {
+                throw new DataModelException("Leaf-list identifier must refer to a child leaf of the list");
+            }
+            leafFound = false;
+        }
+
+        /*
+         * All key leafs in a list MUST have the same value for their "config"
+         * as the list itself.
+         */
+        for (YangLeafList keyLeafList : keyLeafLists) {
+            if (isConfig() != keyLeafList.isConfig()) {
+                throw new DataModelException("All key leaf-lists in a list must have the same value for their" +
+                        " \"config\" as the list itself.");
+            }
+        }
+    }
+
+    /**
+     * Populate the cached handle with information about the list attributes to
+     * generate java code.
+     */
+    @Override
     public void generateJavaCodeEntry() {
         // TODO Auto-generated method stub
 
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.translator.CodeGenerator#generateJavaCodeExit()
+    /**
+     * Free the resources used to generate the java file corresponding to YANG
+     * list info.
      */
+    @Override
     public void generateJavaCodeExit() {
         // TODO Auto-generated method stub
 
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.datamodel.YangNode#getPackage()
+    /**
+     * Get the mapped java package.
+     *
+     * @return the java package
      */
     @Override
     public String getPackage() {
+        return pkg;
+    }
+
+    /**
+     * Set the mapped java package.
+     *
+     * @param pakg the package to set
+     */
+    @Override
+    public void setPackage(String pakg) {
+        pkg = pakg;
+
+    }
+
+    @Override
+    public CachedFileHandle getFileHandle() {
         // TODO Auto-generated method stub
         return null;
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.datamodel.YangNode#setPackage(java.lang.String)
-     */
     @Override
-    public void setPackage(String pkg) {
+    public void setFileHandle(CachedFileHandle fileHandle) {
         // TODO Auto-generated method stub
 
+    }
+
+    @Override
+    public void detectCollidingChild(String identifierName, YangConstructType dataType) throws DataModelException {
+        // Asks helper to detect colliding child.
+        detectCollidingChildUtil(identifierName, dataType, this);
+    }
+
+    @Override
+    public void detectSelfCollision(String identifierName, YangConstructType dataType) throws DataModelException {
+        if (this.getName().equals(identifierName)) {
+            throw new DataModelException("YANG file error: Duplicate input identifier detected, same as list \"" +
+                    this.getName() + "\"");
+        }
     }
 }

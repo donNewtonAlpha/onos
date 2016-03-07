@@ -26,6 +26,7 @@ import org.onlab.packet.ChassisId;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.incubator.net.config.basics.ConfigException;
+import org.onosproject.net.AnnotationKeys;
 import org.onosproject.net.DefaultAnnotations;
 import org.onosproject.net.Device;
 import org.onosproject.net.DeviceId;
@@ -106,7 +107,7 @@ public class RestDeviceProvider extends AbstractProvider
     private static final String UNKNOWN = "unknown";
 
     private final ExecutorService executor =
-            Executors.newFixedThreadPool(5, groupedThreads("onos/restsbprovider", "device-installer-%d"));
+            Executors.newFixedThreadPool(5, groupedThreads("onos/restsbprovider", "device-installer-%d", log));
 
     private final ConfigFactory factory =
             new ConfigFactory<ApplicationId, RestProviderConfig>(APP_SUBJECT_FACTORY,
@@ -130,7 +131,7 @@ public class RestDeviceProvider extends AbstractProvider
         providerService = providerRegistry.register(this);
         cfgService.registerConfigFactory(factory);
         cfgService.addListener(cfgLister);
-        connectDevices();
+        executor.execute(RestDeviceProvider.this::connectDevices);
         log.info("Started");
     }
 
@@ -178,7 +179,9 @@ public class RestDeviceProvider extends AbstractProvider
         ChassisId cid = new ChassisId();
         String ipAddress = nodeId.ip().toString();
         SparseAnnotations annotations = DefaultAnnotations.builder()
-                .set(IPADDRESS, ipAddress).build();
+                .set(IPADDRESS, ipAddress)
+                .set(AnnotationKeys.PROTOCOL, REST.toUpperCase())
+                .build();
         DeviceDescription deviceDescription = new DefaultDeviceDescription(
                 deviceId.uri(),
                 Device.Type.SWITCH,
@@ -279,7 +282,7 @@ public class RestDeviceProvider extends AbstractProvider
 
         @Override
         public void event(NetworkConfigEvent event) {
-            executor.submit(RestDeviceProvider.this::connectDevices);
+            executor.execute(RestDeviceProvider.this::connectDevices);
         }
 
         @Override

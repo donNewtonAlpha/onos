@@ -23,6 +23,7 @@ import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
+import org.onosproject.mastership.MastershipService;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.config.ConfigFactory;
 import org.onosproject.net.config.NetworkConfigListener;
@@ -63,6 +64,9 @@ public final class ResourceRegistrar {
     protected DeviceService deviceService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected MastershipService mastershipService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected NetworkConfigRegistry cfgRegistry;
 
     private final Logger log = getLogger(getClass());
@@ -88,11 +92,11 @@ public final class ResourceRegistrar {
     public void activate() {
         factories.forEach(cfgRegistry::registerConfigFactory);
 
-        cfgListener = new ResourceNetworkConfigListener(adminService, cfgRegistry, executor);
+        cfgListener = new ResourceNetworkConfigListener(adminService, cfgRegistry, mastershipService, executor);
         cfgRegistry.addListener(cfgListener);
 
         deviceListener = new ResourceDeviceListener(adminService, resourceService,
-                deviceService, driverService, cfgRegistry, executor);
+                deviceService, mastershipService, driverService, cfgRegistry, executor);
         deviceService.addListener(deviceListener);
 
         // TODO Attempt initial registration of existing resources?

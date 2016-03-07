@@ -35,9 +35,11 @@
         <module>default</module>
         <module>ciena</module>
         <module>fujitsu</module>
+        <module>cisco</module>
         <module>netconf</module>
         <module>ovsdb</module>
         <module>utilities</module>
+        <module>lumentum</module>
     </modules>
 
     <!--<properties>

@@ -62,17 +62,19 @@ import org.onosproject.net.packet.PacketProcessor;
 import org.onosproject.net.packet.PacketService;
 import org.onosproject.net.provider.AbstractProvider;
 import org.onosproject.net.provider.ProviderId;
-import org.onosproject.openstackswitching.OpenstackNetwork;
-import org.onosproject.openstackswitching.OpenstackPort;
-import org.onosproject.openstackswitching.OpenstackSubnet;
-import org.onosproject.openstackswitching.OpenstackSwitchingService;
+import org.onosproject.openstackinterface.OpenstackInterfaceService;
+import org.onosproject.openstackinterface.OpenstackNetwork;
+import org.onosproject.openstackinterface.OpenstackPort;
+import org.onosproject.openstackinterface.OpenstackSubnet;
 import org.slf4j.Logger;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
@@ -123,7 +125,7 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
     protected GroupService groupService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected OpenstackSwitchingService openstackService;
+    protected OpenstackInterfaceService openstackService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected DhcpService dhcpService;
@@ -266,7 +268,7 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
             }
         }
 
-        Set<IpAddress> ip = Sets.newHashSet(vPort.fixedIps().values());
+        Set<IpAddress> fixedIp = Sets.newHashSet(vPort.fixedIps().values());
         DefaultAnnotations.Builder annotations = DefaultAnnotations.builder()
                 .set(SERVICE_ID, vPort.networkId())
                 .set(OPENSTACK_VM_ID, vPort.deviceId())
@@ -283,7 +285,7 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
                 mac,
                 VlanId.NONE,
                 new HostLocation(connectPoint, System.currentTimeMillis()),
-                ip,
+                fixedIp,
                 annotations.build());
 
         hostProvider.hostDetected(hostId, hostDesc, false);
@@ -354,6 +356,30 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
                 annotations.build());
 
         hostProvider.hostDetected(hostId, hostDesc, false);
+    }
+
+    /**
+     * Returns public ip addresses of vSGs running inside a give vSG host.
+     *
+     * @param vSgHost vSG host
+     * @return map of ip and mac address, or empty map
+     */
+    private Map<IpAddress, MacAddress> getSubscriberGateways(Host vSgHost) {
+        String vPortId = vSgHost.annotations().value(OPENSTACK_PORT_ID);
+        String serviceVlan = vSgHost.annotations().value(S_TAG);
+
+        OpenstackPort vPort = openstackService.port(vPortId);
+        if (vPort == null) {
+            log.warn("Failed to get OpenStack port {} for VM {}", vPortId, vSgHost.id());
+            return Maps.newHashMap();
+        }
+
+        if (!serviceVlan.equals(getServiceVlan(vPort))) {
+            log.error("Host({}) s-tag does not match with vPort s-tag", vSgHost.id());
+            return Maps.newHashMap();
+        }
+
+        return vPort.allowedAddressPairs();
     }
 
     /**
@@ -453,6 +479,16 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
     }
 
     /**
+     * Returns service ID of this host.
+     *
+     * @param host host
+     * @return service id, or null if not found
+     */
+    private String getServiceId(Host host) {
+        return host.annotations().value(SERVICE_ID);
+    }
+
+    /**
      * Returns hosts associated with a given OpenStack network.
      *
      * @param vNet openstack network
@@ -461,40 +497,10 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
     private Set<Host> getHostsWithOpenstackNetwork(OpenstackNetwork vNet) {
         checkNotNull(vNet);
 
-        Set<Host> hosts = openstackService.ports(vNet.id()).stream()
-                .filter(port -> port.deviceOwner().contains("compute"))
-                .map(port -> hostService.getHostsByMac(port.macAddress())
-                        .stream()
-                        .findFirst()
-                        .orElse(null))
+        String vNetId = vNet.id();
+        return StreamSupport.stream(hostService.getHosts().spliterator(), false)
+                .filter(host -> Objects.equals(vNetId, getServiceId(host)))
                 .collect(Collectors.toSet());
-
-        hosts.remove(null);
-        return hosts;
-    }
-
-    /**
-     * Returns public ip addresses of vSGs running inside a give vSG host.
-     *
-     * @param vSgHost vSG host
-     * @return map of ip and mac address, or empty map
-     */
-    private Map<IpAddress, MacAddress> getSubscriberGateways(Host vSgHost) {
-        String vPortId = vSgHost.annotations().value(OPENSTACK_PORT_ID);
-        String serviceVlan = vSgHost.annotations().value(S_TAG);
-
-        OpenstackPort vPort = openstackService.port(vPortId);
-        if (vPort == null) {
-            log.warn("Failed to get OpenStack port {} for VM {}", vPortId, vSgHost.id());
-            return Maps.newHashMap();
-        }
-
-        if (!serviceVlan.equals(getServiceVlan(vPort))) {
-            log.error("Host({}) s-tag does not match with vPort s-tag", vSgHost.id());
-            return Maps.newHashMap();
-        }
-
-        return vPort.allowedAddressPairs();
     }
 
     /**
@@ -548,16 +554,20 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
             return;
         }
 
-        if (service.serviceType().equals(CordService.ServiceType.MANAGEMENT)) {
-            ruleInstaller.populateManagementNetworkRules(host, service);
-        } else {
-            // TODO check if the service needs an update on its group buckets after done CORD-433
-            ruleInstaller.updateServiceGroup(service);
-            arpProxy.addGateway(service.serviceIp(), privateGatewayMac);
-
-            // sends gratuitous ARP here for the case of adding existing VMs
-            // when ONOS or cordvtn app is restarted
-            arpProxy.sendGratuitousArpForGateway(service.serviceIp(), Sets.newHashSet(host));
+        switch (service.serviceType()) {
+            case MANAGEMENT:
+                ruleInstaller.populateManagementNetworkRules(host, service);
+                break;
+            case PRIVATE:
+                arpProxy.addGateway(service.serviceIp(), privateGatewayMac);
+            case PUBLIC:
+            default:
+                // TODO check if the service needs an update on its group buckets after done CORD-433
+                ruleInstaller.updateServiceGroup(service);
+                // sends gratuitous ARP here for the case of adding existing VMs
+                // when ONOS or cordvtn app is restarted
+                arpProxy.sendGratuitousArpForGateway(service.serviceIp(), Sets.newHashSet(host));
+                break;
         }
 
         registerDhcpLease(host, service);
@@ -616,15 +626,19 @@ public class CordVtn extends AbstractProvider implements CordVtnService, HostPro
             return;
         }
 
-        if (service.serviceType().equals(CordService.ServiceType.MANAGEMENT)) {
-            ruleInstaller.removeManagementNetworkRules(host, service);
-        } else {
-            // TODO check if the service needs an update on its group buckets after done CORD-433
-            ruleInstaller.updateServiceGroup(service);
-
-            if (getHostsWithOpenstackNetwork(vNet).isEmpty()) {
-                arpProxy.removeGateway(service.serviceIp());
-            }
+        switch (service.serviceType()) {
+            case MANAGEMENT:
+                ruleInstaller.removeManagementNetworkRules(host, service);
+                break;
+            case PRIVATE:
+                if (getHostsWithOpenstackNetwork(vNet).isEmpty()) {
+                    arpProxy.removeGateway(service.serviceIp());
+                }
+            case PUBLIC:
+            default:
+                // TODO check if the service needs an update on its group buckets after done CORD-433
+                ruleInstaller.updateServiceGroup(service);
+                break;
         }
     }
 

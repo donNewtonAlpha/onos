@@ -16,6 +16,7 @@
 package org.onosproject.provider.of.flow.impl;
 
 import com.google.common.collect.Lists;
+import org.onlab.packet.EthType;
 import org.onlab.packet.Ip4Address;
 import org.onlab.packet.Ip4Prefix;
 import org.onlab.packet.Ip6Address;
@@ -46,7 +47,6 @@ import org.onosproject.net.flow.TrafficTreatment;
 import org.onosproject.net.flow.criteria.ExtensionSelectorType.ExtensionSelectorTypes;
 import org.onosproject.net.flow.instructions.ExtensionTreatmentType.ExtensionTreatmentTypes;
 import org.onosproject.net.flow.instructions.Instructions;
-import org.onosproject.openflow.controller.Dpid;
 import org.onosproject.openflow.controller.ExtensionSelectorInterpreter;
 import org.onosproject.openflow.controller.ExtensionTreatmentInterpreter;
 import org.projectfloodlight.openflow.protocol.OFFlowMod;
@@ -84,20 +84,20 @@ import org.projectfloodlight.openflow.types.IPv4Address;
 import org.projectfloodlight.openflow.types.IPv6Address;
 import org.projectfloodlight.openflow.types.Masked;
 import org.projectfloodlight.openflow.types.OFVlanVidMatch;
+import org.projectfloodlight.openflow.types.OduSignalID;
 import org.projectfloodlight.openflow.types.TransportPort;
 import org.projectfloodlight.openflow.types.U32;
 import org.projectfloodlight.openflow.types.U64;
 import org.projectfloodlight.openflow.types.U8;
 import org.projectfloodlight.openflow.types.VlanPcp;
-import org.projectfloodlight.openflow.types.OduSignalID;
 import org.slf4j.Logger;
 
 import java.util.List;
 
 import static org.onosproject.net.flow.criteria.Criteria.matchLambda;
 import static org.onosproject.net.flow.criteria.Criteria.matchOchSignalType;
-import static org.onosproject.net.flow.criteria.Criteria.matchOduSignalType;
 import static org.onosproject.net.flow.criteria.Criteria.matchOduSignalId;
+import static org.onosproject.net.flow.criteria.Criteria.matchOduSignalType;
 import static org.onosproject.net.flow.instructions.Instructions.modL0Lambda;
 import static org.onosproject.net.flow.instructions.Instructions.modL1OduSignalId;
 import static org.onosproject.provider.of.flow.impl.OpenFlowValueMapper.lookupChannelSpacing;
@@ -119,7 +119,7 @@ public class FlowEntryBuilder {
     // the instruction type is apply instruction (immediate set in ONOS speak)
     private final List<OFInstruction> instructions;
 
-    private final Dpid dpid;
+    private final DeviceId deviceId;
 
     public enum FlowType { STAT, REMOVED, MOD }
 
@@ -127,21 +127,21 @@ public class FlowEntryBuilder {
 
     private final DriverService driverService;
 
-    public FlowEntryBuilder(Dpid dpid, OFFlowStatsEntry entry, DriverService driverService) {
+    public FlowEntryBuilder(DeviceId deviceId, OFFlowStatsEntry entry, DriverService driverService) {
         this.stat = entry;
         this.match = entry.getMatch();
         this.instructions = getInstructions(entry);
-        this.dpid = dpid;
+        this.deviceId = deviceId;
         this.removed = null;
         this.flowMod = null;
         this.type = FlowType.STAT;
         this.driverService = driverService;
     }
 
-    public FlowEntryBuilder(Dpid dpid, OFFlowRemoved removed, DriverService driverService) {
+    public FlowEntryBuilder(DeviceId deviceId, OFFlowRemoved removed, DriverService driverService) {
         this.match = removed.getMatch();
         this.removed = removed;
-        this.dpid = dpid;
+        this.deviceId = deviceId;
         this.instructions = null;
         this.stat = null;
         this.flowMod = null;
@@ -149,9 +149,9 @@ public class FlowEntryBuilder {
         this.driverService = driverService;
     }
 
-    public FlowEntryBuilder(Dpid dpid, OFFlowMod fm, DriverService driverService) {
+    public FlowEntryBuilder(DeviceId deviceId, OFFlowMod fm, DriverService driverService) {
         this.match = fm.getMatch();
-        this.dpid = dpid;
+        this.deviceId = deviceId;
         this.instructions = getInstructions(fm);
         this.type = FlowType.MOD;
         this.flowMod = fm;
@@ -166,7 +166,7 @@ public class FlowEntryBuilder {
             switch (this.type) {
                 case STAT:
                     builder = DefaultFlowRule.builder()
-                            .forDevice(DeviceId.deviceId(Dpid.uri(dpid)))
+                            .forDevice(deviceId)
                             .withSelector(buildSelector())
                             .withTreatment(buildTreatment())
                             .withPriority(stat.getPriority())
@@ -182,7 +182,7 @@ public class FlowEntryBuilder {
                                                 stat.getByteCount().getValue());
                 case REMOVED:
                     builder = DefaultFlowRule.builder()
-                            .forDevice(DeviceId.deviceId(Dpid.uri(dpid)))
+                            .forDevice(deviceId)
                             .withSelector(buildSelector())
                             .withPriority(removed.getPriority())
                             .makeTemporary(removed.getIdleTimeout())
@@ -198,7 +198,7 @@ public class FlowEntryBuilder {
                 case MOD:
                     FlowEntryState flowState = state.length > 0 ? state[0] : FlowEntryState.FAILED;
                     builder = DefaultFlowRule.builder()
-                            .forDevice(DeviceId.deviceId(Dpid.uri(dpid)))
+                            .forDevice(deviceId)
                             .withSelector(buildSelector())
                             .withTreatment(buildTreatment())
                             .withPriority(flowMod.getPriority())
@@ -291,7 +291,7 @@ public class FlowEntryBuilder {
 
     private TrafficTreatment.Builder buildActions(List<OFAction> actions,
                                                   TrafficTreatment.Builder builder) {
-        DriverHandler driverHandler = getDriver(dpid);
+        DriverHandler driverHandler = getDriver(deviceId);
         ExtensionTreatmentInterpreter treatmentInterpreter;
         if (driverHandler.hasBehaviour(ExtensionTreatmentInterpreter.class)) {
             treatmentInterpreter = driverHandler.behaviour(ExtensionTreatmentInterpreter.class);
@@ -347,7 +347,7 @@ public class FlowEntryBuilder {
                     }  else if (exp.getExperimenter() == 0x2320) {
                         if (treatmentInterpreter != null) {
                             builder.extension(treatmentInterpreter.mapAction(exp),
-                                              DeviceId.deviceId(Dpid.uri(dpid)));
+                                    deviceId);
                         }
                     } else {
                         log.warn("Unsupported OFActionExperimenter {}", exp.getExperimenter());
@@ -359,7 +359,7 @@ public class FlowEntryBuilder {
                     break;
                 case POP_MPLS:
                     OFActionPopMpls popMpls = (OFActionPopMpls) act;
-                    builder.popMpls((short) popMpls.getEthertype().getValue());
+                    builder.popMpls(new EthType(popMpls.getEthertype().getValue()));
                     break;
                 case PUSH_MPLS:
                     builder.pushMpls();
@@ -415,7 +415,7 @@ public class FlowEntryBuilder {
 
 
     private void handleSetField(TrafficTreatment.Builder builder, OFActionSetField action) {
-        DriverHandler driverHandler = getDriver(dpid);
+        DriverHandler driverHandler = getDriver(deviceId);
         ExtensionTreatmentInterpreter treatmentInterpreter;
         if (driverHandler.hasBehaviour(ExtensionTreatmentInterpreter.class)) {
             treatmentInterpreter = driverHandler.behaviour(ExtensionTreatmentInterpreter.class);
@@ -434,7 +434,7 @@ public class FlowEntryBuilder {
             if (treatmentInterpreter != null &&
                     treatmentInterpreter.supported(ExtensionTreatmentTypes.OFDPA_SET_VLAN_ID.type())) {
                 builder.extension(treatmentInterpreter.mapAction(action),
-                        DeviceId.deviceId(Dpid.uri(dpid)));
+                        deviceId);
             } else {
                 @SuppressWarnings("unchecked")
                 OFOxm<OFVlanVidMatch> vlanvid = (OFOxm<OFVlanVidMatch>) oxm;
@@ -501,7 +501,7 @@ public class FlowEntryBuilder {
         case TUNNEL_IPV4_DST:
             if (treatmentInterpreter != null &&
                     treatmentInterpreter.supported(ExtensionTreatmentTypes.NICIRA_SET_TUNNEL_DST.type())) {
-                builder.extension(treatmentInterpreter.mapAction(action), DeviceId.deviceId(Dpid.uri(dpid)));
+                builder.extension(treatmentInterpreter.mapAction(action), deviceId);
             }
             break;
        case EXP_ODU_SIG_ID:
@@ -590,7 +590,7 @@ public class FlowEntryBuilder {
         Ip6Prefix ip6Prefix;
         Ip4Address ip;
 
-        DriverHandler driverHandler = getDriver(dpid);
+        DriverHandler driverHandler = getDriver(deviceId);
         ExtensionSelectorInterpreter selectorInterpreter;
         if (driverHandler.hasBehaviour(ExtensionSelectorInterpreter.class)) {
             selectorInterpreter = driverHandler.behaviour(ExtensionSelectorInterpreter.class);
@@ -615,12 +615,26 @@ public class FlowEntryBuilder {
                 builder.matchMetadata(metadata);
                 break;
             case ETH_DST:
-                mac = MacAddress.valueOf(match.get(MatchField.ETH_DST).getLong());
-                builder.matchEthDst(mac);
+                if (match.isPartiallyMasked(MatchField.ETH_DST)) {
+                    Masked<org.projectfloodlight.openflow.types.MacAddress> maskedMac =
+                            match.getMasked(MatchField.ETH_DST);
+                    builder.matchEthDstMasked(MacAddress.valueOf(maskedMac.getValue().getLong()),
+                                              MacAddress.valueOf(maskedMac.getMask().getLong()));
+                } else {
+                    mac = MacAddress.valueOf(match.get(MatchField.ETH_DST).getLong());
+                    builder.matchEthDst(mac);
+                }
                 break;
             case ETH_SRC:
-                mac = MacAddress.valueOf(match.get(MatchField.ETH_SRC).getLong());
-                builder.matchEthSrc(mac);
+                if (match.isPartiallyMasked(MatchField.ETH_SRC)) {
+                    Masked<org.projectfloodlight.openflow.types.MacAddress> maskedMac =
+                            match.getMasked(MatchField.ETH_SRC);
+                    builder.matchEthSrcMasked(MacAddress.valueOf(maskedMac.getValue().getLong()),
+                                              MacAddress.valueOf(maskedMac.getMask().getLong()));
+                } else {
+                    mac = MacAddress.valueOf(match.get(MatchField.ETH_SRC).getLong());
+                    builder.matchEthSrc(mac);
+                }
                 break;
             case ETH_TYPE:
                 int ethType = match.get(MatchField.ETH_TYPE).getValue();
@@ -632,7 +646,7 @@ public class FlowEntryBuilder {
                     if (match.getVersion().equals(OFVersion.OF_13)) {
                         OFOxm oxm = ((OFMatchV3) match).getOxmList().get(MatchField.VLAN_VID);
                         builder.extension(selectorInterpreter.mapOxm(oxm),
-                                DeviceId.deviceId(Dpid.uri(dpid)));
+                                deviceId);
                     } else {
                         break;
                     }
@@ -865,8 +879,7 @@ public class FlowEntryBuilder {
         return builder.build();
     }
 
-    private DriverHandler getDriver(Dpid dpid) {
-        DeviceId deviceId = DeviceId.deviceId(Dpid.uri(dpid));
+    private DriverHandler getDriver(DeviceId deviceId) {
         Driver driver = driverService.getDriver(deviceId);
         DriverHandler handler = new DefaultDriverHandler(new DefaultDriverData(driver, deviceId));
         return handler;

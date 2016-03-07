@@ -23,7 +23,7 @@ public abstract class AbstractProvider implements Provider {
     private final ProviderId providerId;
 
     /**
-     * Creates a provider with the supplier identifier.
+     * Creates a provider with the supplied identifier.
      *
      * @param id provider id
      */

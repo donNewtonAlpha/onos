@@ -73,17 +73,6 @@ public final class Instructions {
     }
 
     /**
-     * Creates a drop instruction.
-     *
-     * @return drop instruction
-     * @deprecated 1.4.0 Emu Release
-     */
-    @Deprecated
-    public static DropInstruction createDrop() {
-        return new DropInstruction();
-    }
-
-    /**
      * Creates a no action instruction.
      *
      * @return no action instruction
@@ -115,6 +104,12 @@ public final class Instructions {
         return new SetQueueInstruction(queueId, port);
     }
 
+    /**
+     * Creates a meter instruction.
+     *
+     * @param meterId Meter Id
+     * @return meter instruction
+     */
     public static MeterInstruction meterTraffic(final MeterId meterId) {
         checkNotNull(meterId, "meter id cannot be null");
         return new MeterInstruction(meterId);
@@ -431,36 +426,10 @@ public final class Instructions {
      *
      * @param port the TCP port number to modify to
      * @return a L4 modification
-     * @deprecated in Drake release
-     */
-    @Deprecated
-    public static L4ModificationInstruction modTcpSrc(short port) {
-       checkNotNull(port, "Src TCP port cannot be null");
-       return new ModTransportPortInstruction(L4SubType.TCP_SRC, TpPort.tpPort(port));
-    }
-
-    /**
-     * Creates a TCP src modification.
-     *
-     * @param port the TCP port number to modify to
-     * @return a L4 modification
      */
     public static L4ModificationInstruction modTcpSrc(TpPort port) {
        checkNotNull(port, "Src TCP port cannot be null");
        return new ModTransportPortInstruction(L4SubType.TCP_SRC, port);
-    }
-
-    /**
-     * Creates a TCP dst modification.
-     *
-     * @param port the TCP port number to modify to
-     * @return a L4 modification
-     * @deprecated in Drake release
-     */
-    @Deprecated
-    public static L4ModificationInstruction modTcpDst(short port) {
-        checkNotNull(port, "Dst TCP port cannot be null");
-        return new ModTransportPortInstruction(L4SubType.TCP_DST, TpPort.tpPort(port));
     }
 
     /**
@@ -479,36 +448,10 @@ public final class Instructions {
      *
      * @param port the UDP port number to modify to
      * @return a L4 modification
-     * @deprecated in Drake release
-     */
-    @Deprecated
-    public static L4ModificationInstruction modUdpSrc(short port) {
-        checkNotNull(port, "Src UDP port cannot be null");
-        return new ModTransportPortInstruction(L4SubType.UDP_SRC, TpPort.tpPort(port));
-    }
-
-    /**
-     * Creates a UDP src modification.
-     *
-     * @param port the UDP port number to modify to
-     * @return a L4 modification
      */
     public static L4ModificationInstruction modUdpSrc(TpPort port) {
         checkNotNull(port, "Src UDP port cannot be null");
         return new ModTransportPortInstruction(L4SubType.UDP_SRC, port);
-    }
-
-    /**
-     * Creates a UDP dst modification.
-     *
-     * @param port the UDP port number to modify to
-     * @return a L4 modification
-     * @deprecated in Drake release
-     */
-    @Deprecated
-    public static L4ModificationInstruction modUdpDst(short port) {
-        checkNotNull(port, "Dst UDP port cannot be null");
-        return new ModTransportPortInstruction(L4SubType.UDP_DST, TpPort.tpPort(port));
     }
 
     /**
@@ -534,42 +477,6 @@ public final class Instructions {
         checkNotNull(extension, "Extension instruction cannot be null");
         checkNotNull(deviceId, "Device ID cannot be null");
         return new ExtensionInstructionWrapper(extension, deviceId);
-    }
-
-    /**
-     *  Drop instruction.
-     *  @deprecated 1.4.0 Emu Release
-     */
-    @Deprecated
-    public static final class DropInstruction implements Instruction {
-
-        private DropInstruction() {}
-
-        @Override
-        public Type type() {
-            return Type.DROP;
-        }
-
-        @Override
-        public String toString() {
-            return type().toString();
-        }
-
-        @Override
-        public int hashCode() {
-            return type().ordinal();
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (this == obj) {
-                return true;
-            }
-            if (obj instanceof DropInstruction) {
-                return true;
-            }
-            return false;
-        }
     }
 
     /**

@@ -1,4 +1,4 @@
-// js for sample app table view
+// js for driver view
 (function () {
     'use strict';
 
@@ -6,10 +6,10 @@
     var $log, $scope, fs, wss;
 
     // constants
-    var detailsReq = 'driverMatrixDetailsRequest',
-        detailsResp = 'driverMatrixDetailsResponse',
+    var detailsReq = 'driverDataRequest',
+        detailsResp = 'driverDataResponse',
+        // TODO: deal with details panel
         pName = 'ov-driver-matrix-item-details-panel',
-
         propOrder = ['id', 'label', 'code'],
         friendlyProps = ['Item ID', 'Item Label', 'Special Code'];
 
@@ -40,11 +40,18 @@
     }
 
     function respDetailsCb(data) {
-        $scope.panelDetails = data.details;
+        //$log.debug('Matrix Data', data);
+        $scope.behaviours = data.behaviours;
+        $scope.drivers = data.drivers;
+        $scope.matrix = data.matrix;
         $scope.$apply();
     }
 
     angular.module('ovDriverMatrix', [])
+        .run(['IconService', function (is) {
+            // Create our icon-to-glyph binding here:
+            is.registerIconMapping('nav_drivers', 'cog');
+        }])
         .controller('OvDriverMatrixCtrl',
         ['$log', '$scope', 'TableBuilderService',
             'FnService', 'WebSocketService',
@@ -56,28 +63,37 @@
                 wss = _wss_;
 
                 var handlers = {};
-                $scope.panelDetails = {};
+                $scope.behaviours = [];
+                $scope.drivers = [];
+                $scope.matrix = {};
 
                 // details response handler
                 handlers[detailsResp] = respDetailsCb;
                 wss.bindHandlers(handlers);
 
-                // custom selection callback
-                function selCb($event, row) {
-                    if ($scope.selId) {
-                        wss.sendEvent(detailsReq, { id: row.id });
-                    } else {
-                        $scope.hidePanel();
-                    }
-                    $log.debug('Got a click on:', row);
+                wss.sendEvent(detailsReq);
+
+                //// custom selection callback
+                //function selCb($event, row) {
+                //    if ($scope.selId) {
+                //        wss.sendEvent(detailsReq, { id: row.id });
+                //    } else {
+                //        $scope.hidePanel();
+                //    }
+                //    $log.debug('Got a click on:', row);
+                //}
+
+                function cellHit(d, b) {
+                    var drec = $scope.matrix[d],
+                        brec = drec && drec[b];
+                    return !!brec;
                 }
 
-                // TableBuilderService creating a table for us
-                tbs.buildTable({
-                    scope: $scope,
-                    tag: 'driverMatrix',
-                    selCb: selCb
-                });
+                $scope.cellMarked = cellHit;
+
+                $scope.cellValue = function(d, b) {
+                    return cellHit(d, b) ? 'x' : '';
+                };
 
                 // cleanup
                 $scope.$on('$destroy', function () {
@@ -88,6 +104,7 @@
                 $log.log('OvDriverMatrixCtrl has been created');
             }])
 
+        // TODO: implement row selection to show details panel
         .directive('ovDriverMatrixItemDetailsPanel', ['PanelService', 'KeyService',
             function (ps, ks) {
             return {

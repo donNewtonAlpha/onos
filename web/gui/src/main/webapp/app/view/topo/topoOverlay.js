@@ -333,12 +333,14 @@
             var hdata = api.findNodeById(host.id),
                 badgeData = host.badge || null;
 
-            if (hdata && !hdata.el.empty()) {
+            if (hdata && hdata.el && !hdata.el.empty()) {
                 hdata.badge = badgeData;
                 if (!host.subdue) {
                     api.unsupNode(hdata.id, less);
                 }
                 // TODO: further highlighting?
+            } else {
+                $log.warn('HILITE: no host element:', host.id);
             }
         });
 
@@ -346,12 +348,14 @@
             var ddata = api.findNodeById(device.id),
                 badgeData = device.badge || null;
 
-            if (ddata && !ddata.el.empty()) {
+            if (ddata && ddata.el && !ddata.el.empty()) {
                 ddata.badge = badgeData;
                 if (!device.subdue) {
                     api.unsupNode(ddata.id, less);
                 }
                 // TODO: further highlighting?
+            } else {
+                $log.warn('HILITE: no device element:', device.id);
             }
         });
 
@@ -359,7 +363,8 @@
             var ldata = api.findLinkById(link.id),
                 lab = link.label,
                 units, portcls, magnitude;
-            if (ldata && !ldata.el.empty()) {
+
+            if (ldata && ldata.el && !ldata.el.empty()) {
                 if (!link.subdue) {
                     api.unsupLink(ldata.key, less);
                 }
@@ -381,6 +386,8 @@
                     }
                     ldata.el.classed(portcls, true);
                 }
+            } else {
+                $log.warn('HILITE: no link element:', link.id);
             }
         });
 

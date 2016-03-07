@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-2016 Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.onlab.osgi.ServiceDirectory;
 import org.onlab.packet.EthType;
 import org.onlab.packet.IPv4;
-import org.onlab.packet.IpPrefix;
 import org.onlab.packet.VlanId;
 import org.onlab.util.KryoNamespace;
 import org.onosproject.core.ApplicationId;
@@ -39,6 +38,7 @@ import org.onosproject.net.driver.AbstractHandlerBehaviour;
 import org.onosproject.net.flow.DefaultFlowRule;
 import org.onosproject.net.flow.DefaultTrafficSelector;
 import org.onosproject.net.flow.DefaultTrafficTreatment;
+import org.onosproject.net.flow.FlowEntry;
 import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.flow.FlowRuleOperations;
 import org.onosproject.net.flow.FlowRuleOperationsContext;
@@ -73,6 +73,8 @@ import org.onosproject.net.group.GroupKey;
 import org.onosproject.net.group.GroupListener;
 import org.onosproject.net.group.GroupService;
 import org.onosproject.store.serializers.KryoNamespaces;
+import org.onosproject.store.service.AtomicCounter;
+import org.onosproject.store.service.StorageService;
 import org.slf4j.Logger;
 
 import java.util.Collection;
@@ -92,16 +94,20 @@ public class OltPipeline extends AbstractHandlerBehaviour implements Pipeliner {
 
     private static final Integer QQ_TABLE = 1;
     private static final short MCAST_VLAN = 4000;
+    private static final String OLTCOOKIES = "olt-cookies-must-be-unique";
     private final Logger log = getLogger(getClass());
 
     private ServiceDirectory serviceDirectory;
     private FlowRuleService flowRuleService;
     private GroupService groupService;
     private CoreService coreService;
+    private StorageService storageService;
 
     private DeviceId deviceId;
     private ApplicationId appId;
-    private IpPrefix mcastPrefix = IpPrefix.valueOf("224.0.0.0/4");
+    // NOTE: OLT currently has some issue with cookie 0. Pick something larger
+    //       to avoid collision
+    private AtomicCounter counter;
 
     protected FlowObjectiveStore flowObjectiveStore;
 
@@ -125,6 +131,18 @@ public class OltPipeline extends AbstractHandlerBehaviour implements Pipeliner {
         coreService = serviceDirectory.get(CoreService.class);
         groupService = serviceDirectory.get(GroupService.class);
         flowObjectiveStore = context.store();
+        storageService = serviceDirectory.get(StorageService.class);
+
+        counter = storageService.atomicCounterBuilder()
+                .withName(String.format(OLTCOOKIES, deviceId))
+                .build()
+                .asAtomicCounter();
+
+        /*
+        magic olt number to make sure we don't collide with it's internal
+        processing
+         */
+        counter.set(123);
 
 
         appId = coreService.registerApplication(
@@ -257,7 +275,6 @@ public class OltPipeline extends AbstractHandlerBehaviour implements Pipeliner {
         GroupKey key = new DefaultGroupKey(appKryo.serialize(nextObjective.id()));
 
 
-
         pendingGroups.put(key, nextObjective);
 
         switch (nextObjective.op()) {
@@ -281,8 +298,8 @@ public class OltPipeline extends AbstractHandlerBehaviour implements Pipeliner {
                 break;
             case REMOVE_FROM_EXISTING:
                 groupService.removeBucketsFromGroup(deviceId, key,
-                                               new GroupBuckets(Collections.singletonList(bucket)),
-                                               key, nextObjective.appId());
+                                                    new GroupBuckets(Collections.singletonList(bucket)),
+                                                    key, nextObjective.appId());
                 break;
             default:
                 log.warn("Unknown next objective operation: {}", nextObjective.op());
@@ -309,9 +326,9 @@ public class OltPipeline extends AbstractHandlerBehaviour implements Pipeliner {
                 buildTreatment(Instructions.createGroup(group.id()));
 
         FlowRule rule = DefaultFlowRule.builder()
+                .withCookie(counter.getAndIncrement())
                 .forDevice(deviceId)
                 .forTable(0)
-                .fromApp(fwd.appId())
                 .makePermanent()
                 .withPriority(fwd.priority())
                 .withSelector(fwd.selector())
@@ -341,13 +358,13 @@ public class OltPipeline extends AbstractHandlerBehaviour implements Pipeliner {
     private boolean checkForMulticast(ForwardingObjective fwd) {
 
         IPCriterion ip = (IPCriterion) filterForCriterion(fwd.selector().criteria(),
-                                                                                Criterion.Type.IPV4_DST);
+                                                          Criterion.Type.IPV4_DST);
 
         if (ip == null) {
             return false;
         }
 
-        return mcastPrefix.contains(ip.ip());
+        return ip.ip().isMulticast();
 
     }
 
@@ -389,8 +406,8 @@ public class OltPipeline extends AbstractHandlerBehaviour implements Pipeliner {
         Criterion innerVid = Criteria.matchVlanId(((VlanIdCriterion) innerVlan).vlanId());
 
         FlowRule.Builder outer = DefaultFlowRule.builder()
+                .withCookie(counter.getAndIncrement())
                 .forDevice(deviceId)
-                .fromApp(appId)
                 .makePermanent()
                 .withPriority(fwd.priority())
                 .withSelector(buildSelector(inport, outerVlan))
@@ -398,8 +415,8 @@ public class OltPipeline extends AbstractHandlerBehaviour implements Pipeliner {
                                               Instructions.transition(QQ_TABLE)));
 
         FlowRule.Builder inner = DefaultFlowRule.builder()
+                .withCookie(counter.getAndIncrement())
                 .forDevice(deviceId)
-                .fromApp(appId)
                 .forTable(QQ_TABLE)
                 .makePermanent()
                 .withPriority(fwd.priority())
@@ -431,8 +448,8 @@ public class OltPipeline extends AbstractHandlerBehaviour implements Pipeliner {
         Pair<Instruction, Instruction> outerPair = vlanOps.remove(0);
 
         FlowRule.Builder inner = DefaultFlowRule.builder()
+                .withCookie(counter.getAndIncrement())
                 .forDevice(deviceId)
-                .fromApp(appId)
                 .makePermanent()
                 .withPriority(fwd.priority())
                 .withSelector(fwd.selector())
@@ -446,8 +463,8 @@ public class OltPipeline extends AbstractHandlerBehaviour implements Pipeliner {
                 innerPair.getRight()).vlanId();
 
         FlowRule.Builder outer = DefaultFlowRule.builder()
+                .withCookie(counter.getAndIncrement())
                 .forDevice(deviceId)
-                .fromApp(appId)
                 .forTable(QQ_TABLE)
                 .makePermanent()
                 .withPriority(fwd.priority())
@@ -542,9 +559,9 @@ public class OltPipeline extends AbstractHandlerBehaviour implements Pipeliner {
     private void buildAndApplyRule(FilteringObjective filter, TrafficSelector selector,
                                    TrafficTreatment treatment) {
         FlowRule rule = DefaultFlowRule.builder()
+                .withCookie(counter.getAndIncrement())
                 .forDevice(deviceId)
                 .forTable(0)
-                .fromApp(filter.appId())
                 .makePermanent()
                 .withSelector(selector)
                 .withTreatment(treatment)
@@ -576,7 +593,12 @@ public class OltPipeline extends AbstractHandlerBehaviour implements Pipeliner {
                 builder.add(inner.build()).add(outer.build());
                 break;
             case REMOVE:
-                builder.remove(inner.build()).remove(outer.build());
+                Iterable<FlowEntry> flows = flowRuleService.getFlowEntries(deviceId);
+                for (FlowEntry fe : flows) {
+                    if (fe.equals(inner.build()) || fe.equals(outer.build())) {
+                        builder.remove(fe);
+                    }
+                }
                 break;
             case ADD_TO_EXISTING:
                 break;

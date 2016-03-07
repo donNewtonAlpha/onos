@@ -211,7 +211,7 @@ public class NetworkElements{
 
     }
 
-    private void twoWayVlanFlow(VlanId vlanId,PortNumber port1, PortNumber port2,  DeviceId deviceId, int priority, boolean popVlan) {
+    public void twoWayVlanFlow(VlanId vlanId,PortNumber port1, PortNumber port2,  DeviceId deviceId, int priority, boolean popVlan) {
 
         //Vlan table flows
         vlanTableFlows(port1, vlanId, deviceId);

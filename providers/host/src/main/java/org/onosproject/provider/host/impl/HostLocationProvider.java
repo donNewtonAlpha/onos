@@ -297,7 +297,7 @@ public class HostLocationProvider extends AbstractProvider implements HostProvid
                                     VlanId vlan, HostLocation hloc) {
             HostDescription desc = new DefaultHostDescription(mac, vlan, hloc);
             try {
-                providerService.hostDetected(hid, desc);
+                providerService.hostDetected(hid, desc, false);
             } catch (IllegalStateException e) {
                 log.debug("Host {} suppressed", hid);
             }
@@ -319,7 +319,7 @@ public class HostLocationProvider extends AbstractProvider implements HostProvid
                     new DefaultHostDescription(mac, vlan, hloc) :
                     new DefaultHostDescription(mac, vlan, hloc, ip);
             try {
-                providerService.hostDetected(hid, desc);
+                providerService.hostDetected(hid, desc, false);
             } catch (IllegalStateException e) {
                 log.debug("Host {} suppressed", hid);
             }
@@ -462,7 +462,9 @@ public class HostLocationProvider extends AbstractProvider implements HostProvid
     // Signals host vanish for all specified hosts.
     private void removeHosts(Set<Host> hosts) {
         for (Host host : hosts) {
-            providerService.hostVanished(host.id());
+            if (host.providerId().equals(HostLocationProvider.this.id())) {
+                providerService.hostVanished(host.id());
+            }
         }
     }
 

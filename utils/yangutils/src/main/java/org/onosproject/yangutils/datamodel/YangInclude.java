@@ -17,7 +17,7 @@ package org.onosproject.yangutils.datamodel;
 
 import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
 import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.ParsableDataType;
+import org.onosproject.yangutils.utils.YangConstructType;
 
 /*
  * Reference:RFC 6020.
@@ -97,8 +97,9 @@ public class YangInclude implements Parsable {
      *
      * @return returns INCLUDE_DATA
      */
-    public ParsableDataType getParsableDataType() {
-        return ParsableDataType.INCLUDE_DATA;
+    @Override
+    public YangConstructType getYangConstructType() {
+        return YangConstructType.INCLUDE_DATA;
     }
 
     /**
@@ -106,6 +107,7 @@ public class YangInclude implements Parsable {
      *
      * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnEntry() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
 
@@ -116,6 +118,7 @@ public class YangInclude implements Parsable {
      *
      * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnExit() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
 

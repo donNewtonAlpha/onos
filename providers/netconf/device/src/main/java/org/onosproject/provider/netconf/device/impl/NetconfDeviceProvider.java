@@ -26,11 +26,13 @@ import org.onlab.packet.ChassisId;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.incubator.net.config.basics.ConfigException;
+import org.onosproject.net.AnnotationKeys;
 import org.onosproject.net.DefaultAnnotations;
 import org.onosproject.net.Device;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.MastershipRole;
 import org.onosproject.net.SparseAnnotations;
+import org.onosproject.net.behaviour.PortDiscovery;
 import org.onosproject.net.config.ConfigFactory;
 import org.onosproject.net.config.NetworkConfigEvent;
 import org.onosproject.net.config.NetworkConfigListener;
@@ -40,6 +42,8 @@ import org.onosproject.net.device.DeviceDescription;
 import org.onosproject.net.device.DeviceProvider;
 import org.onosproject.net.device.DeviceProviderRegistry;
 import org.onosproject.net.device.DeviceProviderService;
+import org.onosproject.net.device.DeviceService;
+import org.onosproject.net.driver.DriverService;
 import org.onosproject.net.provider.AbstractProvider;
 import org.onosproject.net.provider.ProviderId;
 import org.onosproject.netconf.NetconfController;
@@ -50,7 +54,10 @@ import org.onosproject.netconf.NetconfException;
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
+import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.net.config.basics.SubjectFactories.APP_SUBJECT_FACTORY;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -74,10 +81,19 @@ public class NetconfDeviceProvider extends AbstractProvider
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected CoreService coreService;
 
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected DriverService driverService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected DeviceService deviceService;
+
     private static final String APP_NAME = "org.onosproject.netconf";
     private static final String SCHEME_NAME = "netconf";
     private static final String DEVICE_PROVIDER_PACKAGE = "org.onosproject.netconf.provider.device";
     private static final String UNKNOWN = "unknown";
+
+    private final ExecutorService executor =
+            Executors.newFixedThreadPool(5, groupedThreads("onos/netconfdeviceprovider", "device-installer-%d", log));
 
     private DeviceProviderService providerService;
     private NetconfDeviceListener innerNodeListener = new InnerNetconfDeviceListener();
@@ -103,7 +119,7 @@ public class NetconfDeviceProvider extends AbstractProvider
         cfgService.registerConfigFactory(factory);
         cfgService.addListener(cfgLister);
         controller.addDeviceListener(innerNodeListener);
-        connectDevices();
+        executor.execute(NetconfDeviceProvider.this::connectDevices);
         log.info("Started");
     }
 
@@ -136,9 +152,8 @@ public class NetconfDeviceProvider extends AbstractProvider
     public boolean isReachable(DeviceId deviceId) {
         NetconfDevice netconfDevice = controller.getNetconfDevice(deviceId);
         if (netconfDevice == null) {
-            log.debug("Requested device id: "
-                             + deviceId.toString()
-                             + "  is not associated to any NETCONF Device");
+            log.debug("Requested device id: {} is not associated to any " +
+                              "NETCONF Device", deviceId.toString());
             return false;
         }
         return netconfDevice.isActive();
@@ -157,7 +172,9 @@ public class NetconfDeviceProvider extends AbstractProvider
             ChassisId cid = new ChassisId();
             String ipAddress = nodeId.ip().toString();
             SparseAnnotations annotations = DefaultAnnotations.builder()
-                    .set(IPADDRESS, ipAddress).build();
+                    .set(IPADDRESS, ipAddress)
+                    .set(AnnotationKeys.PROTOCOL, SCHEME_NAME.toUpperCase())
+                    .build();
             DeviceDescription deviceDescription = new DefaultDeviceDescription(
                     deviceId.uri(),
                     Device.Type.SWITCH,
@@ -166,7 +183,6 @@ public class NetconfDeviceProvider extends AbstractProvider
                     cid,
                     annotations);
             providerService.deviceConnected(deviceId, deviceDescription);
-
         }
 
         @Override
@@ -185,11 +201,22 @@ public class NetconfDeviceProvider extends AbstractProvider
                 cfg.getDevicesAddresses().stream()
                         .forEach(addr -> {
                                      try {
-                                         controller.connectDevice(
-                                                 new NetconfDeviceInfo(addr.name(),
-                                                                       addr.password(),
-                                                                       addr.ip(),
-                                                                       addr.port()));
+                                         NetconfDeviceInfo netconf = new NetconfDeviceInfo(addr.name(),
+                                                               addr.password(),
+                                                               addr.ip(),
+                                                               addr.port());
+                                         controller.connectDevice(netconf);
+                                         Device device = deviceService.getDevice(netconf.getDeviceId());
+                                         if (device.is(PortDiscovery.class)) {
+                                             PortDiscovery portConfig = device.as(PortDiscovery.class);
+                                             if (portConfig != null) {
+                                                 providerService.updatePorts(netconf.getDeviceId(),
+                                                                             portConfig.getPorts());
+                                             }
+                                         } else {
+                                             log.warn("No portGetter behaviour for device {}", netconf.getDeviceId());
+                                         }
+
                                      } catch (IOException e) {
                                          throw new RuntimeException(
                                                  new NetconfException(
@@ -211,7 +238,7 @@ public class NetconfDeviceProvider extends AbstractProvider
 
         @Override
         public void event(NetworkConfigEvent event) {
-            connectDevices();
+            executor.execute(NetconfDeviceProvider.this::connectDevices);
         }
 
         @Override

@@ -18,14 +18,17 @@ package org.onosproject.yangutils.parser.impl.listeners;
 
 import org.onosproject.yangutils.datamodel.YangContainer;
 import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.ParsableDataType;
 import org.onosproject.yangutils.parser.antlrgencode.GeneratedYangParser;
 import org.onosproject.yangutils.parser.exceptions.ParserException;
 import org.onosproject.yangutils.parser.impl.TreeWalkListener;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorLocation;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorMessageConstruction;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation;
+
+import static org.onosproject.yangutils.utils.YangConstructType.PRESENCE_DATA;
+import static org.onosproject.yangutils.utils.YangConstructType.CONTAINER_DATA;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorLocation.ENTRY;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorMessageConstruction.constructListenerErrorMessage;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.INVALID_HOLDER;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.MISSING_HOLDER;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation.checkStackIsNotEmpty;
 
 /*
  * Reference: RFC6020 and YANG ANTLR Grammar
@@ -54,27 +57,22 @@ public final class PresenceListener {
      * rule (presence), performs validation and updates the data model
      * tree.
      *
-     * @param listener listener's object.
-     * @param ctx context object of the grammar rule.
+     * @param listener listener's object
+     * @param ctx context object of the grammar rule
      */
     public static void processPresenceEntry(TreeWalkListener listener,
                                              GeneratedYangParser.PresenceStatementContext ctx) {
 
         // Check for stack to be non empty.
-        ListenerValidation.checkStackIsNotEmpty(listener, ListenerErrorType.MISSING_HOLDER,
-                ParsableDataType.PRESENCE_DATA, String.valueOf(ctx.string().getText()),
-                ListenerErrorLocation.ENTRY);
+        checkStackIsNotEmpty(listener, MISSING_HOLDER, PRESENCE_DATA, ctx.string().getText(), ENTRY);
 
         Parsable tmpData = listener.getParsedDataStack().peek();
-        if (tmpData.getParsableDataType() == ParsableDataType.CONTAINER_DATA) {
+        if (tmpData.getYangConstructType() == CONTAINER_DATA) {
             YangContainer container = (YangContainer) tmpData;
             container.setPresence(ctx.string().getText());
         } else {
-            throw new ParserException(ListenerErrorMessageConstruction
-                    .constructListenerErrorMessage(ListenerErrorType.INVALID_HOLDER,
-                            ParsableDataType.PRESENCE_DATA,
-                            String.valueOf(ctx.string().getText()),
-                            ListenerErrorLocation.ENTRY));
+            throw new ParserException(constructListenerErrorMessage(INVALID_HOLDER, PRESENCE_DATA,
+                    ctx.string().getText(), ENTRY));
         }
     }
 }

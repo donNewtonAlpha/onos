@@ -19,14 +19,16 @@ package org.onosproject.yangutils.parser.impl.listeners;
 import org.onosproject.yangutils.datamodel.YangLeafList;
 import org.onosproject.yangutils.datamodel.YangList;
 import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.ParsableDataType;
 import org.onosproject.yangutils.parser.antlrgencode.GeneratedYangParser;
 import org.onosproject.yangutils.parser.exceptions.ParserException;
 import org.onosproject.yangutils.parser.impl.TreeWalkListener;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorLocation;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorMessageConstruction;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation;
+
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorLocation.ENTRY;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorMessageConstruction.constructListenerErrorMessage;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.INVALID_HOLDER;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.MISSING_HOLDER;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation.checkStackIsNotEmpty;
+import static org.onosproject.yangutils.utils.YangConstructType.MAX_ELEMENT_DATA;
 
 /*
  * Reference: RFC6020 and YANG ANTLR Grammar
@@ -42,8 +44,9 @@ import org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation;
  */
 
 /**
- * Implements listener based call back function corresponding to the "max-elements"
- * rule defined in ANTLR grammar file for corresponding ABNF rule in RFC 6020.
+ * Implements listener based call back function corresponding to the
+ * "max-elements" rule defined in ANTLR grammar file for corresponding ABNF rule
+ * in RFC 6020.
  */
 public final class MaxElementsListener {
 
@@ -54,20 +57,18 @@ public final class MaxElementsListener {
     }
 
     /**
-     * It is called when parser receives an input matching the grammar
-     * rule (max-elements), performs validation and updates the data model
-     * tree.
+     * It is called when parser receives an input matching the grammar rule
+     * (max-elements), performs validation and updates the data model tree.
      *
-     * @param listener listener's object.
-     * @param ctx context object of the grammar rule.
+     * @param listener listener's object
+     * @param ctx context object of the grammar rule
      */
     public static void processMaxElementsEntry(TreeWalkListener listener,
-                                             GeneratedYangParser.MaxElementsStatementContext ctx) {
+            GeneratedYangParser.MaxElementsStatementContext ctx) {
         int maxElementsValue;
 
         // Check for stack to be non empty.
-        ListenerValidation.checkStackIsNotEmpty(listener, ListenerErrorType.MISSING_HOLDER,
-                ParsableDataType.MAX_ELEMENT_DATA, "", ListenerErrorLocation.ENTRY);
+        checkStackIsNotEmpty(listener, MISSING_HOLDER, MAX_ELEMENT_DATA, "", ENTRY);
 
         if (ctx.maxValueArgument().UNBOUNDED_KEYWORD() != null) {
             maxElementsValue = Integer.MAX_VALUE;
@@ -76,20 +77,17 @@ public final class MaxElementsListener {
         }
 
         Parsable tmpData = listener.getParsedDataStack().peek();
-        switch (tmpData.getParsableDataType()) {
+        switch (tmpData.getYangConstructType()) {
             case LEAF_LIST_DATA:
                 YangLeafList leafList = (YangLeafList) tmpData;
                 leafList.setMaxElelements(maxElementsValue);
                 break;
             case LIST_DATA:
                 YangList yangList = (YangList) tmpData;
-                yangList.setMaxElelements(maxElementsValue);
+                yangList.setMaxElements(maxElementsValue);
                 break;
             default:
-                throw new ParserException(ListenerErrorMessageConstruction
-                        .constructListenerErrorMessage(ListenerErrorType.INVALID_HOLDER,
-                                ParsableDataType.MAX_ELEMENT_DATA,
-                                "", ListenerErrorLocation.ENTRY));
+                throw new ParserException(constructListenerErrorMessage(INVALID_HOLDER, MAX_ELEMENT_DATA, "", ENTRY));
         }
     }
 }

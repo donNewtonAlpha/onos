@@ -18,7 +18,7 @@ package org.onosproject.yangutils.datamodel;
 
 import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
 import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.ParsableDataType;
+import org.onosproject.yangutils.utils.YangConstructType;
 
 /*
  * Reference:RFC 6020.
@@ -56,9 +56,8 @@ import org.onosproject.yangutils.parser.ParsableDataType;
 /**
  * Leaf data represented in YANG.
  *
- * @param <T> YANG data type
  */
-public class YangLeaf<T> implements YangCommonInfo, Parsable {
+public class YangLeaf implements YangCommonInfo, Parsable {
 
     /**
      * Name of leaf.
@@ -68,7 +67,7 @@ public class YangLeaf<T> implements YangCommonInfo, Parsable {
     /**
      * If the leaf is a config parameter.
      */
-    private boolean isConfig;
+    private Boolean isConfig;
 
     /**
      * description of leaf.
@@ -88,7 +87,7 @@ public class YangLeaf<T> implements YangCommonInfo, Parsable {
     /**
      * Status of leaf in YANG definition.
      */
-    private YangStatusType status;
+    private YangStatusType status = YangStatusType.CURRENT;
 
     /**
      * Textual units info.
@@ -98,7 +97,7 @@ public class YangLeaf<T> implements YangCommonInfo, Parsable {
     /**
      * Data type of the leaf.
      */
-    private YangType<T> dataType;
+    private YangType<?> dataType;
 
     /**
      * Default constructor to create a YANG leaf.
@@ -109,7 +108,7 @@ public class YangLeaf<T> implements YangCommonInfo, Parsable {
     /**
      * Get the name of leaf.
      *
-     * @return the leaf name.
+     * @return the leaf name
      */
     public String getLeafName() {
         return name;
@@ -118,25 +117,25 @@ public class YangLeaf<T> implements YangCommonInfo, Parsable {
     /**
      * Set the name of leaf.
      *
-     * @param leafName the leaf name to set.
+     * @param leafName the leaf name to set
      */
     public void setLeafName(String leafName) {
-        this.name = leafName;
+        name = leafName;
     }
 
     /**
      * Get the config flag.
      *
-     * @return if config flag.
+     * @return if config flag
      */
-    public boolean isConfig() {
+    public Boolean isConfig() {
         return isConfig;
     }
 
     /**
      * Set the config flag.
      *
-     * @param isCfg the flag value to set.
+     * @param isCfg the flag value to set
      */
     public void setConfig(boolean isCfg) {
         isConfig = isCfg;
@@ -145,8 +144,9 @@ public class YangLeaf<T> implements YangCommonInfo, Parsable {
     /**
      * Get the description.
      *
-     * @return the description.
+     * @return the description
      */
+    @Override
     public String getDescription() {
         return description;
     }
@@ -154,8 +154,9 @@ public class YangLeaf<T> implements YangCommonInfo, Parsable {
     /**
      * Set the description.
      *
-     * @param description set the description.
+     * @param description set the description
      */
+    @Override
     public void setDescription(String description) {
         this.description = description;
     }
@@ -163,7 +164,7 @@ public class YangLeaf<T> implements YangCommonInfo, Parsable {
     /**
      * Get if the leaf is mandatory.
      *
-     * @return if leaf is mandatory.
+     * @return if leaf is mandatory
      */
     public boolean isMandatory() {
         return isMandatory;
@@ -181,8 +182,9 @@ public class YangLeaf<T> implements YangCommonInfo, Parsable {
     /**
      * Get the textual reference.
      *
-     * @return the reference.
+     * @return the reference
      */
+    @Override
     public String getReference() {
         return reference;
     }
@@ -190,8 +192,9 @@ public class YangLeaf<T> implements YangCommonInfo, Parsable {
     /**
      * Set the textual reference.
      *
-     * @param reference the reference to set.
+     * @param reference the reference to set
      */
+    @Override
     public void setReference(String reference) {
         this.reference = reference;
     }
@@ -199,8 +202,9 @@ public class YangLeaf<T> implements YangCommonInfo, Parsable {
     /**
      * Get the status.
      *
-     * @return the status.
+     * @return the status
      */
+    @Override
     public YangStatusType getStatus() {
         return status;
     }
@@ -208,8 +212,9 @@ public class YangLeaf<T> implements YangCommonInfo, Parsable {
     /**
      * Set the status.
      *
-     * @param status the status to set.
+     * @param status the status to set
      */
+    @Override
     public void setStatus(YangStatusType status) {
         this.status = status;
     }
@@ -217,7 +222,7 @@ public class YangLeaf<T> implements YangCommonInfo, Parsable {
     /**
      * Get the units.
      *
-     * @return the units.
+     * @return the units
      */
     public String getUnits() {
         return units;
@@ -226,7 +231,7 @@ public class YangLeaf<T> implements YangCommonInfo, Parsable {
     /**
      * Set the units.
      *
-     * @param units the units to set.
+     * @param units the units to set
      */
     public void setUnits(String units) {
         this.units = units;
@@ -235,35 +240,37 @@ public class YangLeaf<T> implements YangCommonInfo, Parsable {
     /**
      * Get the data type.
      *
-     * @return the data type.
+     * @return the data type
      */
-    public YangType<T> getDataType() {
+    public YangType<?> getDataType() {
         return dataType;
     }
 
     /**
      * Set the data type.
      *
-     * @param dataType the data type to set.
+     * @param dataType the data type to set
      */
-    public void setDataType(YangType<T> dataType) {
+    public void setDataType(YangType<?> dataType) {
         this.dataType = dataType;
     }
 
     /**
      * Returns the type of the parsed data.
      *
-     * @return returns LEAF_DATA.
+     * @return returns LEAF_DATA
      */
-    public ParsableDataType getParsableDataType() {
-        return ParsableDataType.LEAF_DATA;
+    @Override
+    public YangConstructType getYangConstructType() {
+        return YangConstructType.LEAF_DATA;
     }
 
     /**
      * Validate the data on entering the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnEntry() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
 
@@ -272,8 +279,9 @@ public class YangLeaf<T> implements YangCommonInfo, Parsable {
     /**
      * Validate the data on exiting the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnExit() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
 

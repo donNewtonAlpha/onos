@@ -15,15 +15,16 @@
  */
 package org.onosproject.openflow.controller.driver;
 
+import org.jboss.netty.channel.Channel;
 import org.junit.Before;
 import org.junit.Test;
+import org.onosproject.core.netty.ChannelAdapter;
 import org.onosproject.openflow.controller.Dpid;
 import org.onosproject.openflow.controller.OpenFlowEventListener;
 import org.projectfloodlight.openflow.protocol.OFMessage;
-import org.jboss.netty.channel.Channel;
+
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Future;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.hasSize;
@@ -48,11 +49,10 @@ public class AbstractOpenFlowSwitchTest {
         }
 
         @Override
-        public Future<?> submit(Runnable task) {
+        public void execute(Runnable task) {
             AbstractOpenFlowSwitch.OFMessageHandler handler =
                     (AbstractOpenFlowSwitch.OFMessageHandler) task;
             submittedMessages.add(handler.msg);
-            return null;
         }
     }
 

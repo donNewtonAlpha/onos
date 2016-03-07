@@ -15,12 +15,13 @@
  */
 package org.onosproject.codec.impl;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import org.hamcrest.Description;
 import org.hamcrest.TypeSafeDiagnosingMatcher;
 import org.onlab.util.HexString;
 import org.onosproject.net.OduSignalId;
 import org.onosproject.net.flow.instructions.Instruction;
-import org.onosproject.net.flow.instructions.Instructions.DropInstruction;
+import org.onosproject.net.flow.instructions.Instructions.GroupInstruction;
 import org.onosproject.net.flow.instructions.Instructions.NoActionInstruction;
 import org.onosproject.net.flow.instructions.Instructions.OutputInstruction;
 import org.onosproject.net.flow.instructions.L0ModificationInstruction.ModLambdaInstruction;
@@ -33,8 +34,6 @@ import org.onosproject.net.flow.instructions.L2ModificationInstruction.ModVlanPc
 import org.onosproject.net.flow.instructions.L2ModificationInstruction.PushHeaderInstructions;
 import org.onosproject.net.flow.instructions.L3ModificationInstruction.ModIPInstruction;
 import org.onosproject.net.flow.instructions.L3ModificationInstruction.ModIPv6FlowLabelInstruction;
-
-import com.fasterxml.jackson.databind.JsonNode;
 
 /**
  * Hamcrest matcher for instructions.
@@ -118,6 +117,33 @@ public final class InstructionJsonMatcher extends TypeSafeDiagnosingMatcher<Json
             description.appendText("Unmathcing types ");
             description.appendText("instructionToMatch " + instructionToMatch.port().toString());
             description.appendText("jsonPort " + jsonPort);
+        }
+
+        return true;
+    }
+
+    /**
+     * Matches the contents of a group instruction.
+     *
+     * @param instructionJson JSON instruction to match
+     * @param description Description object used for recording errors
+     * @return true if contents match, false otherwise
+     */
+    private boolean matchGroupInstruction(JsonNode instructionJson,
+                                          Description description) {
+        final String jsonType = instructionJson.get("type").textValue();
+        GroupInstruction instructionToMatch = (GroupInstruction) instruction;
+        if (!instructionToMatch.type().name().equals(jsonType)) {
+            description.appendText("type was " + jsonType);
+            return false;
+        }
+
+        if (instructionJson.get("groupId").isInt()) {
+            final int jsonGroupId = instructionJson.get("groupId").asInt();
+            if (instructionToMatch.groupId().id() != jsonGroupId) {
+                description.appendText("groupId was " + jsonGroupId);
+                return false;
+            }
         }
 
         return true;
@@ -429,7 +455,7 @@ public final class InstructionJsonMatcher extends TypeSafeDiagnosingMatcher<Json
         }
 
         final int jsonLabel = instructionJson.get("label").intValue();
-        final int label = instructionToMatch.mplsLabel().toInt();
+        final int label = instructionToMatch.label().toInt();
         if (label != jsonLabel) {
             description.appendText("MPLS label was " + jsonLabel);
             return false;
@@ -452,10 +478,10 @@ public final class InstructionJsonMatcher extends TypeSafeDiagnosingMatcher<Json
 
         if (instruction instanceof PushHeaderInstructions) {
             return matchPushHeaderInstruction(jsonInstruction, description);
-        } else if (instruction instanceof DropInstruction) {
-            return true;
         } else if (instruction instanceof OutputInstruction) {
             return matchOutputInstruction(jsonInstruction, description);
+        } else if (instruction instanceof GroupInstruction) {
+            return matchGroupInstruction(jsonInstruction, description);
         } else if (instruction instanceof ModLambdaInstruction) {
             return matchModLambdaInstruction(jsonInstruction, description);
         } else if (instruction instanceof ModOchSignalInstruction) {

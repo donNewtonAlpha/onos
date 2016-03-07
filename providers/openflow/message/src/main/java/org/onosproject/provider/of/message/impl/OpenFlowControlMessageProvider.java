@@ -22,6 +22,7 @@ import org.apache.felix.scr.annotations.Deactivate;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.onlab.metrics.MetricsService;
+import org.onlab.util.SharedScheduledExecutors;
 import org.onosproject.cpman.message.ControlMessageProvider;
 import org.onosproject.cpman.message.ControlMessageProviderRegistry;
 import org.onosproject.cpman.message.ControlMessageProviderService;
@@ -39,7 +40,6 @@ import org.projectfloodlight.openflow.protocol.OFPortStatus;
 import org.slf4j.Logger;
 
 import java.util.HashMap;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -47,7 +47,6 @@ import java.util.concurrent.TimeUnit;
 import static org.onosproject.net.DeviceId.deviceId;
 import static org.onosproject.openflow.controller.Dpid.uri;
 import static org.slf4j.LoggerFactory.getLogger;
-import static org.onlab.util.Tools.groupedThreads;
 
 /**
  * Provider which uses an OpenFlow controller to collect control message.
@@ -105,8 +104,7 @@ public class OpenFlowControlMessageProvider extends AbstractProvider
         // listens all OpenFlow outgoing message events
         controller.getSwitches().forEach(sw -> sw.addEventListener(outMsgListener));
 
-        executor = Executors.newSingleThreadScheduledExecutor(
-                             groupedThreads("onos/provider", "aggregator"));
+        executor = SharedScheduledExecutors.getSingleThreadExecutor();
 
         connectInitialDevices();
         log.info("Started");

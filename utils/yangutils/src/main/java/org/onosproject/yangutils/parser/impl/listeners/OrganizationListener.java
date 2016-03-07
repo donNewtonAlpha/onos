@@ -19,14 +19,16 @@ package org.onosproject.yangutils.parser.impl.listeners;
 import org.onosproject.yangutils.datamodel.YangModule;
 import org.onosproject.yangutils.datamodel.YangSubModule;
 import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.ParsableDataType;
 import org.onosproject.yangutils.parser.antlrgencode.GeneratedYangParser;
 import org.onosproject.yangutils.parser.exceptions.ParserException;
 import org.onosproject.yangutils.parser.impl.TreeWalkListener;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorLocation;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorMessageConstruction;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation;
+
+import static org.onosproject.yangutils.utils.YangConstructType.ORGANIZATION_DATA;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorLocation.ENTRY;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorMessageConstruction.constructListenerErrorMessage;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.INVALID_HOLDER;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.MISSING_HOLDER;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation.checkStackIsNotEmpty;
 
 /*
  * Reference: RFC6020 and YANG ANTLR Grammar
@@ -70,8 +72,9 @@ import org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation;
  */
 
 /**
- * Implements listener based call back function corresponding to the "organization"
- * rule defined in ANTLR grammar file for corresponding ABNF rule in RFC 6020.
+ * Implements listener based call back function corresponding to the
+ * "organization" rule defined in ANTLR grammar file for corresponding ABNF rule
+ * in RFC 6020.
  */
 public final class OrganizationListener {
 
@@ -82,41 +85,35 @@ public final class OrganizationListener {
     }
 
     /**
-     * It is called when parser receives an input matching the grammar
-     * rule (organization), perform validations and update the data model
-     * tree.
+     * It is called when parser receives an input matching the grammar rule
+     * (organization), perform validations and update the data model tree.
      *
-     * @param listener Listener's object.
-     * @param ctx context object of the grammar rule.
+     * @param listener Listener's object
+     * @param ctx context object of the grammar rule
      */
     public static void processOrganizationEntry(TreeWalkListener listener,
                                                 GeneratedYangParser.OrganizationStatementContext ctx) {
 
         // Check for stack to be non empty.
-        ListenerValidation.checkStackIsNotEmpty(listener, ListenerErrorType.MISSING_HOLDER,
-                                                ParsableDataType.ORGANIZATION_DATA,
-                                                String.valueOf(ctx.string().getText()), ListenerErrorLocation.ENTRY);
+        checkStackIsNotEmpty(listener, MISSING_HOLDER, ORGANIZATION_DATA, ctx.string().getText(),
+                             ENTRY);
 
         // Obtain the node of the stack.
         Parsable tmpNode = listener.getParsedDataStack().peek();
-        switch (tmpNode.getParsableDataType()) {
+        switch (tmpNode.getYangConstructType()) {
         case MODULE_DATA: {
             YangModule module = (YangModule) tmpNode;
-            module.setOrganization(String.valueOf(ctx.string().getText()));
+            module.setOrganization(ctx.string().getText());
             break;
         }
         case SUB_MODULE_DATA: {
             YangSubModule subModule = (YangSubModule) tmpNode;
-            subModule.setOrganization(String.valueOf(ctx.string().getText()));
+            subModule.setOrganization(ctx.string().getText());
             break;
         }
         default:
-            throw new ParserException(
-                                      ListenerErrorMessageConstruction
-                                              .constructListenerErrorMessage(ListenerErrorType.INVALID_HOLDER,
-                                                                             ParsableDataType.ORGANIZATION_DATA,
-                                                                             String.valueOf(ctx.string().getText()),
-                                                                             ListenerErrorLocation.ENTRY));
+            throw new ParserException(constructListenerErrorMessage(INVALID_HOLDER, ORGANIZATION_DATA,
+                                                                    ctx.string().getText(), ENTRY));
         }
     }
 }

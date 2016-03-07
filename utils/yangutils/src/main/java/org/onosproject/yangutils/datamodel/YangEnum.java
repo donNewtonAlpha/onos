@@ -18,7 +18,9 @@ package org.onosproject.yangutils.datamodel;
 
 import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
 import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.ParsableDataType;
+import org.onosproject.yangutils.utils.YangConstructType;
+
+import java.util.Objects;
 
 /*-
  * The "ENUM" statement, which is a sub-statement to the "type"
@@ -71,7 +73,7 @@ public class YangEnum implements YangCommonInfo, Parsable {
     private YangStatusType status;
 
     /**
-     * value of ENUM.
+     * Value of ENUM.
      */
     private int value;
 
@@ -85,7 +87,7 @@ public class YangEnum implements YangCommonInfo, Parsable {
     /**
      * Get the named value.
      *
-     * @return the named value.
+     * @return the named value
      */
     public String getNamedValue() {
         return namedValue;
@@ -94,7 +96,7 @@ public class YangEnum implements YangCommonInfo, Parsable {
     /**
      * Set the named value.
      *
-     * @param namedValue the named value to set.
+     * @param namedValue the named value to set
      */
     public void setNamedValue(String namedValue) {
         this.namedValue = namedValue;
@@ -103,8 +105,9 @@ public class YangEnum implements YangCommonInfo, Parsable {
     /**
      * Get the description.
      *
-     * @return the description.
+     * @return the description
      */
+    @Override
     public String getDescription() {
         return description;
     }
@@ -112,8 +115,9 @@ public class YangEnum implements YangCommonInfo, Parsable {
     /**
      * Set the description.
      *
-     * @param description set the description.
+     * @param description set the description
      */
+    @Override
     public void setDescription(String description) {
         this.description = description;
     }
@@ -121,8 +125,9 @@ public class YangEnum implements YangCommonInfo, Parsable {
     /**
      * Get the textual reference.
      *
-     * @return the reference.
+     * @return the reference
      */
+    @Override
     public String getReference() {
         return reference;
     }
@@ -130,8 +135,9 @@ public class YangEnum implements YangCommonInfo, Parsable {
     /**
      * Set the textual reference.
      *
-     * @param reference the reference to set.
+     * @param reference the reference to set
      */
+    @Override
     public void setReference(String reference) {
         this.reference = reference;
     }
@@ -139,8 +145,9 @@ public class YangEnum implements YangCommonInfo, Parsable {
     /**
      * Get the status.
      *
-     * @return the status.
+     * @return the status
      */
+    @Override
     public YangStatusType getStatus() {
         return status;
     }
@@ -148,8 +155,9 @@ public class YangEnum implements YangCommonInfo, Parsable {
     /**
      * Set the status.
      *
-     * @param status the status to set.
+     * @param status the status to set
      */
+    @Override
     public void setStatus(YangStatusType status) {
         this.status = status;
     }
@@ -157,7 +165,7 @@ public class YangEnum implements YangCommonInfo, Parsable {
     /**
      * Get the value.
      *
-     * @return the value.
+     * @return the value
      */
     public int getValue() {
         return value;
@@ -166,7 +174,7 @@ public class YangEnum implements YangCommonInfo, Parsable {
     /**
      * Set the value.
      *
-     * @param value the value to set.
+     * @param value the value to set
      */
     public void setValue(int value) {
         this.value = value;
@@ -177,15 +185,34 @@ public class YangEnum implements YangCommonInfo, Parsable {
      *
      * @return ParsedDataType returns ENUM_DATA
      */
-    public ParsableDataType getParsableDataType() {
-        return ParsableDataType.ENUM_DATA;
+    @Override
+    public YangConstructType getYangConstructType() {
+        return YangConstructType.ENUM_DATA;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj instanceof YangEnum) {
+            final YangEnum other = (YangEnum) obj;
+            return Objects.equals(this.namedValue, other.namedValue);
+        }
+        return false;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(this.namedValue);
     }
 
     /**
      * Validate the data on entering the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnEntry() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
     }
@@ -193,8 +220,9 @@ public class YangEnum implements YangCommonInfo, Parsable {
     /**
      * Validate the data on exiting the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnExit() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
     }

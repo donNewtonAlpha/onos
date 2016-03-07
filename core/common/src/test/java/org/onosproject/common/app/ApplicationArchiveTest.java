@@ -20,6 +20,7 @@ import com.google.common.io.ByteStreams;
 import com.google.common.io.Files;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.onlab.util.Tools;
 import org.onosproject.app.ApplicationDescription;
@@ -64,6 +65,7 @@ public class ApplicationArchiveTest {
         assertEquals("incorrect url", URL, app.url());
         assertEquals("incorrect readme", README, app.readme());
 
+        assertEquals("incorrect title", TITLE, app.title());
         assertEquals("incorrect description", DESC, app.description());
         assertEquals("incorrect features URI", FURL, app.featuresRepo().get());
         assertEquals("incorrect permissions", PERMS, app.permissions());
@@ -149,6 +151,7 @@ public class ApplicationArchiveTest {
     }
 
     @Test(expected = ApplicationException.class)
+    @Ignore("No longer needed")
     public void setBadActive() throws IOException {
         aar.setActive("org.foo.BAD");
     }

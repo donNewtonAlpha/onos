@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-2016 Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -99,6 +99,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+
+import static com.google.common.base.Preconditions.checkState;
 
 @Service
 @Component(immediate = true)
@@ -321,15 +323,14 @@ public class SegmentRoutingManager implements SegmentRoutingService {
                 .withTimestampProvider((k, v) -> new WallClockTimestamp())
                 .build();
 
-        cfgService.addListener(cfgListener);
-        cfgService.registerConfigFactory(cfgDeviceFactory);
-        cfgService.registerConfigFactory(cfgAppFactory);
-
         processor = new InternalPacketProcessor();
         linkListener = new InternalLinkListener();
         deviceListener = new InternalDeviceListener();
         netcfgHandler = new NetworkConfigEventHandler(this);
 
+        cfgService.addListener(cfgListener);
+        cfgService.registerConfigFactory(cfgDeviceFactory);
+        cfgService.registerConfigFactory(cfgAppFactory);
         hostService.addListener(hostListener);
         packetService.addProcessor(processor, PacketProcessor.director(2));
         linkService.addListener(linkListener);
@@ -891,6 +892,7 @@ public class SegmentRoutingManager implements SegmentRoutingService {
                         break;
                 }
             } else if (event.configClass().equals(SegmentRoutingAppConfig.class)) {
+                checkState(netcfgHandler != null, "NetworkConfigEventHandler is not initialized");
                 switch (event.type()) {
                     case CONFIG_ADDED:
                         netcfgHandler.processVRouterConfigAdded(event);
@@ -991,7 +993,7 @@ public class SegmentRoutingManager implements SegmentRoutingService {
             Set<IpAddress> ips = event.subject().ipAddresses();
             log.info("Host {}/{} is added at {}:{}", mac, vlanId, deviceId, port);
 
-            if (!deviceConfiguration.excludedPorts()
+            if (!deviceConfiguration.suppressHost()
                     .contains(new ConnectPoint(deviceId, port))) {
                 // Populate bridging table entry
                 log.debug("Populate L2 table entry for host {} at {}:{}",
@@ -1020,7 +1022,7 @@ public class SegmentRoutingManager implements SegmentRoutingService {
             Set<IpAddress> ips = event.subject().ipAddresses();
             log.debug("Host {}/{} is removed from {}:{}", mac, vlanId, deviceId, port);
 
-            if (!deviceConfiguration.excludedPorts()
+            if (!deviceConfiguration.suppressHost()
                     .contains(new ConnectPoint(deviceId, port))) {
                 // Revoke bridging table entry
                 ForwardingObjective.Builder fob =
@@ -1051,7 +1053,7 @@ public class SegmentRoutingManager implements SegmentRoutingService {
             log.debug("Host {}/{} is moved from {}:{} to {}:{}",
                     mac, vlanId, prevDeviceId, prevPort, newDeviceId, newPort);
 
-            if (!deviceConfiguration.excludedPorts()
+            if (!deviceConfiguration.suppressHost()
                     .contains(new ConnectPoint(prevDeviceId, prevPort))) {
                 // Revoke previous bridging table entry
                 ForwardingObjective.Builder prevFob =
@@ -1069,7 +1071,7 @@ public class SegmentRoutingManager implements SegmentRoutingService {
                 });
             }
 
-            if (!deviceConfiguration.excludedPorts()
+            if (!deviceConfiguration.suppressHost()
                     .contains(new ConnectPoint(newDeviceId, newPort))) {
                 // Populate new bridging table entry
                 ForwardingObjective.Builder newFob =
@@ -1099,7 +1101,7 @@ public class SegmentRoutingManager implements SegmentRoutingService {
             Set<IpAddress> newIps = event.subject().ipAddresses();
             log.debug("Host {}/{} is updated", mac, vlanId);
 
-            if (!deviceConfiguration.excludedPorts()
+            if (!deviceConfiguration.suppressHost()
                     .contains(new ConnectPoint(prevDeviceId, prevPort))) {
                 // Revoke previous IP table entry
                 prevIps.forEach(ip -> {
@@ -1110,7 +1112,7 @@ public class SegmentRoutingManager implements SegmentRoutingService {
                 });
             }
 
-            if (!deviceConfiguration.excludedPorts()
+            if (!deviceConfiguration.suppressHost()
                     .contains(new ConnectPoint(newDeviceId, newPort))) {
                 // Populate new IP table entry
                 newIps.forEach(ip -> {

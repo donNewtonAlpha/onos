@@ -17,7 +17,8 @@ package org.onosproject.yangutils.datamodel;
 
 import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
 import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.ParsableDataType;
+import org.onosproject.yangutils.translator.CachedFileHandle;
+import org.onosproject.yangutils.utils.YangConstructType;
 
 /*-
  * Reference RFC 6020.
@@ -54,11 +55,6 @@ import org.onosproject.yangutils.parser.ParsableDataType;
 public class YangTypeDef extends YangNode implements YangCommonInfo, Parsable {
 
     /**
-     * Name of derived data type.
-     */
-    private String derivedName;
-
-    /**
      * Default value in string, needs to be converted to the target object,
      * based on the type.
      */
@@ -80,15 +76,19 @@ public class YangTypeDef extends YangNode implements YangCommonInfo, Parsable {
     private YangStatusType status;
 
     /**
-     * Derived data type.
+     * Maintain the derived type information.
      */
-    @SuppressWarnings("rawtypes")
-    private YangType derivedType;
+    private YangType<YangDerivedType> derivedType;
 
     /**
      * Units of the data type.
      */
     private String units;
+
+    /**
+     * package of the generated java code.
+     */
+    private String pkg;
 
     /**
      * Create a typedef node.
@@ -98,27 +98,9 @@ public class YangTypeDef extends YangNode implements YangCommonInfo, Parsable {
     }
 
     /**
-     * Get the data type name.
-     *
-     * @return the data type name.
-     */
-    public String getDerivedName() {
-        return derivedName;
-    }
-
-    /**
-     * Set the data type name.
-     *
-     * @param derrivedName data type name.
-     */
-    public void setDerivedName(String derrivedName) {
-        derivedName = derrivedName;
-    }
-
-    /**
      * Get the default value.
      *
-     * @return the default value.
+     * @return the default value
      */
     public String getDefaultValueInString() {
         return defaultValueInString;
@@ -127,7 +109,7 @@ public class YangTypeDef extends YangNode implements YangCommonInfo, Parsable {
     /**
      * Set the default value.
      *
-     * @param defaultValueInString the default value.
+     * @param defaultValueInString the default value
      */
     public void setDefaultValueInString(String defaultValueInString) {
         this.defaultValueInString = defaultValueInString;
@@ -136,8 +118,9 @@ public class YangTypeDef extends YangNode implements YangCommonInfo, Parsable {
     /**
      * Get the description.
      *
-     * @return the description.
+     * @return the description
      */
+    @Override
     public String getDescription() {
         return description;
     }
@@ -145,8 +128,9 @@ public class YangTypeDef extends YangNode implements YangCommonInfo, Parsable {
     /**
      * Set the description.
      *
-     * @param description set the description.
+     * @param description set the description
      */
+    @Override
     public void setDescription(String description) {
         this.description = description;
     }
@@ -154,8 +138,9 @@ public class YangTypeDef extends YangNode implements YangCommonInfo, Parsable {
     /**
      * Get the textual reference.
      *
-     * @return the reference.
+     * @return the reference
      */
+    @Override
     public String getReference() {
         return reference;
     }
@@ -163,8 +148,9 @@ public class YangTypeDef extends YangNode implements YangCommonInfo, Parsable {
     /**
      * Set the textual reference.
      *
-     * @param reference the reference to set.
+     * @param reference the reference to set
      */
+    @Override
     public void setReference(String reference) {
         this.reference = reference;
     }
@@ -172,8 +158,9 @@ public class YangTypeDef extends YangNode implements YangCommonInfo, Parsable {
     /**
      * Get the status.
      *
-     * @return the status.
+     * @return the status
      */
+    @Override
     public YangStatusType getStatus() {
         return status;
     }
@@ -181,29 +168,28 @@ public class YangTypeDef extends YangNode implements YangCommonInfo, Parsable {
     /**
      * Set the status.
      *
-     * @param status the status to set.
+     * @param status the status to set
      */
+    @Override
     public void setStatus(YangStatusType status) {
         this.status = status;
     }
 
     /**
-     * Get the referenced type.
+     * Get the derived type.
      *
-     * @return the referenced type.
+     * @return the derived type
      */
-    @SuppressWarnings("rawtypes")
-    public YangType getDerivedType() {
+    public YangType<YangDerivedType> getDerivedType() {
         return derivedType;
     }
 
     /**
-     * Get the referenced type.
+     * Set the derived type.
      *
-     * @param derivedType the referenced type.
+     * @param derivedType the derived type
      */
-    @SuppressWarnings("rawtypes")
-    public void setDerivedType(YangType derivedType) {
+    public void setDerivedType(YangType<YangDerivedType> derivedType) {
         this.derivedType = derivedType;
     }
 
@@ -230,15 +216,17 @@ public class YangTypeDef extends YangNode implements YangCommonInfo, Parsable {
      *
      * @return returns TYPEDEF_DATA
      */
-    public ParsableDataType getParsableDataType() {
-        return ParsableDataType.TYPEDEF_DATA;
+    @Override
+    public YangConstructType getYangConstructType() {
+        return YangConstructType.TYPEDEF_DATA;
     }
 
     /**
      * Validate the data on entering the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnEntry() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
     }
@@ -246,60 +234,125 @@ public class YangTypeDef extends YangNode implements YangCommonInfo, Parsable {
     /**
      * Validate the data on exiting the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnExit() throws DataModelException {
-        // TODO auto-generated method stub, to be implemented by parser
+        YangType<YangDerivedType> type = getDerivedType();
+        if (type == null) {
+            throw new DataModelException("Typedef does not have type info.");
+        }
+        if (type.getDataType() != YangDataTypes.DERIVED
+                || type.getDataTypeName() == null) {
+            throw new DataModelException("Typedef type is not derived.");
+        }
+
+        YangDerivedType derivedTypeInfo = type.getDataTypeExtendedInfo();
+        if (derivedTypeInfo == null) {
+            throw new DataModelException("derrived type does not have derived info.");
+        }
+
+        YangType<?> baseType = derivedTypeInfo.getBaseType();
+        if (baseType == null) {
+            throw new DataModelException("Base type of a derived type is missing.");
+        }
+
+        if (derivedTypeInfo.getEffectiveYangBuiltInType() == null) {
+            /* resolve the effective type from the data tree. */
+            /*
+             * TODO: try to resolve the nested reference, if possible in the
+             * partial tree, otherwise we need to resolve finally when the
+             * complete module is created.
+             */
+            YangModule.addToResolveList(this);
+        }
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.datamodel.YangNode#getName()
+    /**
+     * Get the YANG name of the typedef.
+     *
+     * @return YANG name of the typedef
      */
     @Override
     public String getName() {
-        // TODO Auto-generated method stub
+        if (getDerivedType() != null) {
+            return getDerivedType().getDataTypeName();
+        }
         return null;
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.datamodel.YangNode#setName(java.lang.String)
+    /**
+     * Set YANG name of the typedef.
+     *
+     * @param name YANG name of the typedef
      */
     @Override
     public void setName(String name) {
-        // TODO Auto-generated method stub
-
+        if (getDerivedType() == null) {
+            throw new RuntimeException(
+                    "Derrived Type info needs to be set in parser when the typedef listner is processed");
+        }
+        getDerivedType().setDataTypeName(name);
+        getDerivedType().setDataType(YangDataTypes.DERIVED);
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.translator.CodeGenerator#generateJavaCodeEntry()
+    /**
+     * Generate java code snippet corresponding to YANG typedef.
      */
+    @Override
     public void generateJavaCodeEntry() {
         // TODO Auto-generated method stub
 
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.translator.CodeGenerator#generateJavaCodeExit()
+    /**
+     * Free resource used for code generation of YANG typedef.
      */
+    @Override
     public void generateJavaCodeExit() {
         // TODO Auto-generated method stub
 
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.datamodel.YangNode#getPackage()
+    /**
+     * Get the mapped java package.
+     *
+     * @return the java package
      */
     @Override
     public String getPackage() {
+        return pkg;
+    }
+
+    /**
+     * Set the mapped java package.
+     *
+     * @param pakg mapped java package
+     */
+    @Override
+    public void setPackage(String pakg) {
+        pkg = pakg;
+
+    }
+
+    /**
+     * Get the file handle of the cached file used during code generation.
+     *
+     * @return cached file handle
+     */
+    @Override
+    public CachedFileHandle getFileHandle() {
         // TODO Auto-generated method stub
         return null;
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.datamodel.YangNode#setPackage(java.lang.String)
+    /**
+     * Set the file handle to be used used for code generation.
+     *
+     * @param fileHandle cached file handle
      */
     @Override
-    public void setPackage(String pkg) {
+    public void setFileHandle(CachedFileHandle fileHandle) {
         // TODO Auto-generated method stub
 
     }

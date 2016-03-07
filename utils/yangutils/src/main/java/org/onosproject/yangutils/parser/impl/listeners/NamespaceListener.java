@@ -16,19 +16,21 @@
 
 package org.onosproject.yangutils.parser.impl.listeners;
 
+import java.net.URI;
+
 import org.onosproject.yangutils.datamodel.YangModule;
 import org.onosproject.yangutils.datamodel.YangNameSpace;
 import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.ParsableDataType;
 import org.onosproject.yangutils.parser.antlrgencode.GeneratedYangParser;
 import org.onosproject.yangutils.parser.exceptions.ParserException;
 import org.onosproject.yangutils.parser.impl.TreeWalkListener;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorLocation;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorMessageConstruction;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation;
 
-import java.net.URI;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorLocation.ENTRY;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorMessageConstruction.constructListenerErrorMessage;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.INVALID_HOLDER;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.MISSING_HOLDER;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation.checkStackIsNotEmpty;
+import static org.onosproject.yangutils.utils.YangConstructType.NAMESPACE_DATA;
 
 /*
  * Reference: RFC6020 and YANG ANTLR Grammar
@@ -65,23 +67,20 @@ public final class NamespaceListener {
     }
 
     /**
-     * It is called when parser receives an input matching the grammar
-     * rule (namespace), perform validations and update the data model
-     * tree.
+     * It is called when parser receives an input matching the grammar rule
+     * (namespace), perform validations and update the data model tree.
      *
-     * @param listener Listener's object.
-     * @param ctx context object of the grammar rule.
+     * @param listener Listener's object
+     * @param ctx context object of the grammar rule
      */
     public static void processNamespaceEntry(TreeWalkListener listener,
-                                             GeneratedYangParser.NamespaceStatementContext ctx) {
+            GeneratedYangParser.NamespaceStatementContext ctx) {
 
         // Check for stack to be non empty.
-        ListenerValidation.checkStackIsNotEmpty(listener, ListenerErrorType.MISSING_HOLDER,
-                                                ParsableDataType.NAMESPACE_DATA,
-                                                String.valueOf(ctx.string().getText()), ListenerErrorLocation.ENTRY);
+        checkStackIsNotEmpty(listener, MISSING_HOLDER, NAMESPACE_DATA, ctx.string().getText(), ENTRY);
 
-        if (!validateUriValue(String.valueOf(ctx.string().getText()))) {
-            ParserException parserException = new ParserException("Invalid namespace URI");
+        if (!validateUriValue(ctx.string().getText())) {
+            ParserException parserException = new ParserException("YANG file error: Invalid namespace URI");
             parserException.setLine(ctx.string().STRING(0).getSymbol().getLine());
             parserException.setCharPosition(ctx.string().STRING(0).getSymbol().getCharPositionInLine());
             throw parserException;
@@ -89,21 +88,17 @@ public final class NamespaceListener {
 
         // Obtain the node of the stack.
         Parsable tmpNode = listener.getParsedDataStack().peek();
-        switch (tmpNode.getParsableDataType()) {
-        case MODULE_DATA: {
-            YangModule module = (YangModule) tmpNode;
-            YangNameSpace uri = new YangNameSpace();
-            uri.setUri(String.valueOf(ctx.string().getText()));
-            module.setNameSpace(uri);
-            break;
-        }
-        default:
-            throw new ParserException(
-                                      ListenerErrorMessageConstruction
-                                              .constructListenerErrorMessage(ListenerErrorType.INVALID_HOLDER,
-                                                                             ParsableDataType.NAMESPACE_DATA,
-                                                                             String.valueOf(ctx.string().getText()),
-                                                                             ListenerErrorLocation.ENTRY));
+        switch (tmpNode.getYangConstructType()) {
+            case MODULE_DATA: {
+                YangModule module = (YangModule) tmpNode;
+                YangNameSpace uri = new YangNameSpace();
+                uri.setUri(ctx.string().getText());
+                module.setNameSpace(uri);
+                break;
+            }
+            default:
+                throw new ParserException(constructListenerErrorMessage(INVALID_HOLDER, NAMESPACE_DATA,
+                        ctx.string().getText(), ENTRY));
         }
     }
 
@@ -115,9 +110,8 @@ public final class NamespaceListener {
      */
     private static boolean validateUriValue(String uri) {
         uri = uri.replace("\"", "");
-        final URI tmpUri;
         try {
-            tmpUri = URI.create(uri);
+            URI.create(uri);
         } catch (Exception e1) {
             return false;
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-2016 Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package org.onosproject.igmp;
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
+import org.apache.felix.scr.annotations.Modified;
 import org.apache.felix.scr.annotations.Property;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
@@ -31,6 +32,8 @@ import org.onlab.packet.Ip4Address;
 import org.onlab.packet.IpAddress;
 import org.onlab.packet.IpPrefix;
 import org.onlab.util.SafeRecurringTask;
+import org.onlab.util.Tools;
+import org.onosproject.cfg.ComponentConfigService;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.net.ConnectPoint;
@@ -63,12 +66,15 @@ import org.onosproject.net.packet.PacketProcessor;
 import org.onosproject.net.packet.PacketService;
 import org.onosproject.olt.AccessDeviceConfig;
 import org.onosproject.olt.AccessDeviceData;
+import org.osgi.service.component.ComponentContext;
 import org.slf4j.Logger;
 
 import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.Dictionary;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -90,12 +96,11 @@ public class IgmpSnoop {
     private static final String DEST_IP = "224.0.0.1";
 
     private static final int DEFAULT_QUERY_PERIOD_SECS = 60;
-    private static final byte DEFAULT_IGMP_RESP_CODE = 0;
-    private static final String DEFAULT_MCAST_ADDR = "224.0.0.0/4";
+    private static final byte DEFAULT_IGMP_RESP_CODE = 100;
 
     @Property(name = "multicastAddress",
             label = "Define the multicast base range to listen to")
-    private String multicastAddress = DEFAULT_MCAST_ADDR;
+    private String multicastAddress = IpPrefix.IPV4_MULTICAST_PREFIX.toString();
 
     @Property(name = "queryPeriod", intValue = DEFAULT_QUERY_PERIOD_SECS,
             label = "Delay in seconds between successive query runs")
@@ -116,6 +121,9 @@ public class IgmpSnoop {
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected NetworkConfigRegistry networkConfig;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected ComponentConfigService componentConfigService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected MulticastRouteService multicastService;
@@ -169,7 +177,10 @@ public class IgmpSnoop {
 
 
     @Activate
-    public void activate() {
+    public void activate(ComponentContext context) {
+        componentConfigService.registerProperties(getClass());
+        modified(context);
+
         appId = coreService.registerApplication("org.onosproject.igmp");
 
         packetService.addProcessor(processor, PacketProcessor.director(1));
@@ -208,13 +219,7 @@ public class IgmpSnoop {
 
         deviceService.addListener(deviceListener);
 
-        queryPacket = buildQueryPacket();
-
-        queryTask = queryService.scheduleWithFixedDelay(
-                SafeRecurringTask.wrap(this::querySubscribers),
-                0,
-                queryPeriod,
-                TimeUnit.SECONDS);
+        restartQueryTask();
 
         log.info("Started");
     }
@@ -229,7 +234,48 @@ public class IgmpSnoop {
         networkConfig.unregisterConfigFactory(ssmTranslateConfigFactory);
         queryTask.cancel(true);
         queryService.shutdownNow();
+        componentConfigService.unregisterProperties(getClass(), false);
         log.info("Stopped");
+    }
+
+    @Modified
+    protected void modified(ComponentContext context) {
+        Dictionary<?, ?> properties = context != null ? context.getProperties() : new Properties();
+
+        // TODO read multicastAddress from config
+        String strQueryPeriod = Tools.get(properties, "queryPeriod");
+        String strResponseCode = Tools.get(properties, "maxRespCode");
+        try {
+            byte newMaxRespCode = Byte.parseByte(strResponseCode);
+            if (maxRespCode != newMaxRespCode) {
+                maxRespCode = newMaxRespCode;
+                queryPacket = buildQueryPacket();
+            }
+
+            int newQueryPeriod = Integer.parseInt(strQueryPeriod);
+            if (newQueryPeriod != queryPeriod) {
+                queryPeriod = newQueryPeriod;
+                restartQueryTask();
+            }
+
+        } catch (NumberFormatException e) {
+            log.warn("Error parsing config input", e);
+        }
+
+        log.info("queryPeriod set to {}", queryPeriod);
+        log.info("maxRespCode set to {}", maxRespCode);
+    }
+
+    private void restartQueryTask() {
+        if (queryTask != null) {
+            queryTask.cancel(true);
+        }
+        queryPacket = buildQueryPacket();
+        queryTask = queryService.scheduleWithFixedDelay(
+                SafeRecurringTask.wrap(this::querySubscribers),
+                0,
+                queryPeriod,
+                TimeUnit.SECONDS);
     }
 
     private void processFilterObjective(DeviceId devId, Port port, boolean remove) {
@@ -322,6 +368,8 @@ public class IgmpSnoop {
 
         eth.setPayload(ip);
 
+        eth.setPad(true);
+
         return ByteBuffer.wrap(eth.serialize());
     }
 
@@ -357,10 +405,8 @@ public class IgmpSnoop {
                 return;
             }
 
-            /*
-             * IPv6 MLD packets are handled by ICMP6. We'll only deal
-             * with IPv4.
-             */
+
+            // IPv6 MLD packets are handled by ICMP6. We'll only deal with IPv4.
             if (ethPkt.getEtherType() != Ethernet.TYPE_IPV4) {
                 return;
             }
@@ -368,29 +414,22 @@ public class IgmpSnoop {
             IPv4 ip = (IPv4) ethPkt.getPayload();
             IpAddress gaddr = IpAddress.valueOf(ip.getDestinationAddress());
             IpAddress saddr = Ip4Address.valueOf(ip.getSourceAddress());
-            log.debug("Packet ({}, {}) -> ingress port: {}", saddr, gaddr,
+            log.trace("Packet ({}, {}) -> ingress port: {}", saddr, gaddr,
                       context.inPacket().receivedFrom());
 
 
-            if (ip.getProtocol() != IPv4.PROTOCOL_IGMP) {
-                log.debug("IGMP Picked up a non IGMP packet.");
+            if (ip.getProtocol() != IPv4.PROTOCOL_IGMP ||
+                    !IpPrefix.IPV4_MULTICAST_PREFIX.contains(gaddr)) {
                 return;
             }
 
-            IpPrefix mcast = IpPrefix.valueOf(DEFAULT_MCAST_ADDR);
-            if (!mcast.contains(gaddr)) {
-                log.debug("IGMP Picked up a non multicast packet.");
-                return;
-            }
-
-            if (mcast.contains(saddr)) {
+            if (IpPrefix.IPV4_MULTICAST_PREFIX.contains(saddr)) {
                 log.debug("IGMP Picked up a packet with a multicast source address.");
                 return;
             }
 
             IGMP igmp = (IGMP) ip.getPayload();
             switch (igmp.getIgmpType()) {
-
                 case IGMP.TYPE_IGMPV3_MEMBERSHIP_REPORT:
                     processMembership(igmp, pkt.receivedFrom());
                     break;
@@ -407,7 +446,7 @@ public class IgmpSnoop {
                               igmp.getIgmpType());
                     break;
                 default:
-                    log.debug("Unknown IGMP message type: {}", igmp.getIgmpType());
+                    log.warn("Unknown IGMP message type: {}", igmp.getIgmpType());
                     break;
             }
         }
@@ -491,7 +530,10 @@ public class IgmpSnoop {
                 case CONFIG_REMOVED:
                     if (event.configClass().equals(SSM_TRANSLATE_CONFIG_CLASS)) {
                         ssmTranslateTable.clear();
+                    } else if (event.configClass().equals(CONFIG_CLASS)) {
+                        oltData.remove(event.subject());
                     }
+
                 default:
                     break;
             }
@@ -505,6 +547,5 @@ public class IgmpSnoop {
                 .filter(p -> !oltData.get(p.element().id()).uplink().equals(p.number()))
                 .filter(p -> p.isEnabled())
                 .forEach(p -> processFilterObjective((DeviceId) p.element().id(), p, false));
-
     }
 }

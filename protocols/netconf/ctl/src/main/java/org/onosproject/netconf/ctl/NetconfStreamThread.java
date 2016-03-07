@@ -161,13 +161,8 @@ public class NetconfStreamThread extends Thread implements NetconfStreamHandler 
                 while (!socketClosed) {
                     int cInt = bufferReader.read();
                     if (cInt == -1) {
-                        socketClosed = true;
-                        log.debug("char {} " + bufferReader.read());
-                        NetconfDeviceOutputEvent event = new NetconfDeviceOutputEvent(
-                                NetconfDeviceOutputEvent.Type.DEVICE_UNREGISTERED,
-                                null, null, Optional.of(-1), netconfDeviceInfo);
-                        netconfDeviceEventListeners.forEach(
-                                listener -> listener.event(event));
+                        log.debug("Netconf device {}  sent error char in session," +
+                                          " will need to be reopend", netconfDeviceInfo);
                     }
                     char c = (char) cInt;
                     state = state.evaluateChar(c);
@@ -175,6 +170,7 @@ public class NetconfStreamThread extends Thread implements NetconfStreamHandler 
                     if (state == NetconfMessageState.END_PATTERN) {
                         String deviceReply = deviceReplyBuilder.toString();
                         if (deviceReply.equals(END_PATTERN)) {
+                            socketClosed = true;
                             NetconfDeviceOutputEvent event = new NetconfDeviceOutputEvent(
                                     NetconfDeviceOutputEvent.Type.DEVICE_UNREGISTERED,
                                     null, null, Optional.of(-1), netconfDeviceInfo);
@@ -206,7 +202,7 @@ public class NetconfStreamThread extends Thread implements NetconfStreamHandler 
                     }
                 }
             } catch (IOException e) {
-                log.warn("Error in reading from the session for device " + netconfDeviceInfo, e);
+                log.warn("Error in reading from the session for device {} ", netconfDeviceInfo, e);
                 throw new RuntimeException(new NetconfException("Error in reading from the session for device {}" +
                                                                         netconfDeviceInfo, e));
                 //TODO should we send a socket closed message to listeners ?

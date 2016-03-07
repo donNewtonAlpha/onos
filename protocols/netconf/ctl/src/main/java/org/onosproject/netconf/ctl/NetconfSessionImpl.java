@@ -101,24 +101,22 @@ public class NetconfSessionImpl implements NetconfSession {
                             deviceInfo.password());
                 } else {
                     log.debug("Authenticating to device {} with username {}",
-                              deviceInfo.getDeviceId(), deviceInfo.name(), deviceInfo.password());
+                              deviceInfo.getDeviceId(), deviceInfo.name());
                     isAuthenticated = netconfConnection.authenticateWithPassword(
                             deviceInfo.name(), deviceInfo.password());
                 }
             } catch (IOException e) {
-                log.error("Authentication connection to device " +
-                                  deviceInfo.getDeviceId() + " failed:" +
-                                  e.getMessage());
+                log.error("Authentication connection to device {} failed: {} ",
+                                  deviceInfo.getDeviceId(), e.getMessage());
                 throw new NetconfException("Authentication connection to device " +
                                                    deviceInfo.getDeviceId() + " failed", e);
             }
 
             connectionActive = true;
             Preconditions.checkArgument(isAuthenticated,
-                                        "Authentication to device {} with username " +
-                                                "{} Failed",
-                                        deviceInfo.getDeviceId(), deviceInfo.name(),
-                                        deviceInfo.password());
+                                        "Authentication to device %s with username " +
+                                                "%s failed",
+                                        deviceInfo.getDeviceId(), deviceInfo.name());
             startSshSession();
         }
     }
@@ -133,8 +131,7 @@ public class NetconfSessionImpl implements NetconfSession {
             this.addDeviceOutputListener(new NetconfDeviceOutputEventListenerImpl(deviceInfo));
             sendHello();
         } catch (IOException e) {
-            log.error("Failed to create ch.ethz.ssh2.Session session:" +
-                              e.getMessage());
+            log.error("Failed to create ch.ethz.ssh2.Session session:", e);
             throw new NetconfException("Failed to create ch.ethz.ssh2.Session session with device" +
                                                deviceInfo, e);
         }
@@ -170,7 +167,7 @@ public class NetconfSessionImpl implements NetconfSession {
                 try {
                     startConnection();
                 } catch (IOException e2) {
-                    log.error("No connection {} for device, exception {}", netconfConnection, e2);
+                    log.error("No connection {} for device", netconfConnection, e2);
                     throw new NetconfException("Cannot re-open the connection with device" + deviceInfo, e);
                 }
             }
@@ -206,7 +203,7 @@ public class NetconfSessionImpl implements NetconfSession {
             throw new NetconfException("No matching reply for request " + request, e);
         }
         log.debug("Result {} from request {} to device {}", rp, request, deviceInfo);
-        return rp;
+        return rp.trim();
     }
 
     private String formatRequestMessageId(String request) {
@@ -284,19 +281,20 @@ public class NetconfSessionImpl implements NetconfSession {
         rpc.append(messageIdInteger.get());
         rpc.append("\"  ");
         rpc.append("xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">\n");
-        rpc.append("<edit-config>");
+        rpc.append("<edit-config>\n");
         rpc.append("<target>");
         rpc.append("<").append(targetConfiguration).append("/>");
-        rpc.append("</target>");
+        rpc.append("</target>\n");
         rpc.append("<default-operation>");
         rpc.append(mode);
-        rpc.append("</default-operation>");
-        rpc.append("<config>");
+        rpc.append("</default-operation>\n");
+        rpc.append("<config>\n");
         rpc.append(newConfiguration);
-        rpc.append("</config>");
-        rpc.append("</edit-config>");
+        rpc.append("</config>\n");
+        rpc.append("</edit-config>\n");
         rpc.append("</rpc>");
         rpc.append(ENDPATTERN);
+        log.info(rpc.toString());
         return checkReply(sendRequest(rpc.toString()));
     }
 
@@ -434,7 +432,7 @@ public class NetconfSessionImpl implements NetconfSession {
                 return true;
             }
         }
-        log.warn("Device " + deviceInfo + "has error in reply {}", reply);
+        log.warn("Device {} has error in reply {}", deviceInfo, reply);
         return false;
     }
 
@@ -445,8 +443,8 @@ public class NetconfSessionImpl implements NetconfSession {
             Optional<Integer> messageId = event.getMessageID();
             if (!messageId.isPresent()) {
                 errorReplies.add(event.getMessagePayload());
-                log.error("Device " + event.getDeviceInfo() +
-                          " sent error reply " + event.getMessagePayload());
+                log.error("Device {} sent error reply {}",
+                          event.getDeviceInfo(), event.getMessagePayload());
                 return;
             }
             CompletableFuture<String> completedReply =

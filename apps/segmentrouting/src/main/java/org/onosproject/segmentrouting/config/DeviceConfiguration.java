@@ -18,7 +18,6 @@ package org.onosproject.segmentrouting.config;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.SetMultimap;
-import com.google.common.collect.Sets;
 import org.onlab.packet.Ip4Address;
 import org.onlab.packet.Ip4Prefix;
 import org.onlab.packet.IpPrefix;
@@ -30,6 +29,7 @@ import org.onosproject.incubator.net.config.basics.InterfaceConfig;
 import org.onosproject.incubator.net.intf.Interface;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.config.NetworkConfigRegistry;
+import org.onosproject.net.config.NetworkConfigService;
 import org.onosproject.net.host.InterfaceIpAddress;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
@@ -57,8 +57,8 @@ public class DeviceConfiguration implements DeviceProperties {
     private final List<Integer> allSegmentIds = new ArrayList<>();
     private final Map<DeviceId, SegmentRouterInfo> deviceConfigMap = new ConcurrentHashMap<>();
     private final Map<VlanId, List<ConnectPoint>> xConnects = new ConcurrentHashMap<>();
-    private final Set<ConnectPoint> excludedPorts = Sets.newConcurrentHashSet();
-    private SegmentRoutingAppConfig appConfig;
+    private ApplicationId appId;
+    private NetworkConfigService cfgService;
 
     private class SegmentRouterInfo {
         int nodeSid;
@@ -85,6 +85,9 @@ public class DeviceConfiguration implements DeviceProperties {
      */
     public DeviceConfiguration(ApplicationId appId,
             NetworkConfigRegistry cfgService) {
+        this.appId = appId;
+        this.cfgService = cfgService;
+
         // Read config from device subject, excluding gatewayIps and subnets.
         Set<DeviceId> deviceSubjects =
                 cfgService.getSubjects(DeviceId.class, SegmentRoutingDeviceConfig.class);
@@ -103,15 +106,15 @@ public class DeviceConfiguration implements DeviceProperties {
             allSegmentIds.add(info.nodeSid);
         });
 
-        // Read excluded port names from config
-        appConfig = cfgService.getConfig(appId, SegmentRoutingAppConfig.class);
-        Set<String> excludePorts = (appConfig != null) ?
-                appConfig.excludePorts() : ImmutableSet.of();
-
         // Read gatewayIps and subnets from port subject.
         Set<ConnectPoint> portSubjects =
             cfgService.getSubjects(ConnectPoint.class, InterfaceConfig.class);
         portSubjects.forEach(subject -> {
+            // Do not process excluded ports
+            if (suppressSubnet().contains(subject)) {
+                return;
+            }
+
             InterfaceConfig config =
                     cfgService.getConfig(subject, InterfaceConfig.class);
             Set<Interface> networkInterfaces;
@@ -122,12 +125,6 @@ public class DeviceConfiguration implements DeviceProperties {
                 return;
             }
             networkInterfaces.forEach(networkInterface -> {
-                // Do not process excluded ports
-                if (excludePorts.contains(networkInterface.name())) {
-                    excludedPorts.add(subject);
-                    return;
-                }
-
                 VlanId vlanId = networkInterface.vlan();
                 ConnectPoint connectPoint = networkInterface.connectPoint();
                 DeviceId dpid = connectPoint.deviceId();
@@ -137,7 +134,7 @@ public class DeviceConfiguration implements DeviceProperties {
                 // skip if there is no corresponding device for this ConenctPoint
                 if (info != null) {
                     // Extract subnet information
-                    Set<InterfaceIpAddress> interfaceAddresses = networkInterface.ipAddresses();
+                    List<InterfaceIpAddress> interfaceAddresses = networkInterface.ipAddressesList();
                     interfaceAddresses.forEach(interfaceAddress -> {
                         // Do not add /0 and /32 to gateway IP list
                         int prefixLength = interfaceAddress.subnetAddress().prefixLength();
@@ -278,6 +275,10 @@ public class DeviceConfiguration implements DeviceProperties {
             PortNumber port = entry.getKey();
             Ip4Prefix subnet = entry.getValue();
 
+            if (subnet.prefixLength() == IpPrefix.MAX_INET_MASK_LENGTH) {
+                return;
+            }
+
             if (subnetPortMap.containsKey(subnet)) {
                 subnetPortMap.get(subnet).add(port);
             } else {
@@ -362,8 +363,12 @@ public class DeviceConfiguration implements DeviceProperties {
 
             ImmutableSet.Builder<Ip4Prefix> builder = ImmutableSet.builder();
             builder.addAll(srinfo.subnets.values());
-            if (deviceId.equals(appConfig.vRouterId())) {
-                builder.add(Ip4Prefix.valueOf("0.0.0.0/0"));
+            SegmentRoutingAppConfig appConfig =
+                    cfgService.getConfig(appId, SegmentRoutingAppConfig.class);
+            if (appConfig != null) {
+                if (deviceId.equals(appConfig.vRouterId().orElse(null))) {
+                    builder.add(Ip4Prefix.valueOf("0.0.0.0/0"));
+                }
             }
             return builder.build();
         }
@@ -487,12 +492,15 @@ public class DeviceConfiguration implements DeviceProperties {
         return srinfo != null && srinfo.adjacencySids.containsKey(sid);
     }
 
-    /**
-     * Returns a set of excluded ports.
-     *
-     * @return excluded ports
-     */
-    public Set<ConnectPoint> excludedPorts() {
-        return excludedPorts;
+    public Set<ConnectPoint> suppressSubnet() {
+        SegmentRoutingAppConfig appConfig =
+                cfgService.getConfig(appId, SegmentRoutingAppConfig.class);
+        return (appConfig != null) ? appConfig.suppressSubnet() : ImmutableSet.of();
+    }
+
+    public Set<ConnectPoint> suppressHost() {
+        SegmentRoutingAppConfig appConfig =
+                cfgService.getConfig(appId, SegmentRoutingAppConfig.class);
+        return (appConfig != null) ? appConfig.suppressHost() : ImmutableSet.of();
     }
 }

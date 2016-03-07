@@ -15,9 +15,12 @@
  */
 package org.onlab.util;
 
+import com.codahale.metrics.Timer;
+import com.google.common.base.Throwables;
 import org.onlab.metrics.MetricsComponent;
 import org.onlab.metrics.MetricsFeature;
 import org.onlab.metrics.MetricsService;
+import org.slf4j.Logger;
 
 import java.util.Collection;
 import java.util.List;
@@ -27,8 +30,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import com.codahale.metrics.Timer;
 
+import static org.slf4j.LoggerFactory.getLogger;
 
 
 /**
@@ -38,6 +41,7 @@ import com.codahale.metrics.Timer;
 class SharedExecutorService implements ExecutorService {
 
     private static final String NOT_ALLOWED = "Shutdown of shared executor is not allowed";
+    private final Logger log = getLogger(getClass());
 
     private ExecutorService executor;
 
@@ -77,7 +81,6 @@ class SharedExecutorService implements ExecutorService {
         oldExecutor.shutdown();
     }
 
-
     @Override
     public void shutdown() {
         throw new UnsupportedOperationException(NOT_ALLOWED);
@@ -111,11 +114,11 @@ class SharedExecutorService implements ExecutorService {
         return executor.submit(() -> {
                     T t = null;
                     long queueWaitTime = (long) taskCounter.duration();
-                    String className;
+                    Class className;
                     if (task instanceof  CallableExtended) {
-                        className =  ((CallableExtended) task).getRunnable().getClass().toString();
+                        className =  ((CallableExtended) task).getRunnable().getClass();
                     } else {
-                        className = task.getClass().toString();
+                        className = task.getClass();
                     }
                     if (queueMetrics != null) {
                         queueMetrics.update(queueWaitTime, TimeUnit.SECONDS);
@@ -123,7 +126,9 @@ class SharedExecutorService implements ExecutorService {
                     taskCounter.reset();
                     try {
                         t = task.call();
-                    } catch (Exception e) { }
+                    } catch (Exception e) {
+                        getLogger(className).error("Uncaught exception on " + className, e);
+                    }
                     long taskwaittime = (long) taskCounter.duration();
                     if (delayMetrics != null) {
                         delayMetrics.update(taskwaittime, TimeUnit.SECONDS);
@@ -135,12 +140,12 @@ class SharedExecutorService implements ExecutorService {
 
     @Override
     public <T> Future<T> submit(Runnable task, T result) {
-        return executor.submit(task, result);
+        return executor.submit(wrap(task), result);
     }
 
     @Override
     public Future<?> submit(Runnable task) {
-        return executor.submit(task);
+        return executor.submit(wrap(task));
     }
 
     @Override
@@ -190,10 +195,36 @@ class SharedExecutorService implements ExecutorService {
        }
     }
 
+    private Runnable wrap(Runnable command) {
+        return new LoggableRunnable(command);
+    }
+
+    /**
+     * A runnable class that allows to capture and log the exceptions.
+     */
+    private class LoggableRunnable implements Runnable {
+
+        private Runnable runnable;
+
+        public LoggableRunnable(Runnable runnable) {
+            super();
+            this.runnable = runnable;
+        }
+
+        @Override
+        public void run() {
+            try {
+                runnable.run();
+            } catch (Exception e) {
+                log.error("Uncaught exception on " + runnable.getClass().getSimpleName(), e);
+                throw Throwables.propagate(e);
+            }
+        }
+    }
+
     /**
      *  CallableExtended class is used to get Runnable Object
      *  from Callable Object.
-     *
      */
     class CallableExtended implements Callable {
 

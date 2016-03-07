@@ -50,7 +50,6 @@ public class NullLinkCommand extends AbstractShellCommand {
 
         try {
             ConnectPoint onePoint = ConnectPoint.deviceConnectPoint(one);
-
             ConnectPoint twoPoint = ConnectPoint.deviceConnectPoint(two);
 
             if (cmd.equals(UP)) {

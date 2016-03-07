@@ -21,7 +21,7 @@ import java.util.Set;
 
 import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
 import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.ParsableDataType;
+import org.onosproject.yangutils.utils.YangConstructType;
 
 /*
  * The enumeration built-in type represents values from a set of
@@ -31,20 +31,19 @@ import org.onosproject.yangutils.parser.ParsableDataType;
 /**
  * Maintains the enumeration data type information.
  */
-public class YangEnumeration extends YangNode implements Parsable {
+public class YangEnumeration implements Parsable {
 
-    /**
-     * Enumeration info set.
-     */
+    // Enumeration info set.
     private Set<YangEnum> enumSet;
 
+    // Enumeration name.
+    private String enumerationName;
+
     /**
-     * Create an enumeration object.
+     * Creates an enumeration object.
      */
     public YangEnumeration() {
-        super(YangNodeType.ENUMERATION_NODE);
         setEnumSet(new HashSet<YangEnum>());
-
     }
 
     /**
@@ -66,12 +65,33 @@ public class YangEnumeration extends YangNode implements Parsable {
     }
 
     /**
-     * Add ENUM value.
+     * Add ENUM information.
      *
-     * @param enumInfo the ENUM value of string
+     * @param enumInfo the ENUM information to be added
+     * @throws DataModelException due to violation in data model rules
      */
-    public void addEnumInfo(YangEnum enumInfo) {
+    public void addEnumInfo(YangEnum enumInfo) throws DataModelException {
+        if (!getEnumSet().add(enumInfo)) {
+            throw new DataModelException("YANG ENUM already exists");
+        }
+    }
 
+    /**
+     * Return enumeration name.
+     *
+     * @return the enumeration name
+     */
+    public String getEnumerationName() {
+        return enumerationName;
+    }
+
+    /**
+     * Set the enumeration name.
+     *
+     * @param enumerationName enumeration name
+     */
+    public void setEnumerationName(String enumerationName) {
+        this.enumerationName = enumerationName;
     }
 
     /**
@@ -79,15 +99,17 @@ public class YangEnumeration extends YangNode implements Parsable {
      *
      * @return returns ENUMERATION_DATA
      */
-    public ParsableDataType getParsableDataType() {
-        return ParsableDataType.ENUMERATION_DATA;
+    @Override
+    public YangConstructType getYangConstructType() {
+        return YangConstructType.ENUMERATION_DATA;
     }
 
     /**
      * Validate the data on entering the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnEntry() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
     }
@@ -95,61 +117,10 @@ public class YangEnumeration extends YangNode implements Parsable {
     /**
      * Validate the data on exiting the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnExit() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
-    }
-
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.datamodel.YangNode#getName()
-     */
-    @Override
-    public String getName() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.datamodel.YangNode#setName(java.lang.String)
-     */
-    @Override
-    public void setName(String name) {
-        // TODO Auto-generated method stub
-
-    }
-
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.datamodel.YangNode#getPackage()
-     */
-    @Override
-    public String getPackage() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.datamodel.YangNode#setPackage(java.lang.String)
-     */
-    @Override
-    public void setPackage(String pkg) {
-        // TODO Auto-generated method stub
-
-    }
-
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.translator.CodeGenerator#generateJavaCodeEntry()
-     */
-    public void generateJavaCodeEntry() {
-        // TODO Auto-generated method stub
-
-    }
-
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.translator.CodeGenerator#generateJavaCodeExit()
-     */
-    public void generateJavaCodeExit() {
-        // TODO Auto-generated method stub
-
     }
 }

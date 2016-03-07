@@ -31,11 +31,15 @@
 
     <properties>
         <onos.app.name>org.onosproject.openflow</onos.app.name>
+        <onos.app.title>OpenFlow Southbound Meta App</onos.app.title>
         <onos.app.requires>
             org.onosproject.openflow-base,
             org.onosproject.hostprovider,
             org.onosproject.lldpprovider
         </onos.app.requires>
+        <onos.app.url>
+            https://wiki.onosproject.org/display/ONOS/Application+Subsystem
+        </onos.app.url>
     </properties>
 
     <description>OpenFlow southbound meta application</description>

@@ -20,7 +20,8 @@ import java.util.List;
 
 import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
 import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.ParsableDataType;
+import org.onosproject.yangutils.utils.YangConstructType;
+import org.onosproject.yangutils.translator.CachedFileHandle;
 
 /*-
  * Reference RFC 6020.
@@ -91,13 +92,11 @@ public class YangGrouping extends YangNode
     /**
      * List of leaves.
      */
-    @SuppressWarnings("rawtypes")
     private List<YangLeaf> listOfLeaf;
 
     /**
      * List of leaf lists.
      */
-    @SuppressWarnings("rawtypes")
     private List<YangLeafList> listOfLeafList;
 
     /**
@@ -111,22 +110,31 @@ public class YangGrouping extends YangNode
     private YangStatusType status;
 
     /**
+     * Package of the generated java code.
+     */
+    private String pkg;
+
+    /**
      * Creates the grouping node.
      */
     public YangGrouping() {
         super(YangNodeType.GROUPING_NODE);
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.datamodel.YangNode#getName()
+    /**
+     * Get YANG grouping name.
+     *
+     * @return YANG grouping name
      */
     @Override
     public String getName() {
         return name;
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.datamodel.YangNode#setName(java.lang.String)
+    /**
+     * Set YANG grouping name.
+     *
+     * @param name YANG grouping name
      */
     @Override
     public void setName(String name) {
@@ -136,8 +144,9 @@ public class YangGrouping extends YangNode
     /**
      * Get the description.
      *
-     * @return the description.
+     * @return the description
      */
+    @Override
     public String getDescription() {
         return description;
     }
@@ -145,8 +154,9 @@ public class YangGrouping extends YangNode
     /**
      * Set the description.
      *
-     * @param description set the description.
+     * @param description set the description
      */
+    @Override
     public void setDescription(String description) {
         this.description = description;
     }
@@ -154,9 +164,9 @@ public class YangGrouping extends YangNode
     /**
      * Get the list of leaves.
      *
-     * @return the list of leaves.
+     * @return the list of leaves
      */
-    @SuppressWarnings("rawtypes")
+    @Override
     public List<YangLeaf> getListOfLeaf() {
         return listOfLeaf;
     }
@@ -164,9 +174,8 @@ public class YangGrouping extends YangNode
     /**
      * Set the list of leaves.
      *
-     * @param leafsList the list of leaf to set.
+     * @param leafsList the list of leaf to set
      */
-    @SuppressWarnings("rawtypes")
     private void setListOfLeaf(List<YangLeaf> leafsList) {
         listOfLeaf = leafsList;
     }
@@ -174,10 +183,10 @@ public class YangGrouping extends YangNode
     /**
      * Add a leaf.
      *
-     * @param leaf the leaf to be added.
+     * @param leaf the leaf to be added
      */
-    @SuppressWarnings("rawtypes")
-    public void addLeaf(YangLeaf<?> leaf) {
+    @Override
+    public void addLeaf(YangLeaf leaf) {
         if (getListOfLeaf() == null) {
             setListOfLeaf(new LinkedList<YangLeaf>());
         }
@@ -188,9 +197,9 @@ public class YangGrouping extends YangNode
     /**
      * Get the list of leaf-list.
      *
-     * @return the list of leaf-list.
+     * @return the list of leaf-list
      */
-    @SuppressWarnings("rawtypes")
+    @Override
     public List<YangLeafList> getListOfLeafList() {
         return listOfLeafList;
     }
@@ -198,9 +207,8 @@ public class YangGrouping extends YangNode
     /**
      * Set the list of leaf-list.
      *
-     * @param listOfLeafList the list of leaf-list to set.
+     * @param listOfLeafList the list of leaf-list to set
      */
-    @SuppressWarnings("rawtypes")
     private void setListOfLeafList(List<YangLeafList> listOfLeafList) {
         this.listOfLeafList = listOfLeafList;
     }
@@ -208,10 +216,10 @@ public class YangGrouping extends YangNode
     /**
      * Add a leaf-list.
      *
-     * @param leafList the leaf-list to be added.
+     * @param leafList the leaf-list to be added
      */
-    @SuppressWarnings("rawtypes")
-    public void addLeafList(YangLeafList<?> leafList) {
+    @Override
+    public void addLeafList(YangLeafList leafList) {
         if (getListOfLeafList() == null) {
             setListOfLeafList(new LinkedList<YangLeafList>());
         }
@@ -222,8 +230,9 @@ public class YangGrouping extends YangNode
     /**
      * Get the textual reference.
      *
-     * @return the reference.
+     * @return the reference
      */
+    @Override
     public String getReference() {
         return reference;
     }
@@ -231,8 +240,9 @@ public class YangGrouping extends YangNode
     /**
      * Set the textual reference.
      *
-     * @param reference the reference to set.
+     * @param reference the reference to set
      */
+    @Override
     public void setReference(String reference) {
         this.reference = reference;
     }
@@ -240,8 +250,9 @@ public class YangGrouping extends YangNode
     /**
      * Get the status.
      *
-     * @return the status.
+     * @return the status
      */
+    @Override
     public YangStatusType getStatus() {
         return status;
     }
@@ -249,8 +260,9 @@ public class YangGrouping extends YangNode
     /**
      * Set the status.
      *
-     * @param status the status to set.
+     * @param status the status to set
      */
+    @Override
     public void setStatus(YangStatusType status) {
         this.status = status;
     }
@@ -258,17 +270,19 @@ public class YangGrouping extends YangNode
     /**
      * Returns the type of the data.
      *
-     * @return returns GROUPING_DATA.
+     * @return returns GROUPING_DATA
      */
-    public ParsableDataType getParsableDataType() {
-        return ParsableDataType.GROUPING_DATA;
+    @Override
+    public YangConstructType getYangConstructType() {
+        return YangConstructType.GROUPING_DATA;
     }
 
     /**
      * Validate the data on entering the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnEntry() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
     }
@@ -276,42 +290,61 @@ public class YangGrouping extends YangNode
     /**
      * Validate the data on exiting the corresponding parse tree node.
      *
-     * @throws DataModelException a violation of data model rules.
+     * @throws DataModelException a violation of data model rules
      */
+    @Override
     public void validateDataOnExit() throws DataModelException {
         // TODO auto-generated method stub, to be implemented by parser
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.translator.CodeGenerator#generateJavaCodeEntry()
+    /**
+     * Generate the code for YANG grouping.
      */
+    @Override
     public void generateJavaCodeEntry() {
         // TODO Auto-generated method stub
 
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.translator.CodeGenerator#generateJavaCodeExit()
+    /**
+     * Free the resources used to generate java files corresponding to YANG
+     * grouping info and generate valid java files.
      */
+    @Override
     public void generateJavaCodeExit() {
         // TODO Auto-generated method stub
 
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.datamodel.YangNode#getPackage()
+    /**
+     * Get the mapped java package.
+     *
+     * @return the java package
      */
     @Override
     public String getPackage() {
+        return pkg;
+    }
+
+    /**
+     * Set the mapped java package.
+     *
+     * @param pakg the package to set
+     */
+    @Override
+    public void setPackage(String pakg) {
+        pkg = pakg;
+
+    }
+
+    @Override
+    public CachedFileHandle getFileHandle() {
         // TODO Auto-generated method stub
         return null;
     }
 
-    /* (non-Javadoc)
-     * @see org.onosproject.yangutils.datamodel.YangNode#setPackage(java.lang.String)
-     */
     @Override
-    public void setPackage(String pkg) {
+    public void setFileHandle(CachedFileHandle fileHandle) {
         // TODO Auto-generated method stub
 
     }

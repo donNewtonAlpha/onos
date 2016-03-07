@@ -45,7 +45,9 @@ public class CoreWebApplication extends AbstractWebApplication {
                 StatisticsWebResource.class,
                 MetricsWebResource.class,
                 FlowObjectiveWebResource.class,
-                MulticastRouteWebResource.class
+                MulticastRouteWebResource.class,
+                DeviceKeyWebResource.class,
+                RegionsWebResource.class
         );
     }
 }

@@ -20,14 +20,22 @@ import org.onosproject.yangutils.datamodel.YangModule;
 import org.onosproject.yangutils.datamodel.YangRevision;
 import org.onosproject.yangutils.datamodel.YangSubModule;
 import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.ParsableDataType;
 import org.onosproject.yangutils.parser.antlrgencode.GeneratedYangParser;
 import org.onosproject.yangutils.parser.exceptions.ParserException;
 import org.onosproject.yangutils.parser.impl.TreeWalkListener;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorLocation;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorMessageConstruction;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType;
-import org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation;
+
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.MISSING_HOLDER;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.INVALID_HOLDER;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.MISSING_CURRENT_HOLDER;
+import static org.onosproject.yangutils.utils.YangConstructType.REVISION_DATA;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorLocation.ENTRY;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorLocation.EXIT;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorMessageConstruction.constructListenerErrorMessage;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation.checkStackIsNotEmpty;
+
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 /*
  * Reference: RFC6020 and YANG ANTLR Grammar
@@ -69,23 +77,35 @@ public final class RevisionListener {
     private RevisionListener() {
     }
 
+    /**
+     * It is called when parser receives an input matching the grammar rule
+     * (revision),perform validations and update the data model tree.
+     *
+     * @param listener Listener's object
+     * @param ctx context object of the grammar rule
+     */
     public static void processRevisionEntry(TreeWalkListener listener,
                                             GeneratedYangParser.RevisionStatementContext ctx) {
 
         // Check for stack to be non empty.
-        ListenerValidation.checkStackIsNotEmpty(listener, ListenerErrorType.MISSING_HOLDER,
-                                                ParsableDataType.REVISION_DATA,
-                                                String.valueOf(ctx.DATE_ARG().getText()),
-                                                ListenerErrorLocation.ENTRY);
+        checkStackIsNotEmpty(listener, MISSING_HOLDER, REVISION_DATA, ctx.DATE_ARG().getText(), ENTRY);
 
-        // Validate for reverse chronological order of revision & for revision value.
+        // Validate for reverse chronological order of revision & for revision
+        // value.
         if (!validateRevision(listener, ctx)) {
             return;
             // TODO to be implemented.
         }
 
+        if (!isDateValid(ctx.DATE_ARG().getText())) {
+            ParserException parserException = new ParserException("YANG file error: Input date is not correct");
+            parserException.setLine(ctx.DATE_ARG().getSymbol().getLine());
+            parserException.setCharPosition(ctx.DATE_ARG().getSymbol().getCharPositionInLine());
+            throw parserException;
+        }
+
         YangRevision revisionNode = new YangRevision();
-        revisionNode.setRevDate(String.valueOf(ctx.DATE_ARG().getText()));
+        revisionNode.setRevDate(ctx.DATE_ARG().getText());
 
         listener.getParsedDataStack().push(revisionNode);
     }
@@ -94,29 +114,25 @@ public final class RevisionListener {
      * It is called when parser exits from grammar rule (revision), it perform
      * validations and update the data model tree.
      *
-     * @param listener Listener's object.
-     * @param ctx context object of the grammar rule.
+     * @param listener Listener's object
+     * @param ctx context object of the grammar rule
      */
-    public static void processRevisionExit(TreeWalkListener listener,
-                                           GeneratedYangParser.RevisionStatementContext ctx) {
+    public static void processRevisionExit(TreeWalkListener listener, GeneratedYangParser.RevisionStatementContext
+            ctx) {
 
         // Check for stack to be non empty.
-        ListenerValidation
-                .checkStackIsNotEmpty(listener, ListenerErrorType.MISSING_HOLDER, ParsableDataType.REVISION_DATA,
-                                      String.valueOf(ctx.DATE_ARG().getText()), ListenerErrorLocation.EXIT);
+        checkStackIsNotEmpty(listener, MISSING_HOLDER, REVISION_DATA, ctx.DATE_ARG().getText(), EXIT);
 
         Parsable tmpRevisionNode = listener.getParsedDataStack().peek();
         if (tmpRevisionNode instanceof YangRevision) {
             listener.getParsedDataStack().pop();
 
             // Check for stack to be non empty.
-            ListenerValidation.checkStackIsNotEmpty(listener, ListenerErrorType.MISSING_HOLDER,
-                                                    ParsableDataType.REVISION_DATA,
-                                                    String.valueOf(ctx.DATE_ARG().getText()),
-                                                    ListenerErrorLocation.EXIT);
+            checkStackIsNotEmpty(listener, MISSING_HOLDER, REVISION_DATA, ctx.DATE_ARG().getText(),
+                                 EXIT);
 
             Parsable tmpNode = listener.getParsedDataStack().peek();
-            switch (tmpNode.getParsableDataType()) {
+            switch (tmpNode.getYangConstructType()) {
             case MODULE_DATA: {
                 YangModule module = (YangModule) tmpNode;
                 module.setRevision((YangRevision) tmpRevisionNode);
@@ -128,35 +144,51 @@ public final class RevisionListener {
                 break;
             }
             default:
-                throw new ParserException(
-                                          ListenerErrorMessageConstruction
-                                                  .constructListenerErrorMessage(ListenerErrorType.INVALID_HOLDER,
-                                                                                 ParsableDataType.REVISION_DATA,
-                                                                                 String.valueOf(ctx.DATE_ARG()
-                                                                                         .getText()),
-                                                                                 ListenerErrorLocation.EXIT));
+                throw new ParserException(constructListenerErrorMessage(INVALID_HOLDER, REVISION_DATA,
+                                                                        ctx.DATE_ARG().getText(),
+                                                                        EXIT));
             }
         } else {
-            throw new ParserException(
-                                      ListenerErrorMessageConstruction
-                                              .constructListenerErrorMessage(ListenerErrorType.MISSING_CURRENT_HOLDER,
-                                                                             ParsableDataType.REVISION_DATA, String
-                                                                                     .valueOf(ctx.DATE_ARG()
-                                                                                             .getText()),
-                                                                             ListenerErrorLocation.EXIT));
+            throw new ParserException(constructListenerErrorMessage(MISSING_CURRENT_HOLDER, REVISION_DATA,
+                                                                    ctx.DATE_ARG().getText(), EXIT));
         }
     }
 
     /**
      * Validate revision.
      *
-     * @param listener Listener's object.
-     * @param ctx context object of the grammar rule.
+     * @param listener Listener's object
+     * @param ctx context object of the grammar rule
      * @return validation result
      */
     private static boolean validateRevision(TreeWalkListener listener,
                                             GeneratedYangParser.RevisionStatementContext ctx) {
         // TODO to be implemented
+        return true;
+    }
+
+    /**
+     * Validates the revision date.
+     *
+     * @param dateToValidate input revision date
+     * @return validation result, true for success, false for failure
+     */
+    private static boolean isDateValid(String dateToValidate) {
+
+        if (dateToValidate == null) {
+            return false;
+        }
+
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        sdf.setLenient(false);
+
+        try {
+            //if not valid, it will throw ParseException
+            Date date = sdf.parse(dateToValidate);
+            System.out.println(date);
+        } catch (ParseException e) {
+            return false;
+        }
         return true;
     }
 }
