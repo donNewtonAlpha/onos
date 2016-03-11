@@ -1,5 +1,7 @@
 package org.onosproject.phase1;
 
+import org.onlab.packet.Ethernet;
+import org.onlab.packet.Ip4Prefix;
 import org.onlab.packet.MacAddress;
 import org.onlab.packet.VlanId;
 import org.onosproject.core.ApplicationId;
@@ -7,10 +9,10 @@ import org.onosproject.core.GroupId;
 import org.onosproject.driver.extensions.OfdpaMatchVlanVid;
 import org.onosproject.driver.extensions.OfdpaSetVlanVid;
 import org.onosproject.net.DeviceId;
-import org.onosproject.net.Link;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.flow.*;
 import org.onosproject.net.group.*;
+import org.onosproject.phase1.ofdpagroups.GroupFinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,6 +34,7 @@ public class NetworkElements{
     static final int PORT_TABLE = 0;
     static final int VLAN_TABLE = 10;
     static final int TMAC_TABLE = 20;
+    static final int UNICAST_ROUTING_TABLE = 30;
     static final int VLAN1_TABLE = 11;
     static final int BRIDGING_TABLE = 50;
 
@@ -39,13 +42,13 @@ public class NetworkElements{
 
 
     //Internet ports, connections to the external router (7750)
-    static final PortNumber primaryInternet = PortNumber.portNumber(153);
+    static final PortNumber primaryInternet = PortNumber.portNumber(15);
     static final PortNumber secondaryInternet = PortNumber.portNumber(157);
 
 
 
     static final VlanId internalInternetVlan = VlanId.vlanId((short) 500);
-    static final VlanId primaryInternetVlan = VlanId.vlanId((short) 501);
+    static final VlanId primaryInternetVlan = VlanId.vlanId((short) 500);
     static final VlanId secondaryInternetVlan = VlanId.vlanId((short) 502);
 
 
@@ -54,16 +57,20 @@ public class NetworkElements{
 
     private ApplicationId appId;
     private DeviceId deviceId;
+    private MacAddress torMac;
+    private MacAddress primaryUplinkMac;
 
     private List<NetworkElement> elements;
     private GroupId serverFloodGroup = null;
 
-    public NetworkElements(FlowRuleService flowRuleService, GroupService groupService, ApplicationId appId, DeviceId deviceId){
+    public NetworkElements(FlowRuleService flowRuleService, GroupService groupService, ApplicationId appId, DeviceId deviceId, MacAddress mac){
         elements = new LinkedList<>();
         this.flowRuleService = flowRuleService;
         this.groupService = groupService;
         this.appId = appId;
         this.deviceId = deviceId;
+        this.torMac = mac;
+        setMacUplink(MacAddress.valueOf("aa:aa:aa:bb:22:aa")); //Default value
     }
 
     public void addElement(NetworkElement newElement){
@@ -96,35 +103,17 @@ public class NetworkElements{
         return servers;
     }
 
-    private QuaggaInstance getQuagga(boolean primary){
-        for(NetworkElement element : elements){
-            if(element instanceof QuaggaInstance){
-                QuaggaInstance quagga = (QuaggaInstance) element;
-                if(quagga.isPrimary() == primary){
-                    return quagga;
-                }
-            }
-        }
-        return null;
-    }
 
-    private QuaggaInstance getPrimaryQuagga(){
-        return getQuagga(true);
-    }
-
-    private QuaggaInstance getSecondaryQuagga(){
-        return getQuagga(false);
-    }
 
     public void update(){
-        updateFloodGroup(deviceId);
+        //updateFloodGroup(deviceId);
         internetFlows(deviceId);
-        floodFlow(deviceId);
-        innerNetworkFlows(deviceId);
+        //floodFlow(deviceId);
+        //innerNetworkFlows(deviceId);
         lanFlows(deviceId);
     }
 
-    private void updateFloodGroup(DeviceId deviceId){
+    /*private void updateFloodGroup(DeviceId deviceId){
 
         //TODO: really update instead of removing and adding the new group
 
@@ -160,7 +149,7 @@ public class NetworkElements{
         serverFloodGroup = groupService.getGroup(deviceId, floodGroupkey).id();
 
     }
-
+*/
     private void connectOltToServer(Olt olt, VsgServer server, DeviceId device){
 
         List<VlanId> oltVlans = olt.getVlanHandled();
@@ -248,7 +237,7 @@ public class NetworkElements{
 
     }
 
-    private void untaggedPacketsTagging(PortNumber port, VlanId vlanId, DeviceId deviceId){
+    void untaggedPacketsTagging(PortNumber port, VlanId vlanId, DeviceId deviceId){
 
         vlanTableFlows(port, vlanId, deviceId);
 
@@ -303,44 +292,95 @@ public class NetworkElements{
 
     }
 
+    private void tMacTableFlowUnicastRouting(MacAddress dstMac, int priority){
+        //TMAC table Flow
+        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+        selector.matchEthType(Ethernet.TYPE_IPV4);
+        selector.matchEthDst(dstMac);
+
+        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+        treatment.transition(UNICAST_ROUTING_TABLE);
+
+
+        FlowRule.Builder rule = DefaultFlowRule.builder();
+        rule.withSelector(selector.build());
+        rule.withTreatment(treatment.build());
+        rule.withPriority(priority);
+        rule.fromApp(appId);
+        rule.forTable(TMAC_TABLE);
+        rule.makePermanent();
+        rule.forDevice(deviceId);
+
+        flowRuleService.applyFlowRules(rule.build());
+    }
+
+    private void ipFlow(Ip4Prefix ipDst, PortNumber outPort, int IncomingVlanId, MacAddress thisHopMac, MacAddress nextHopMac, boolean popVlan, int priority){
+
+        //Unicast routing flow table
+        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+        selector.matchEthType(Ethernet.TYPE_IPV4);
+        selector.matchIPDst(ipDst);
+
+        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+        treatment.transition(ACL_TABLE);
+        treatment.deferred();
+        treatment.group(GroupFinder.getL3Interface((int)outPort.toLong(), IncomingVlanId,thisHopMac, nextHopMac, ipDst, popVlan, deviceId));
+
+
+
+        FlowRule.Builder rule = DefaultFlowRule.builder();
+        rule.withSelector(selector.build());
+        rule.withTreatment(treatment.build());
+        rule.withPriority(priority);
+        rule.fromApp(appId);
+        rule.forTable(UNICAST_ROUTING_TABLE);
+        rule.makePermanent();
+        rule.forDevice(deviceId);
+
+        flowRuleService.applyFlowRules(rule.build());
+
+    }
+
+
+
     private void internetFlows(DeviceId deviceId){
 
-        //////Internet to server
+        //////Flows from uplink to Vsgs
 
         //Tagging the untagged traffic from the internet
         untaggedPacketsTagging(primaryInternet, primaryInternetVlan, deviceId);
-        untaggedPacketsTagging(secondaryInternet, secondaryInternetVlan, deviceId);
+        //Treating it as ip unicast traffic, this ToR is now (partially) a router
+        tMacTableFlowUnicastRouting(torMac, 10);
+        //Setting the Ip flows for all Vsgs
+        for(VsgServer server : getVsgServers()){
+            for(VsgVm vm : server.getVms()){
+                for(Vsg vsg : vm.getVsgs()){
+                    log.info("Vsg mac : " + vsg.getWanSideMac() + "Vsg public ip : " + vsg.getPublicIp());
+                    ipFlow(vsg.getPublicIp().toIpPrefix().getIp4Prefix(), server.getPortNumber(), primaryInternetVlan.toShort(), torMac, vsg.getWanSideMac(),false, 2000);
+                }
+            }
+        }
 
-        PortNumber primaryQuagga = getPrimaryQuagga().getPortNumber();
-        PortNumber secondaryQuagga = null;
+        //////////////
 
-        if (getSecondaryQuagga() != null) {
-            secondaryQuagga = getSecondaryQuagga().getPortNumber();
+
+        ////////Flows from the Vsgs to the Internet
+
+        for(VsgServer server : getVsgServers()){
+            //Allowing the internet Vlan on this port
+            vlanTableFlows(server.getPortNumber(), primaryInternetVlan, deviceId);
+            // TMAC flow already in
+
+            //Ip flow to the internet, 2 /1 prefix with low priority
+
+            ipFlow(Ip4Prefix.valueOf("0.0.0.0/1"), primaryInternet, primaryInternetVlan.toShort(), torMac, primaryUplinkMac, true, 5);
+            ipFlow(Ip4Prefix.valueOf("128.0.0.0/1"), primaryInternet, primaryInternetVlan.toShort(), torMac, primaryUplinkMac, true, 5);
+
         }
 
 
-        //Setting an output
-        oneWayAclVlanFlow(primaryInternetVlan, primaryInternet,primaryQuagga , deviceId, 43001, false);
-        if(secondaryQuagga != null) {
-            oneWayAclVlanFlow(secondaryInternetVlan, secondaryInternet, secondaryQuagga, deviceId, 43002, false);
-        }
-        ////////
 
 
-        /////////Server to Internet
-
-        //Vlan table
-        vlanTableFlows(primaryQuagga, primaryInternetVlan, deviceId);
-        if(secondaryQuagga != null) {
-            vlanTableFlows(secondaryQuagga, secondaryInternetVlan, deviceId);
-        }
-
-        //ACL table
-        oneWayAclVlanFlow(primaryInternetVlan, primaryQuagga, primaryInternet, deviceId, 41031, true);
-        if(secondaryQuagga != null) {
-            oneWayAclVlanFlow(secondaryInternetVlan, secondaryQuagga, secondaryInternet, deviceId, 41032, true);
-        }
-        /////////
 
 
     }
@@ -402,6 +442,10 @@ public class NetworkElements{
                 connectOltToServer(olt, vsgServer, deviceId);
             }
         }
+    }
+
+    public void setMacUplink(MacAddress mac){
+        primaryUplinkMac = mac;
     }
 
 

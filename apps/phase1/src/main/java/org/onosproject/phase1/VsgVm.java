@@ -13,21 +13,46 @@ import java.util.List;
  */
 public class VsgVm {
 
-    private Ip4Prefix ipBlock;
+    private List<Vsg> vsgs;
     private Ip4Address transitNetworkIp;
     private List<VlanId> vlanHandled;
     private MacAddress mac;
 
-    public VsgVm(Ip4Address transitNetworkIp, MacAddress vmMac, Ip4Prefix ipBlock, List<Integer> vlans){
+    public VsgVm(Ip4Address transitNetworkIp, MacAddress vmMac, List<Integer> vlans){
 
-        this.ipBlock = ipBlock;
         this.mac = vmMac;
         this.transitNetworkIp = transitNetworkIp;
         vlanHandled = new LinkedList<>();
         for(Integer i : vlans){
             vlanHandled.add(VlanId.vlanId(i.shortValue()));
         }
+        this.vsgs = new LinkedList<>();
 
+    }
+
+    public void addVsg(Vsg newVsg){
+        vsgs.add(newVsg);
+    }
+
+    public List<Vsg> addVsgs(int n, Ip4Address firstIp, MacAddress firstMac){
+
+        List<Vsg> vsgsAdded = new LinkedList<>();
+
+        for(int i = 0; i < n; i++){
+            Vsg newVsg = new Vsg(MacAddress.valueOf(firstMac.toLong() + i), Ip4Address.valueOf(firstIp.toInt()+i));
+            vsgs.add(newVsg);
+            vsgsAdded.add(newVsg);
+        }
+
+        return vsgsAdded;
+    }
+
+    public void removeVsg(Ip4Address ip){
+        for(Vsg vsg : vsgs){
+            if (vsg.getPublicIp().equals(ip)) {
+                vsgs.remove(vsg);
+            }
+        }
     }
 
     public void addVlan(int newVlan){
@@ -52,8 +77,8 @@ public class VsgVm {
         vlanHandled.remove(vlanToRemove);
     }
 
-    public Ip4Prefix getIpBlock() {
-        return ipBlock;
+    public List<Vsg> getVsgs() {
+        return vsgs;
     }
 
     public Ip4Address getTransitNetworkIp() {

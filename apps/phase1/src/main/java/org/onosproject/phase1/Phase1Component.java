@@ -1,6 +1,7 @@
 
 package org.onosproject.phase1;
 
+import org.apache.commons.configuration.SystemConfiguration;
 import org.apache.felix.scr.annotations.*;
 
 
@@ -9,33 +10,20 @@ import org.onlab.packet.*;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.core.GroupId;
-import org.onosproject.net.Device;
-import org.onosproject.net.DeviceId;
-import org.onosproject.net.PortNumber;
-import org.onosproject.net.apps.TorService;
+import org.onosproject.driver.extensions.OfdpaMatchVlanVid;
+import org.onosproject.net.*;
 import org.onosproject.net.flow.*;
-import org.onosproject.net.flow.DefaultFlowRule;
-import org.onosproject.net.flow.DefaultTrafficSelector;
-import org.onosproject.net.flow.DefaultTrafficTreatment;
-import org.onosproject.net.flow.FlowRule;
-import org.onosproject.net.flow.TrafficSelector;
-import org.onosproject.net.flow.TrafficTreatment;
+import org.onosproject.net.flow.instructions.Instructions;
 import org.onosproject.net.group.*;
 import org.onosproject.net.packet.*;
+import org.onosproject.phase1.ofdpagroups.GroupFinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.json.*;
-
-
-import java.io.*;
-import java.net.*;
 import java.nio.ByteBuffer;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.Semaphore;
+import java.util.Set;
 
 
 /**
@@ -51,17 +39,25 @@ public class Phase1Component{
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected CoreService coreService;
 
-
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected FlowRuleService flowRuleService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected GroupService groupService;
 
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected PacketService packetService;
+
 
     static ApplicationId appId;
     static final DeviceId torId = DeviceId.deviceId("of:0000000000000111");
+    static MacAddress torMac = MacAddress.valueOf("00:00:00:00:01:11");
+    static Ip4Address torIp = Ip4Address.valueOf("29.29.4.1");
+    static Ip4Address torGatewayIp = Ip4Address.valueOf("29.29.0.1");
+    static Ip4Address primaryUplinkIp = Ip4Address.valueOf("29.29.4.0");
 
+    NetworkElements elements;
+    Phase1PacketProcessor processor;
 
 
 
@@ -75,55 +71,65 @@ public class Phase1Component{
 
         GroupFinder.initiate(appId, groupService);
 
-        //OLT Test
+        log.debug("GroupFinder initiated");
 
-        NetworkElements elements = new NetworkElements(flowRuleService, groupService, appId, torId);
-        elements.twoWayVlanFlow(VlanId.vlanId((short)5), PortNumber.portNumber(1), PortNumber.portNumber(11), torId,41000, false );
+        elements = new NetworkElements(flowRuleService, groupService, appId, torId, torMac);
 
+        //Setup packet processor and flows to intercept the desired ARP
+        List<PortNumber> vsgServerPorts = new LinkedList<>();
+        vsgServerPorts.add(PortNumber.portNumber(3));
+        processor = new Phase1PacketProcessor(vsgServerPorts, NetworkElements.primaryInternet);
+
+        packetService.addProcessor(processor, 2);
+
+        log.debug("processor created and added");
+
+
+
+        try {
+            for(int i = 0 ; i<3; i++) {
+                processor.sendArpRequest(primaryUplinkIp, NetworkElements.primaryInternet, VlanId.NONE);
+                Thread.sleep(1000);
+            }
+        } catch (Exception e){
+
+        }
+
+        log.debug("Packet sent to get MAc from uplink");
 
         //Creation of the network objects
         
-       /* LinkedList<Integer> oltVlans = new LinkedList<>();
+        LinkedList<Integer> oltVlans = new LinkedList<>();
         LinkedList<Integer> vm1Vlans = new LinkedList<>();
-        LinkedList<Integer> vm2Vlans = new LinkedList<>();
 
+        oltVlans.add(5);
+        vm1Vlans.add(5);
 
-        for(int i = 2; i < 6; i++){
-            oltVlans.add(i);
-            vm1Vlans.add(i);
-            vm2Vlans.add(i +5);
-        }
-        Olt olt = new Olt(145, oltVlans);
-        VsgVm vm1 = new VsgVm(Ip4Address.valueOf("10.255.255.2"), MacAddress.valueOf("52:54:00:E5:28:CF"),Ip4Prefix.valueOf("29.29.0.0/24"),vm1Vlans);
+        Olt olt = new Olt(9, oltVlans);
+
+        VsgVm vm1 = new VsgVm(Ip4Address.valueOf("10.255.255.2"), MacAddress.valueOf("52:54:00:E5:28:CF"),vm1Vlans);
+        vm1.addVsgs(1, Ip4Address.valueOf("29.29.0.2"), MacAddress.valueOf("52:54:00:3D:29:81"));
         LinkedList<VsgVm> vms1 = new LinkedList<>();
         vms1.add(vm1);
 
-        //VsgVm vm2 = new VsgVm(Ip4Address.valueOf("10.255.255.2"), MacAddress.valueOf("14:55:00:E5:28:52"),Ip4Prefix.valueOf("29.29.0.0/24"),vm1Vlans);
-        LinkedList<VsgVm> vms2 = new LinkedList<>();
-        //vms1.add(vm2);
+
+        VsgServer vsgServer1 = new VsgServer(3,MacAddress.valueOf("e4:1d:2d:08:4b:80"), vms1, Ip4Prefix.valueOf("29.29.0.0/22"));
 
 
-        VsgServer vsgServer1 = new VsgServer(2,MacAddress.valueOf("e4:1d:2d:08:4b:80"), vms1, Ip4Prefix.valueOf("29.29.0.0/22"));
-
-        VsgServer vsgServer2 = new VsgServer(1,MacAddress.valueOf("e4:1d:2d:2d:ad:50"), vms2, Ip4Prefix.valueOf("29.29.43.0/22"));
 
         log.debug("Olt and server objects created");
         log.debug(" Olt : " + olt.toString());
         log.debug("VsgServer 1 : " + vsgServer1.toString());
 
 
-        QuaggaInstance primaryQuaggaInstance = new QuaggaInstance(4, MacAddress.valueOf("52:54:00:9e:a9:8a"), true);
-        QuaggaInstance secondaryQuaggaInstance = new QuaggaInstance(4, MacAddress.valueOf("52:54:00:9e:a9:8a"), false);
 
 
-        NetworkElements elements = new NetworkElements(flowRuleService, groupService, appId, torId);
         elements.addElement(olt);
         elements.addElement(vsgServer1);
-        elements.addElement(vsgServer2);
-        elements.addElement(primaryQuaggaInstance);
-        elements.addElement(secondaryQuaggaInstance);
 
-        elements.update();*/
+
+        elements.update();
+
 
         //Limitation for now, single tor
         //TODO: 2 tors
@@ -148,6 +154,241 @@ public class Phase1Component{
 
 
 
+    private class Phase1PacketProcessor implements PacketProcessor {
+
+        private List<PortNumber> vsgServerPorts;
+        private PortNumber uplinkPort;
+
+        public Phase1PacketProcessor(List<PortNumber> vsgServerPorts, PortNumber uplinkPort){
+            this.vsgServerPorts = vsgServerPorts;
+            this.uplinkPort = uplinkPort;
+
+
+            arpIntercepts(this.vsgServerPorts);
+        }
+
+
+        @Override
+        public void process(PacketContext context) {
+            if (context.isHandled()) {
+                return;
+            }
+
+            try {
+                InboundPacket pkt = context.inPacket();
+
+
+                Ethernet ethPkt = pkt.parsed();
+                IPacket payload = ethPkt.getPayload();
+
+                if (payload instanceof ARP) {
+
+                    log.debug("ARP packet received by phase 1");
+
+                    ARP arp = (ARP) payload;
+
+                    PortNumber inPort = pkt.receivedFrom().port();
+
+                    if (arp.getOpCode() == ARP.OP_REQUEST) {
+                        log.debug("It is an ARP request");
+                        handleArpRequest(inPort, ethPkt);
+                    } else {
+                        log.debug("It is an ARP reply");
+                        handleArpReply(inPort, ethPkt);
+                    }
+                }
+            } catch(Exception e){
+                log.error("Exception during processing" , e);
+            }
+        }
+
+        private void arpIntercepts(List<PortNumber> ports){
+
+            //////////Intercept on the internet uplink port
+            TrafficSelector.Builder uplinkSelector = DefaultTrafficSelector.builder();
+            uplinkSelector.matchInPort(uplinkPort);
+
+
+            TrafficTreatment toController = DefaultTrafficTreatment.builder().punt().build();
+
+
+            FlowRule.Builder uplinkArpRule = DefaultFlowRule.builder();
+            uplinkArpRule.withSelector(uplinkSelector.build());
+            uplinkArpRule.withTreatment(toController);
+            uplinkArpRule.withPriority(45000);
+            uplinkArpRule.fromApp(appId);
+            uplinkArpRule.forTable(NetworkElements.ACL_TABLE);
+            uplinkArpRule.makePermanent();
+            uplinkArpRule.forDevice(torId);
+
+            flowRuleService.applyFlowRules(uplinkArpRule.build());
+
+            ///////////
+
+            /////////Intercept on the Vsg servers ports (to use the TOR as the gateway
+
+            for(PortNumber port : ports) {
+
+                TrafficSelector.Builder vsgPortSelector = DefaultTrafficSelector.builder();
+                vsgPortSelector.matchInPort(port);
+                vsgPortSelector.extension(new OfdpaMatchVlanVid(NetworkElements.primaryInternetVlan), torId);
+
+                FlowRule.Builder vsgArpRule = DefaultFlowRule.builder();
+                vsgArpRule.withSelector(vsgPortSelector.build());
+                vsgArpRule.withTreatment(toController);
+                vsgArpRule.withPriority(45000);
+                vsgArpRule.fromApp(appId);
+                vsgArpRule.forTable(NetworkElements.ACL_TABLE);
+                vsgArpRule.makePermanent();
+                vsgArpRule.forDevice(torId);
+
+                flowRuleService.applyFlowRules(vsgArpRule.build());
+
+            }
+
+
+        }
+
+        private void handleArpRequest(PortNumber inPort, Ethernet ethPkt) {
+            ARP arpRequest = (ARP) ethPkt.getPayload();
+            VlanId vlanId = VlanId.vlanId(ethPkt.getVlanID());
+
+            // ARP request for router. Send ARP reply.
+            if (isArpForTor(arpRequest)) {
+                sendArpResponse(arpRequest, inPort, vlanId);
+            }
+        }
+
+        private void handleArpReply(PortNumber inPort, Ethernet ethPkt) {
+            ARP arpReply = (ARP) ethPkt.getPayload();
+
+
+            // ARP reply for router. Process all pending IP packets.
+            Ip4Address hostIpAddress = Ip4Address.valueOf(arpReply.getSenderProtocolAddress());
+            if(hostIpAddress.equals(primaryUplinkIp)) {
+                MacAddress uplinkMac = MacAddress.valueOf(arpReply.getSenderHardwareAddress());
+                elements.setMacUplink(uplinkMac);
+                log.info("Uplink MAC found : "  +uplinkMac.toString());
+            }
+        }
+
+
+        private boolean isArpForTor(ARP arpMsg) {
+            Ip4Address targetProtocolAddress = Ip4Address.valueOf(
+                    arpMsg.getTargetProtocolAddress());
+            return (targetProtocolAddress.equals(torIp)||targetProtocolAddress.equals(torGatewayIp));
+        }
+
+
+        public void sendArpRequest(IpAddress targetAddress, PortNumber dstPort, VlanId vlanId) {
+
+
+            ARP arpRequest = new ARP();
+            arpRequest.setHardwareType(ARP.HW_TYPE_ETHERNET)
+                    .setProtocolType(ARP.PROTO_TYPE_IP)
+                    .setHardwareAddressLength(
+                            (byte) Ethernet.DATALAYER_ADDRESS_LENGTH)
+                    .setProtocolAddressLength((byte) Ip4Address.BYTE_LENGTH)
+                    .setOpCode(ARP.OP_REQUEST)
+                    .setSenderHardwareAddress(torMac.toBytes())
+                    .setTargetHardwareAddress(MacAddress.ZERO.toBytes())
+                    .setSenderProtocolAddress(torIp.toOctets())
+                    .setTargetProtocolAddress(targetAddress.toOctets());
+
+            Ethernet eth = new Ethernet();
+            eth.setDestinationMACAddress(MacAddress.BROADCAST.toBytes())
+                    .setSourceMACAddress(torMac)
+                    .setEtherType(Ethernet.TYPE_ARP).setPayload(arpRequest);
+
+            if(!vlanId.equals(VlanId.NONE)){
+                eth.setVlanID(vlanId.toShort());
+            }
+
+            TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+            treatment.setOutput(dstPort);
+            OutboundPacket outPacket = new DefaultOutboundPacket(torId,
+                    treatment.build(), ByteBuffer.wrap(eth.serialize()));
+
+            packetService.emit(outPacket);
+        }
+
+        private void sendArpResponse(ARP arpRequest, PortNumber dstPort, VlanId vlanId) {
+            ARP arpReply = new ARP();
+            arpReply.setHardwareType(ARP.HW_TYPE_ETHERNET)
+                    .setProtocolType(ARP.PROTO_TYPE_IP)
+                    .setHardwareAddressLength(
+                            (byte) Ethernet.DATALAYER_ADDRESS_LENGTH)
+                    .setProtocolAddressLength((byte) Ip4Address.BYTE_LENGTH)
+                    .setOpCode(ARP.OP_REPLY)
+                    .setSenderHardwareAddress(torMac.toBytes())
+                    .setSenderProtocolAddress(arpRequest.getTargetProtocolAddress())
+                    .setTargetHardwareAddress(arpRequest.getSenderHardwareAddress())
+                    .setTargetProtocolAddress(arpRequest.getSenderProtocolAddress());
+
+            Ethernet eth = new Ethernet();
+            eth.setDestinationMACAddress(arpRequest.getSenderHardwareAddress())
+                    .setSourceMACAddress(torMac)
+                    .setEtherType(Ethernet.TYPE_ARP)
+                    .setPayload(arpReply);
+
+            if(!vlanId.equals(VlanId.NONE)){
+                eth.setVlanID(vlanId.toShort());
+            }
+
+
+            TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+            treatment.setOutput(dstPort);
+            OutboundPacket outPacket = new DefaultOutboundPacket(torId,
+                    treatment.build(), ByteBuffer.wrap(eth.serialize()));
+
+            packetService.emit(outPacket);
+        }
+    }
+
+
+
+    public void linkPorts(int port1, int port2){
+
+        int tunnelVlan = 17;
+
+        elements.untaggedPacketsTagging(PortNumber.portNumber(port1), VlanId.vlanId((short)tunnelVlan), torId);
+        elements.untaggedPacketsTagging(PortNumber.portNumber(port2), VlanId.vlanId((short)tunnelVlan), torId);
+
+        TrafficSelector.Builder selector1 = DefaultTrafficSelector.builder();
+        selector1.matchInPort(PortNumber.portNumber(port1));
+
+        TrafficTreatment.Builder outpoutTo2 = DefaultTrafficTreatment.builder();
+        outpoutTo2.group(GroupFinder.getL2Interface(port2, tunnelVlan, true, torId));
+
+        FlowRule.Builder rule1to2 = DefaultFlowRule.builder();
+        rule1to2.withSelector(selector1.build());
+        rule1to2.withTreatment(outpoutTo2.build());
+        rule1to2.withPriority(51000);
+        rule1to2.forDevice(torId);
+        rule1to2.forTable(NetworkElements.ACL_TABLE);
+        rule1to2.makePermanent();
+
+        flowRuleService.applyFlowRules(rule1to2.build());
+
+        TrafficSelector.Builder selector2 = DefaultTrafficSelector.builder();
+        selector2.matchInPort(PortNumber.portNumber(port2));
+
+        TrafficTreatment.Builder outpoutTo1 = DefaultTrafficTreatment.builder();
+        outpoutTo2.group(GroupFinder.getL2Interface(port1, tunnelVlan, true, torId));
+
+        FlowRule.Builder rule2to1 = DefaultFlowRule.builder();
+        rule2to1.withSelector(selector2.build());
+        rule2to1.withTreatment(outpoutTo1.build());
+        rule2to1.withPriority(51000);
+        rule2to1.forDevice(torId);
+        rule2to1.forTable(NetworkElements.ACL_TABLE);
+        rule2to1.makePermanent();
+
+        flowRuleService.applyFlowRules(rule2to1.build());
+
+
+
+    }
 
 
 

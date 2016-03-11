@@ -1,4 +1,4 @@
-package org.onosproject.phase1;
+package org.onosproject.phase1.ofdpagroups;
 
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.GroupId;

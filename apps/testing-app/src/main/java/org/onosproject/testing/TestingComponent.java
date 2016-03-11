@@ -60,7 +60,7 @@ public class TestingComponent {
 
         log.info("FlowRuleTranslation initiated");
 
-        FlowRule flow1 = testFlow1(15,16,436);
+        /*FlowRule flow1 = testFlow1(15,16,436);
         FlowRule flow2 = testFlow1(17,18,-1);
 
         try {
@@ -88,7 +88,7 @@ public class TestingComponent {
             log.error("Test 3 error", e);
         }
 
-        log.info("Test 3 ended");
+        log.info("Test 3 ended");*/
 
     }
 
@@ -105,6 +105,11 @@ public class TestingComponent {
         }
 
         log.info("Stopped");
+    }
+
+    private void linkPorts(int port1, int port2){
+
+
     }
 
     private FlowRule testFlow1(int inPort, int outPort, int vlan){
