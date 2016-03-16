@@ -8,6 +8,7 @@ import org.onosproject.core.ApplicationId;
 import org.onosproject.core.GroupId;
 import org.onosproject.driver.extensions.OfdpaMatchVlanVid;
 import org.onosproject.driver.extensions.OfdpaSetVlanVid;
+import org.onosproject.net.Device;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.flow.*;
@@ -235,6 +236,40 @@ public class NetworkElements{
 
         flowRuleService.applyFlowRules(vlanTableRule.build());
 
+    }
+
+    public void bridgingTableFlow(PortNumber outPort, VlanId vlanId, MacAddress dstMac, DeviceId deviceId){
+
+        flowRuleService.applyFlowRules(buildBridgingTableFlow(outPort, vlanId, dstMac, deviceId));
+
+    }
+
+    public void removeBridgingTableFlow(PortNumber outPort, VlanId vlanId, MacAddress dstMac, DeviceId deviceId){
+
+        flowRuleService.removeFlowRules(buildBridgingTableFlow(outPort, vlanId, dstMac, deviceId));
+
+    }
+
+    private FlowRule buildBridgingTableFlow(PortNumber outPort, VlanId vlanId, MacAddress dstMac, DeviceId deviceId){
+
+        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+        selector.extension(new OfdpaMatchVlanVid(vlanId), deviceId);
+        selector.matchEthDst(dstMac);
+
+        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+        treatment.group(GroupFinder.getL2Interface(outPort, vlanId, false, deviceId));
+        treatment.transition(ACL_TABLE);
+
+        FlowRule.Builder flow = DefaultFlowRule.builder();
+        flow.withSelector(selector.build());
+        flow.withTreatment(treatment.build());
+        flow.withPriority(2000);
+        flow.forTable(BRIDGING_TABLE);
+        flow.fromApp(appId);
+        flow.forDevice(deviceId);
+        flow.makePermanent();
+
+        return flow.build();
     }
 
     void untaggedPacketsTagging(PortNumber port, VlanId vlanId, DeviceId deviceId){

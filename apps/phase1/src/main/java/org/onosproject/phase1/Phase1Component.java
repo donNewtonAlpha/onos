@@ -12,10 +12,19 @@ import org.onosproject.core.CoreService;
 import org.onosproject.core.GroupId;
 import org.onosproject.driver.extensions.OfdpaMatchVlanVid;
 import org.onosproject.net.*;
+import org.onosproject.net.config.ConfigFactory;
+import org.onosproject.net.config.NetworkConfigRegistry;
+import org.onosproject.net.config.basics.SubjectFactories;
 import org.onosproject.net.flow.*;
 import org.onosproject.net.flow.instructions.Instructions;
+import org.onosproject.net.flowobjective.DefaultForwardingObjective;
+import org.onosproject.net.flowobjective.ForwardingObjective;
 import org.onosproject.net.group.*;
+import org.onosproject.net.host.HostEvent;
+import org.onosproject.net.host.HostListener;
+import org.onosproject.net.host.HostService;
 import org.onosproject.net.packet.*;
+import org.onosproject.phase1.config.Phase1AppConfig;
 import org.onosproject.phase1.ofdpagroups.GroupFinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +57,22 @@ public class Phase1Component{
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected PacketService packetService;
 
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected NetworkConfigRegistry cfgService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected HostService hostService;
+
+    private final ConfigFactory<ApplicationId, Phase1AppConfig> cfgAppFactory =
+            new ConfigFactory<ApplicationId, Phase1AppConfig>(SubjectFactories.APP_SUBJECT_FACTORY,
+                    Phase1AppConfig.class,
+                    "phase1") {
+                @Override
+                public Phase1AppConfig createConfig() {
+                    return new Phase1AppConfig();
+                }
+            };
+
 
     static ApplicationId appId;
     static final DeviceId torId = DeviceId.deviceId("of:0000000000000111");
@@ -58,6 +83,7 @@ public class Phase1Component{
 
     NetworkElements elements;
     Phase1PacketProcessor processor;
+    InternalHostListener hostListener;
 
 
 
@@ -65,6 +91,8 @@ public class Phase1Component{
     protected void activate() {
 
         log.debug("trying to activate");
+
+
         appId = coreService.registerApplication("org.onosproject.phase1");
 
         //Initiation
@@ -74,6 +102,12 @@ public class Phase1Component{
         log.debug("GroupFinder initiated");
 
         elements = new NetworkElements(flowRuleService, groupService, appId, torId, torMac);
+
+        cfgService.registerConfigFactory(cfgAppFactory);
+
+        hostListener = new InternalHostListener();
+
+        hostService.addListener(hostListener);
 
         //Setup packet processor and flows to intercept the desired ARP
         List<PortNumber> vsgServerPorts = new LinkedList<>();
@@ -92,7 +126,7 @@ public class Phase1Component{
                 Thread.sleep(1000);
             }
         } catch (Exception e){
-
+            log.warn("Exception" , e);
         }
 
         log.debug("Packet sent to get MAc from uplink");
@@ -130,6 +164,9 @@ public class Phase1Component{
 
         elements.update();
 
+        Phase1AppConfig config = cfgService.getConfig(appId, Phase1AppConfig.class);
+        config.testConfig();
+
 
         //Limitation for now, single tor
         //TODO: 2 tors
@@ -143,6 +180,7 @@ public class Phase1Component{
 
         flowRuleService.removeFlowRulesById(appId);
 
+        cfgService.unregisterConfigFactory(cfgAppFactory);
 
         Iterable<Group> appGroups = groupService.getGroups(torId, appId);
         for(Group group : appGroups) {
@@ -389,6 +427,61 @@ public class Phase1Component{
 
 
     }
+
+    private class InternalHostListener implements HostListener {
+
+        private void readInitialHosts() {
+            hostService.getHosts().forEach(host -> {
+                addFlow(host);
+            });
+        }
+
+        private void addFlow(Host host){
+            MacAddress mac = host.mac();
+            VlanId vlanId = host.vlan();
+            DeviceId deviceId = host.location().deviceId();
+            PortNumber port = host.location().port();
+
+            //L2 flow to each known host
+            elements.bridgingTableFlow(port, vlanId, mac, deviceId);
+        }
+
+        private  void removeFlow(Host host){
+
+            MacAddress mac = host.mac();
+            VlanId vlanId = host.vlan();
+            DeviceId deviceId = host.location().deviceId();
+            PortNumber port = host.location().port();
+
+            //Remove L2 flow to each known host
+            elements.removeBridgingTableFlow(port, vlanId, mac, deviceId);
+        }
+
+        @Override
+        public void event(HostEvent event) {
+
+            switch (event.type()) {
+                case HOST_ADDED:
+                    addFlow(event.subject());
+                    break;
+                case HOST_MOVED:
+                    removeFlow(event.prevSubject());
+                    addFlow(event.subject());
+                    break;
+                case HOST_REMOVED:
+                    removeFlow(event.subject());
+                    break;
+                case HOST_UPDATED:
+                    removeFlow(event.prevSubject());
+                    addFlow(event.subject());
+                    break;
+                default:
+                    log.warn("Unsupported host event type: {}", event.type());
+                    break;
+            }
+        }
+    }
+
 
 
 
