@@ -73,6 +73,7 @@
         <module>openstacknode</module>
         <module>openstacknetworking</module>
         <module>openstackinterface</module>
+        <module>translation</module>
   </modules>
 
     <properties>
