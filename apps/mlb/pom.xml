@@ -22,7 +22,7 @@
     <parent>
         <groupId>org.onosproject</groupId>
         <artifactId>onos-apps</artifactId>
-        <version>1.5.0-SNAPSHOT</version>
+        <version>1.6.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -34,9 +34,10 @@
     <properties>
         <onos.app.name>org.onosproject.mlb</onos.app.name>
         <onos.app.title>Mastership Load Balancer App</onos.app.title>
-        <onos.app.category>default</onos.app.category>
+        <onos.app.category>Utility</onos.app.category>
         <onos.app.url>http://onosproject.org</onos.app.url>
-        <onos.app.readme>Application that balances mastership among nodes.
+        <onos.app.readme>
+            Application that balances mastership among nodes.
         </onos.app.readme>
     </properties>
 

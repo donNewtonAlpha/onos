@@ -27,9 +27,10 @@ import org.onlab.packet.IpAddress;
 import org.onlab.util.ItemNotFoundException;
 import org.onlab.util.KryoNamespace;
 import org.onosproject.cluster.ClusterService;
+import org.onosproject.cluster.LeadershipService;
+import org.onosproject.cluster.NodeId;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
-import org.onosproject.mastership.MastershipService;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.DefaultAnnotations;
 import org.onosproject.net.Device;
@@ -70,8 +71,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
@@ -148,7 +151,7 @@ public class CordVtnNodeManager {
     protected FlowRuleService flowRuleService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected MastershipService mastershipService;
+    protected LeadershipService leadershipService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected GroupService groupService;
@@ -165,11 +168,12 @@ public class CordVtnNodeManager {
     private final OvsdbHandler ovsdbHandler = new OvsdbHandler();
     private final BridgeHandler bridgeHandler = new BridgeHandler();
 
-    private ConsistentMap<CordVtnNode, NodeState> nodeStore;
+    private ConsistentMap<String, CordVtnNode> nodeStore;
     private CordVtnRuleInstaller ruleInstaller;
     private ApplicationId appId;
+    private NodeId localNodeId;
 
-    private enum NodeState {
+    private enum NodeState implements CordVtnNodeState {
 
         INIT {
             @Override
@@ -197,7 +201,6 @@ public class CordVtnNodeManager {
             public void process(CordVtnNodeManager nodeManager, CordVtnNode node) {
                 nodeManager.setIpAddress(node);
             }
-
         },
         COMPLETE {
             @Override
@@ -217,7 +220,10 @@ public class CordVtnNodeManager {
     @Activate
     protected void active() {
         appId = coreService.getAppId(CordVtnService.CORDVTN_APP_ID);
-        nodeStore = storageService.<CordVtnNode, NodeState>consistentMapBuilder()
+        localNodeId = clusterService.getLocalNode().id();
+        leadershipService.runForLeadership(appId.name());
+
+        nodeStore = storageService.<String, CordVtnNode>consistentMapBuilder()
                 .withSerializer(Serializer.using(NODE_SERIALIZER.build()))
                 .withName("cordvtn-nodestore")
                 .withApplicationId(appId)
@@ -227,12 +233,11 @@ public class CordVtnNodeManager {
                                                  deviceService,
                                                  driverService,
                                                  groupService,
-                                                 mastershipService,
+                                                 configRegistry,
                                                  DEFAULT_TUNNEL);
 
         deviceService.addListener(deviceListener);
         configService.addListener(configListener);
-        readConfiguration();
     }
 
     @Deactivate
@@ -242,6 +247,7 @@ public class CordVtnNodeManager {
 
         eventExecutor.shutdown();
         nodeStore.clear();
+        leadershipService.withdraw(appId.name());
     }
 
     /**
@@ -252,7 +258,8 @@ public class CordVtnNodeManager {
     public void addNode(CordVtnNode node) {
         checkNotNull(node);
 
-        nodeStore.putIfAbsent(node, getNodeState(node));
+        // allow update node attributes
+        nodeStore.put(node.hostname(), CordVtnNode.getUpdatedNode(node, getNodeState(node)));
         initNode(node);
     }
 
@@ -268,7 +275,7 @@ public class CordVtnNodeManager {
             disconnectOvsdb(node);
         }
 
-        nodeStore.remove(node);
+        nodeStore.remove(node.hostname());
     }
 
     /**
@@ -279,12 +286,20 @@ public class CordVtnNodeManager {
     public void initNode(CordVtnNode node) {
         checkNotNull(node);
 
-        if (!nodeStore.containsKey(node)) {
+        if (!nodeStore.containsKey(node.hostname())) {
             log.warn("Node {} does not exist, add node first", node.hostname());
             return;
         }
 
+        NodeId leaderNodeId = leadershipService.getLeader(appId.name());
+        log.debug("Node init requested, local: {} leader: {}", localNodeId, leaderNodeId);
+        if (!Objects.equals(localNodeId, leaderNodeId)) {
+            // only the leader performs node init
+            return;
+        }
+
         NodeState state = getNodeState(node);
+        log.debug("Init node: {} state: {}", node.hostname(), state.toString());
         state.process(this, node);
     }
 
@@ -296,7 +311,14 @@ public class CordVtnNodeManager {
      */
     public boolean isNodeInitComplete(CordVtnNode node) {
         checkNotNull(node);
-        return nodeStore.containsKey(node) && getNodeState(node).equals(NodeState.COMPLETE);
+        return nodeStore.containsKey(node.hostname()) && getNodeState(node).equals(NodeState.COMPLETE);
+    }
+
+    /**
+     * Flush flows installed by cordvtn.
+     */
+    public void flushRules() {
+        ruleInstaller.flushRules();
     }
 
     /**
@@ -311,8 +333,9 @@ public class CordVtnNodeManager {
         // the state saved in nodeStore can be wrong if IP address settings are changed
         // after the node init has been completed since there's no way to detect it
         // getNodeState and checkNodeInitState always return correct answer but can be slow
-        Versioned<NodeState> state = nodeStore.get(node);
-        return state != null && state.value().equals(NodeState.COMPLETE);
+        Versioned<CordVtnNode> versionedNode = nodeStore.get(node.hostname());
+        CordVtnNodeState state = versionedNode.value().state();
+        return state != null && state.equals(NodeState.COMPLETE);
     }
 
     /**
@@ -324,7 +347,7 @@ public class CordVtnNodeManager {
     public String checkNodeInitState(CordVtnNode node) {
         checkNotNull(node);
 
-        if (!nodeStore.containsKey(node)) {
+        if (!nodeStore.containsKey(node.hostname())) {
             log.warn("Node {} does not exist, add node first", node.hostname());
             return null;
         }
@@ -337,13 +360,13 @@ public class CordVtnNodeManager {
 
         Set<IpAddress> intBrIps = RemoteIpCommandUtil.getCurrentIps(session, DEFAULT_BRIDGE);
         String result = String.format(
-                "Integration bridge created/connected : %s (%s)%n" +
+                "br-int created and connected : %s (%s)%n" +
                         "VXLAN interface created : %s%n" +
                         "Data plane interface added : %s (%s)%n" +
                         "IP flushed from %s : %s%n" +
                         "Data plane IP added to br-int : %s (%s)%n" +
                         "Local management IP added to br-int : %s (%s)",
-                isBrIntCreated(node) ? OK : NO, DEFAULT_BRIDGE,
+                isBrIntCreated(node) ? OK : NO, node.intBrId(),
                 isTunnelIntfCreated(node) ? OK : NO,
                 isDataPlaneIntfAdded(node) ? OK : NO, node.dpIntf(),
                 node.dpIntf(),
@@ -371,9 +394,9 @@ public class CordVtnNodeManager {
      * @return list of nodes
      */
     public List<CordVtnNode> getNodes() {
-        List<CordVtnNode> nodes = new ArrayList<>();
-        nodes.addAll(nodeStore.keySet());
-        return nodes;
+        return nodeStore.values().stream()
+                .map(Versioned::value)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -410,8 +433,7 @@ public class CordVtnNodeManager {
         checkNotNull(node);
 
         log.debug("Changed {} state: {}", node.hostname(), newState.toString());
-
-        nodeStore.put(node, newState);
+        nodeStore.put(node.hostname(), CordVtnNode.getUpdatedNode(node, newState));
         newState.process(this, node);
     }
 
@@ -497,7 +519,7 @@ public class CordVtnNodeManager {
     private void connectOvsdb(CordVtnNode node) {
         checkNotNull(node);
 
-        if (!nodeStore.containsKey(node)) {
+        if (!nodeStore.containsKey(node.hostname())) {
             log.warn("Node {} does not exist", node.hostname());
             return;
         }
@@ -515,7 +537,7 @@ public class CordVtnNodeManager {
     private void disconnectOvsdb(CordVtnNode node) {
         checkNotNull(node);
 
-        if (!nodeStore.containsKey(node)) {
+        if (!nodeStore.containsKey(node.hostname())) {
             log.warn("Node {} does not exist", node.hostname());
             return;
         }
@@ -747,6 +769,7 @@ public class CordVtnNodeManager {
         @Override
         public void disconnected(Device device) {
             if (!deviceService.isAvailable(device.id())) {
+                log.debug("Device {} is disconnected", device.id());
                 adminService.removeDevice(device.id());
             }
         }
@@ -835,6 +858,12 @@ public class CordVtnNodeManager {
 
         @Override
         public void event(DeviceEvent event) {
+
+            NodeId leaderNodeId = leadershipService.getLeader(appId.name());
+            if (!Objects.equals(localNodeId, leaderNodeId)) {
+                // only the leader processes events
+                return;
+            }
 
             Device device = event.subject();
             ConnectionHandler<Device> handler =

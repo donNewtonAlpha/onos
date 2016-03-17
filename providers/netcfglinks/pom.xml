@@ -20,7 +20,7 @@
     <parent>
         <artifactId>onos-providers</artifactId>
         <groupId>org.onosproject</groupId>
-        <version>1.5.0-SNAPSHOT</version>
+        <version>1.6.0-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -30,16 +30,8 @@
     <description>
         Links provider that uses network config service to predefine devices and links.
     </description>
-    <url>http://onosproject.org</url>
-
-    <properties>
-        <onos.app.name>org.onosproject.netcfglinksprovider</onos.app.name>
-        <onos.app.title>Network Config Link Provider</onos.app.title>
-        <onos.app.origin>ON.Lab</onos.app.origin>
-    </properties>
 
     <dependencies>
-
         <dependency>
             <groupId>org.onosproject</groupId>
             <artifactId>onlab-osgi</artifactId>
@@ -48,7 +40,7 @@
         <dependency>
             <groupId>org.onosproject</groupId>
             <artifactId>onos-lldp-provider-common</artifactId>
-            <version>1.5.0-SNAPSHOT</version>
+            <version>1.6.0-SNAPSHOT</version>
         </dependency>
 
         <dependency>

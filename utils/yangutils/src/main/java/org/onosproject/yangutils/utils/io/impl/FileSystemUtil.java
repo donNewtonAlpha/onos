@@ -104,7 +104,7 @@ public final class FileSystemUtil {
      */
     public static void appendFileContents(File toAppend, File srcFile) throws IOException {
 
-        insertStringInFile(srcFile, UtilConstants.NEW_LINE + readAppendFile(toAppend.toString()));
+        updateFileHandle(srcFile, UtilConstants.NEW_LINE + readAppendFile(toAppend.toString()), false);
         return;
     }
 
@@ -122,8 +122,14 @@ public final class FileSystemUtil {
             String line = bufferReader.readLine();
 
             while (line != null) {
-                stringBuilder.append(UtilConstants.FOUR_SPACE_INDENTATION + line);
-                stringBuilder.append("\n");
+                if (line.equals(UtilConstants.FOUR_SPACE_INDENTATION)
+                        || line.equals(UtilConstants.EIGHT_SPACE_INDENTATION)
+                        || line.equals(UtilConstants.SPACE) || line.equals("") || line.equals(UtilConstants.NEW_LINE)) {
+                    stringBuilder.append("\n");
+                } else {
+                    stringBuilder.append(UtilConstants.FOUR_SPACE_INDENTATION + line);
+                    stringBuilder.append("\n");
+                }
                 line = bufferReader.readLine();
             }
             return stringBuilder.toString();
@@ -133,18 +139,23 @@ public final class FileSystemUtil {
     }
 
     /**
-     * Insert content to the generated file.
+     * Update the generated file handle.
      *
      * @param inputFile input file
      * @param contentTobeAdded content to be appended to the file
+     * @param isClose when close of file is called.
      * @throws IOException when fails to append content to the file
      */
-    public static void insertStringInFile(File inputFile, String contentTobeAdded) throws IOException {
+    public static void updateFileHandle(File inputFile, String contentTobeAdded, boolean isClose) throws IOException {
         FileWriter fileWriter = new FileWriter(inputFile, true);
         PrintWriter outputPrintWriter = new PrintWriter(fileWriter);
-        outputPrintWriter.write(contentTobeAdded);
-        outputPrintWriter.flush();
-        outputPrintWriter.close();
-
+        if (!isClose) {
+            outputPrintWriter.write(contentTobeAdded);
+            outputPrintWriter.flush();
+            outputPrintWriter.close();
+        } else {
+            fileWriter.flush();
+            fileWriter.close();
+        }
     }
 }

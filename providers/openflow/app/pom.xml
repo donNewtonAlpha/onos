@@ -22,7 +22,7 @@
     <parent>
         <groupId>org.onosproject</groupId>
         <artifactId>onos-of-providers</artifactId>
-        <version>1.5.0-SNAPSHOT</version>
+        <version>1.6.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -31,7 +31,8 @@
 
     <properties>
         <onos.app.name>org.onosproject.openflow</onos.app.name>
-        <onos.app.title>OpenFlow Southbound Meta App</onos.app.title>
+        <onos.app.title>OpenFlow Meta App</onos.app.title>
+        <onos.app.category>Provider</onos.app.category>
         <onos.app.requires>
             org.onosproject.openflow-base,
             org.onosproject.hostprovider,

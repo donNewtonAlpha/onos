@@ -20,7 +20,7 @@
     <parent>
         <artifactId>onos-apps</artifactId>
         <groupId>org.onosproject</groupId>
-        <version>1.5.0-SNAPSHOT</version>
+        <version>1.6.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -29,14 +29,6 @@
 
     <packaging>bundle</packaging>
     <description>Libraries for routing applications</description>
-
-    <properties>
-        <onos.app.name>org.onosproject.routing</onos.app.name>
-        <onos.app.title>SDN-IP Routing App</onos.app.title>
-        <onos.app.category>default</onos.app.category>
-        <onos.app.url>http://onosproject.org</onos.app.url>
-        <onos.app.readme>SDN-IP routing application.</onos.app.readme>
-    </properties>
 
     <dependencies>
         <dependency>

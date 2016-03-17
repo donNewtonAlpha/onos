@@ -85,7 +85,7 @@ public class LeafListListenerTest {
     @Test
     public void processLeafListInvalidIdentifier() throws IOException, ParserException {
         thrown.expect(ParserException.class);
-        thrown.expectMessage("mismatched input '1invalid-interval' expecting IDENTIFIER");
+        thrown.expectMessage("YANG file error : leaf-list name 1invalid-interval is not valid.");
         YangNode node = manager.getDataModel("src/test/resources/LeafListInvalidIdentifier.yang");
     }
 
@@ -97,8 +97,8 @@ public class LeafListListenerTest {
         thrown.expect(ParserException.class);
         thrown.expectMessage("mismatched input 'leaflist' expecting {'augment', 'choice', 'contact', 'container',"
                 + " 'description', 'extension', 'deviation', 'feature', 'grouping', 'identity', 'import', 'include',"
-                + " 'leaf', 'leaf-list', 'list', 'namespace', 'notification', 'organization', 'prefix', 'reference',"
-                + " 'revision', 'rpc', 'typedef', 'uses', 'yang-version', '}'}");
+                + " 'leaf', 'leaf-list', 'list', 'notification', 'organization', 'reference',"
+                + " 'revision', 'rpc', 'typedef', 'uses', '}'}");
         YangNode node = manager.getDataModel("src/test/resources/LeafListInvalidStatement.yang");
     }
 
