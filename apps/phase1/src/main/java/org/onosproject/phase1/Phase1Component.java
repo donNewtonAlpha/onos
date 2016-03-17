@@ -129,7 +129,7 @@ public class Phase1Component{
             log.warn("Exception" , e);
         }
 
-        log.debug("Packet sent to get MAc from uplink");
+        log.debug("Packet sent to get MAC from uplink");
 
         //Creation of the network objects
         
