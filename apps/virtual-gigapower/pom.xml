@@ -30,7 +30,7 @@
 
 
     <properties>
-        <onos.version>1.5.0-SNAPSHOT</onos.version>
+        <onos.version>1.6.0-SNAPSHOT</onos.version>
         <onos.app.name>org.onosproject.virtualgigapower</onos.app.name>
         <onos.app.origin>SDN Arena, Inc.</onos.app.origin>
         <checkstyle.skip>true</checkstyle.skip>

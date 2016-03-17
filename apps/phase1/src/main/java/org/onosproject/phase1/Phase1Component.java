@@ -167,6 +167,10 @@ public class Phase1Component{
         Phase1AppConfig config = cfgService.getConfig(appId, Phase1AppConfig.class);
         config.testConfig();
 
+        hostListener.readInitialHosts();
+
+        logConfig();
+
 
         //Limitation for now, single tor
         //TODO: 2 tors
@@ -188,6 +192,27 @@ public class Phase1Component{
         }
 
         log.info("Stopped");
+    }
+
+    private void logConfig(){
+
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                for(int i = 0 ; i < 12; i++) {
+                    try {
+                        Thread.sleep(10000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        };
+
+        Thread t = new Thread(r);
+        t.setDaemon(true);
+        t.start();
+
     }
 
 
@@ -463,17 +488,21 @@ public class Phase1Component{
             switch (event.type()) {
                 case HOST_ADDED:
                     addFlow(event.subject());
+                    log.info("Host added");
                     break;
                 case HOST_MOVED:
                     removeFlow(event.prevSubject());
                     addFlow(event.subject());
+                    log.info("Host moved");
                     break;
                 case HOST_REMOVED:
                     removeFlow(event.subject());
+                    log.info("Host removed");
                     break;
                 case HOST_UPDATED:
                     removeFlow(event.prevSubject());
                     addFlow(event.subject());
+                    log.info("Host updateded");
                     break;
                 default:
                     log.warn("Unsupported host event type: {}", event.type());

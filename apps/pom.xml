@@ -65,7 +65,6 @@
         <module>events</module>
         <module>vrouter</module>
         <module>tor</module>
-        <module>virtual-gigapower</module>
         <module>oneping</module>
         <module>phase1</module>
         <module>testing-app</module>
