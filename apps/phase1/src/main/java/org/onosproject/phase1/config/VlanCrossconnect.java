@@ -44,4 +44,16 @@ public class VlanCrossconnect {
         return builder.toString();
     }
 
+    public boolean equals(Object other){
+        if(other instanceof VlanCrossconnect) {
+            VlanCrossconnect otherVCC = (VlanCrossconnect) other;
+            if(this.getVlanId().equals(otherVCC.getVlanId())){
+                List<PortNumber> ports1 = this.getPorts();
+                List<PortNumber> ports2 = otherVCC.getPorts();
+                return ports1.equals(ports2);
+            }
+        }
+        return false;
+    }
+
 }

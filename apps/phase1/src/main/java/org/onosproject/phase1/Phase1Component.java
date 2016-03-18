@@ -13,6 +13,8 @@ import org.onosproject.core.GroupId;
 import org.onosproject.driver.extensions.OfdpaMatchVlanVid;
 import org.onosproject.net.*;
 import org.onosproject.net.config.ConfigFactory;
+import org.onosproject.net.config.NetworkConfigEvent;
+import org.onosproject.net.config.NetworkConfigListener;
 import org.onosproject.net.config.NetworkConfigRegistry;
 import org.onosproject.net.config.basics.SubjectFactories;
 import org.onosproject.net.flow.*;
@@ -77,13 +79,12 @@ public class Phase1Component{
     static ApplicationId appId;
     static final DeviceId torId = DeviceId.deviceId("of:0000000000000111");
     static MacAddress torMac = MacAddress.valueOf("00:00:00:00:01:11");
-    static Ip4Address torIp = Ip4Address.valueOf("29.29.4.1");
-    static Ip4Address torGatewayIp = Ip4Address.valueOf("29.29.0.1");
-    static Ip4Address primaryUplinkIp = Ip4Address.valueOf("29.29.4.0");
+
 
     NetworkElements elements;
     Phase1PacketProcessor processor;
     InternalHostListener hostListener;
+    InternalConfigListener cfgListener;
 
 
 
@@ -98,18 +99,29 @@ public class Phase1Component{
         //Initiation
 
         GroupFinder.initiate(appId, groupService);
-
         log.debug("GroupFinder initiated");
 
-        elements = new NetworkElements(flowRuleService, groupService, appId, torId, torMac);
 
+        ///Elements
+        elements = new NetworkElements(flowRuleService, appId, torId, torMac, this);
+        //ToR as a router flow
+        elements.tMacTableFlowUnicastRouting(torMac, 10);
+
+
+        ////////Configs
         cfgService.registerConfigFactory(cfgAppFactory);
+        cfgListener = new InternalConfigListener();
+        cfgService.addListener(cfgListener);
+        ////////////
 
+        ///////Host discovery
         hostListener = new InternalHostListener();
 
         hostService.addListener(hostListener);
+        ////////////////
 
         //Setup packet processor and flows to intercept the desired ARP
+        //TODO : change this to config or remove it if already taken care of by qualifiedhost provider
         List<PortNumber> vsgServerPorts = new LinkedList<>();
         vsgServerPorts.add(PortNumber.portNumber(3));
         processor = new Phase1PacketProcessor(vsgServerPorts, NetworkElements.primaryInternet);
@@ -120,15 +132,8 @@ public class Phase1Component{
 
 
 
-        try {
-            for(int i = 0 ; i<3; i++) {
-                processor.sendArpRequest(primaryUplinkIp, NetworkElements.primaryInternet, VlanId.NONE);
-                Thread.sleep(1000);
-            }
-        } catch (Exception e){
-            log.warn("Exception" , e);
-        }
 
+/*
         log.debug("Packet sent to get MAC from uplink");
 
         //Creation of the network objects
@@ -159,13 +164,11 @@ public class Phase1Component{
 
 
         elements.addElement(olt);
-        elements.addElement(vsgServer1);
-
-
-        elements.update();
+        elements.addElement(vsgServer1);*/
 
         Phase1AppConfig config = cfgService.getConfig(appId, Phase1AppConfig.class);
-        config.testConfig();
+        elements.update(config);
+
 
         hostListener.readInitialHosts();
 
@@ -202,6 +205,12 @@ public class Phase1Component{
                 for(int i = 0 ; i < 12; i++) {
                     try {
                         Thread.sleep(10000);
+                        Phase1AppConfig config = cfgService.getConfig(appId, Phase1AppConfig.class);
+                        if(config == null){
+                            log.warn("Config is null");
+                        } else {
+                            config.testConfig();
+                        }
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
@@ -215,6 +224,17 @@ public class Phase1Component{
 
     }
 
+    public void requestUplinkMac(Ip4Address uplinkIp, PortNumber uplinkPort){
+
+        try {
+            for(int i = 0 ; i<3; i++) {
+                processor.sendArpRequest(uplinkIp, uplinkPort, VlanId.NONE);
+                Thread.sleep(50);
+            }
+        } catch (Exception e){
+            log.warn("Exception" , e);
+        }
+    }
 
 
     private class Phase1PacketProcessor implements PacketProcessor {
@@ -294,7 +314,7 @@ public class Phase1Component{
 
                 TrafficSelector.Builder vsgPortSelector = DefaultTrafficSelector.builder();
                 vsgPortSelector.matchInPort(port);
-                vsgPortSelector.extension(new OfdpaMatchVlanVid(NetworkElements.primaryInternetVlan), torId);
+                vsgPortSelector.extension(new OfdpaMatchVlanVid(NetworkElements.internalInternetVlan), torId);
 
                 FlowRule.Builder vsgArpRule = DefaultFlowRule.builder();
                 vsgArpRule.withSelector(vsgPortSelector.build());
@@ -328,7 +348,7 @@ public class Phase1Component{
 
             // ARP reply for router. Process all pending IP packets.
             Ip4Address hostIpAddress = Ip4Address.valueOf(arpReply.getSenderProtocolAddress());
-            if(hostIpAddress.equals(primaryUplinkIp)) {
+            if(hostIpAddress.equals(NetworkElements.primaryUplinkIp)) {
                 MacAddress uplinkMac = MacAddress.valueOf(arpReply.getSenderHardwareAddress());
                 elements.setMacUplink(uplinkMac);
                 log.info("Uplink MAC found : "  +uplinkMac.toString());
@@ -339,7 +359,7 @@ public class Phase1Component{
         private boolean isArpForTor(ARP arpMsg) {
             Ip4Address targetProtocolAddress = Ip4Address.valueOf(
                     arpMsg.getTargetProtocolAddress());
-            return (targetProtocolAddress.equals(torIp)||targetProtocolAddress.equals(torGatewayIp));
+            return (targetProtocolAddress.equals(NetworkElements.torIp)||targetProtocolAddress.equals(NetworkElements.torGatewayIp));
         }
 
 
@@ -355,7 +375,7 @@ public class Phase1Component{
                     .setOpCode(ARP.OP_REQUEST)
                     .setSenderHardwareAddress(torMac.toBytes())
                     .setTargetHardwareAddress(MacAddress.ZERO.toBytes())
-                    .setSenderProtocolAddress(torIp.toOctets())
+                    .setSenderProtocolAddress(NetworkElements.torIp.toOctets())
                     .setTargetProtocolAddress(targetAddress.toOctets());
 
             Ethernet eth = new Ethernet();
@@ -502,13 +522,43 @@ public class Phase1Component{
                 case HOST_UPDATED:
                     removeFlow(event.prevSubject());
                     addFlow(event.subject());
-                    log.info("Host updateded");
+                    log.info("Host updated");
                     break;
                 default:
                     log.warn("Unsupported host event type: {}", event.type());
                     break;
             }
         }
+    }
+
+    private class InternalConfigListener implements NetworkConfigListener {
+
+        @Override
+        public void event(NetworkConfigEvent event){
+
+
+            if(event.configClass().equals(Phase1AppConfig.class)) {
+
+                switch(event.type()){
+                    case CONFIG_ADDED:
+                        log.info("Phase 1 Config added");
+                        break;
+                    case CONFIG_UPDATED:
+                        log.info("Phase 1 config updated");
+                        break;
+                    case CONFIG_REMOVED:
+                        log.info("Phase 1 Config removed");
+                        break;
+                    default:
+                        log.info("Phase 1 config, unexpected action "  + event.type());
+                }
+                //Update the flows whatever happens
+                elements.update((Phase1AppConfig) event.config().get());
+            }
+
+        }
+
+
     }
 
 

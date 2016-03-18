@@ -18,7 +18,6 @@ package org.onosproject.provider.qualifiedhost;
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
-import org.apache.felix.scr.annotations.Modified;
 import org.apache.felix.scr.annotations.Property;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
@@ -66,7 +65,6 @@ import org.onosproject.net.host.HostProviderRegistry;
 import org.onosproject.net.host.HostProviderService;
 import org.onosproject.net.host.HostService;
 import org.onosproject.net.packet.PacketContext;
-import org.onosproject.net.packet.PacketPriority;
 import org.onosproject.net.packet.PacketProcessor;
 import org.onosproject.net.packet.PacketService;
 import org.onosproject.net.provider.AbstractProvider;
@@ -178,7 +176,11 @@ public class QualifiedHostLocationProvider extends AbstractProvider implements H
         netCfgService.registerConfigFactory(cfgAppFactory);
         netCfgService.addListener(netCfgListener);
 
-        modified(context);
+        try {
+            netCfgListener.applyConfig(null);
+        } catch (Exception e) {
+            log.warn("Unable to start the intercepts, config probably not present yet", e);
+        }
 
         log.info("Started with Application ID {}", appId.id());
     }
@@ -188,72 +190,21 @@ public class QualifiedHostLocationProvider extends AbstractProvider implements H
         cfgService.unregisterProperties(getClass(), false);
         netCfgService.unregisterConfigFactory(cfgAppFactory);
 
-        withdrawIntercepts();
+
 
         providerRegistry.unregister(this);
         packetService.removeProcessor(processor);
         deviceService.removeListener(deviceListener);
         eventHandler.shutdown();
         providerService = null;
+
+        netCfgListener.removeAllFlows();
+
+        netCfgService.unregisterConfigFactory(cfgAppFactory);
+        netCfgService.removeListener(netCfgListener);
         log.info("Stopped");
     }
 
-    @Modified
-    public void modified(ComponentContext context) {
-        readComponentConfiguration(context);
-
-        if (requestInterceptsEnabled) {
-            requestIntercepts();
-        } else {
-            withdrawIntercepts();
-        }
-    }
-
-    /**
-     * Request packet intercepts.
-     */
-    private void requestIntercepts() {
-        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
-        selector.matchEthType(Ethernet.TYPE_ARP);
-        packetService.requestPackets(selector.build(), PacketPriority.CONTROL, appId);
-
-        // IPv6 Neighbor Solicitation packet.
-        selector.matchEthType(Ethernet.TYPE_IPV6);
-        selector.matchIPProtocol(IPv6.PROTOCOL_ICMP6);
-        selector.matchIcmpv6Type(ICMP6.NEIGHBOR_SOLICITATION);
-        if (ipv6NeighborDiscovery) {
-            packetService.requestPackets(selector.build(), PacketPriority.CONTROL, appId);
-        } else {
-            packetService.cancelPackets(selector.build(), PacketPriority.CONTROL, appId);
-        }
-
-        // IPv6 Neighbor Advertisement packet.
-        selector.matchIcmpv6Type(ICMP6.NEIGHBOR_ADVERTISEMENT);
-        if (ipv6NeighborDiscovery) {
-            packetService.requestPackets(selector.build(), PacketPriority.CONTROL, appId);
-        } else {
-            packetService.cancelPackets(selector.build(), PacketPriority.CONTROL, appId);
-        }
-    }
-
-    /**
-     * Withdraw packet intercepts.
-     */
-    private void withdrawIntercepts() {
-        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
-        selector.matchEthType(Ethernet.TYPE_ARP);
-        packetService.cancelPackets(selector.build(), PacketPriority.CONTROL, appId);
-
-        // IPv6 Neighbor Solicitation packet.
-        selector.matchEthType(Ethernet.TYPE_IPV6);
-        selector.matchIPProtocol(IPv6.PROTOCOL_ICMP6);
-        selector.matchIcmpv6Type(ICMP6.NEIGHBOR_SOLICITATION);
-        packetService.cancelPackets(selector.build(), PacketPriority.CONTROL, appId);
-
-        // IPv6 Neighbor Advertisement packet.
-        selector.matchIcmpv6Type(ICMP6.NEIGHBOR_ADVERTISEMENT);
-        packetService.cancelPackets(selector.build(), PacketPriority.CONTROL, appId);
-    }
 
     /**
      * Extracts properties from the component configuration context.
@@ -520,9 +471,13 @@ public class QualifiedHostLocationProvider extends AbstractProvider implements H
         /**
          * Reads network config and initializes related data structure accordingly.
          */
-        public void applyConfig() {
+        public void applyConfig(QualifiedHostProviderConfig config) {
 
-            QualifiedHostProviderConfig config = netCfgService.getConfig(appId, QualifiedHostProviderConfig.class);
+            if (config == null) {
+                //config not coming from an event, try to read it
+                config = netCfgService.getConfig(appId, QualifiedHostProviderConfig.class);
+            }
+
             List<QualifiedHostProviderConfig.SwitchConfig> switchConfigs = config.switchConfigs();
             //Copy of what is already setup
 
@@ -605,11 +560,11 @@ public class QualifiedHostLocationProvider extends AbstractProvider implements H
                 switch (event.type()) {
                     case CONFIG_ADDED:
                         log.info("Qualified Host config added");
-                        applyConfig();
+                        applyConfig((QualifiedHostProviderConfig) event.config().get());
                         break;
                     case CONFIG_UPDATED:
                         log.info("Qualified Host config updated.");
-                        applyConfig();
+                        applyConfig((QualifiedHostProviderConfig) event.config().get());
                         break;
                     case CONFIG_REMOVED:
                         log.info("Qualified Host config removed.");
