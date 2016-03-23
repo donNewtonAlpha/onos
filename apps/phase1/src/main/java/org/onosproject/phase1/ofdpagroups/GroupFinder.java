@@ -13,6 +13,8 @@ import org.onosproject.net.group.GroupKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
+
 /**
  * Created by nick on 2/9/16.
  */
@@ -25,6 +27,7 @@ public class GroupFinder {
     public static void initiate(ApplicationId appId, GroupService groupService){
         GroupFinder.groupService = groupService;
         L2InterfaceGroup.initiate(appId, groupService);
+        L2MulticastGroup.initiate(appId, groupService);
         L3UnicastGroup.initiate(appId, groupService);
     }
 
@@ -54,6 +57,23 @@ public class GroupFinder {
 
             return newL2InterfaceGroupId;
 
+        }
+
+    }
+
+    public static GroupId getL2Multicast(List<PortNumber> ports, VlanId vlanId, DeviceId deviceId) {
+
+        GroupKey key = L2MulticastGroup.key(vlanId);
+
+        Group matchingGroup = groupService.getGroup(deviceId, key);
+
+        if(matchingGroup != null) {
+            return matchingGroup.id();
+        } else {
+            //Create the group and add it to the list
+            GroupId newL2MulticastGroupId = L2MulticastGroup.create(ports, vlanId, deviceId);
+
+            return newL2MulticastGroupId;
         }
 
     }

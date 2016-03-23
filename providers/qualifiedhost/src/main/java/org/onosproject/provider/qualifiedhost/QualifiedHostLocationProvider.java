@@ -154,7 +154,7 @@ public class QualifiedHostLocationProvider extends AbstractProvider implements H
             };
 
     private final InternalConfigListener netCfgListener =
-            new InternalConfigListener(flowRuleService);
+            new InternalConfigListener();
 
     /**
      * Creates an OpenFlow host provider.
@@ -460,11 +460,10 @@ public class QualifiedHostLocationProvider extends AbstractProvider implements H
 
 
         HashMap<DeviceId, HashMap<VlanId, FlowRule>>  arpVlanRules;
-        FlowRuleService flowRuleService;
 
-        public InternalConfigListener(FlowRuleService flowRuleService) {
+
+        public InternalConfigListener() {
             arpVlanRules = new HashMap<>();
-            this.flowRuleService = flowRuleService;
         }
 
 
@@ -476,6 +475,10 @@ public class QualifiedHostLocationProvider extends AbstractProvider implements H
             if (config == null) {
                 //config not coming from an event, try to read it
                 config = netCfgService.getConfig(appId, QualifiedHostProviderConfig.class);
+                if (config == null) {
+                    log.info("No configs could be found");
+                    return;
+                }
             }
 
             List<QualifiedHostProviderConfig.SwitchConfig> switchConfigs = config.switchConfigs();
@@ -570,6 +573,10 @@ public class QualifiedHostLocationProvider extends AbstractProvider implements H
                         log.info("Qualified Host config removed.");
                         removeAllFlows();
                         break;
+                    case CONFIG_REGISTERED:
+                        log.info("Qualified Host config registered");
+                        QualifiedHostProviderConfig registeredConfig = netCfgService.getConfig(appId, QualifiedHostProviderConfig.class);
+                        applyConfig(registeredConfig);
                     default:
                         break;
                 }

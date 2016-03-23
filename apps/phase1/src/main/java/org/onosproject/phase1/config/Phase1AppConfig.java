@@ -31,6 +31,7 @@ public class Phase1AppConfig extends Config<ApplicationId>{
     private static final String MULTICAST_VLAN = "multicastVlan";
     private static final String INTERNAL_INTERNET_VLAN = "internalInternetVlan";
     private static final String VLAN_CROSSCONNECTS = "vlanCrossconnects";
+    private static final String INTERNAL_WAN_PORTS = "internalWanPorts";
 
     private static final String VLAN = "vlan";
     private static final String PORTS = "ports";
@@ -39,13 +40,14 @@ public class Phase1AppConfig extends Config<ApplicationId>{
     public boolean isValid() {
         return hasOnlyFields(GATEWAY_IP,PRIMARY_UPLINK_FABRIC_SIDE_IP, SECONDARY_UPLINK_FABRIC_SIDE_IP,
                 PRIMARY_UPLINK_UPLINK_SIDE_IP, SECONDARY_UPLINK_UPLINK_SIDE_IP, MULTICAST_VLAN,
-                INTERNAL_INTERNET_VLAN, PRIMARY_UPLINK_PORT, SECONDARY_UPLINK_PORT, VLAN_CROSSCONNECTS)&&
+                INTERNAL_INTERNET_VLAN, PRIMARY_UPLINK_PORT, SECONDARY_UPLINK_PORT, VLAN_CROSSCONNECTS, INTERNAL_WAN_PORTS)&&
                 gatewayIp() != null &&
                 primaryFabricIp() != null &&
                 primaryUplinkIp() != null &&
                 internalInternetVlan() != null &&
                 primaryUplinkPort() != null &&
-                secondaryUplinkPort() != null;
+                secondaryUplinkPort() != null &&
+                !internalWanPorts().isEmpty();
     }
 
     public Ip4Address gatewayIp(){
@@ -116,7 +118,7 @@ public class Phase1AppConfig extends Config<ApplicationId>{
     }
 
     public VlanId internalInternetVlan(){
-        int vlan = get(MULTICAST_VLAN, -2);
+        int vlan = get(INTERNAL_INTERNET_VLAN, -2);
 
         if(vlan == -1){
             return VlanId.NONE;
@@ -207,12 +209,35 @@ public class Phase1AppConfig extends Config<ApplicationId>{
         return vlanCrossconnects;
     }
 
+    public List<PortNumber> internalWanPorts(){
+
+        List<PortNumber> ports = new LinkedList<>();
+        ArrayNode jsonArray = (ArrayNode) object.path(INTERNAL_WAN_PORTS);
+
+        for(JsonNode portNode : jsonArray) {
+            try {
+                int portNumber = portNode.asInt(-2);
+                if(portNumber != -2){
+                    PortNumber port = PortNumber.portNumber(portNumber);
+                    ports.add(port);
+                } else {
+                    log.warn("Invalid port number");
+                }
+            } catch (Exception e){
+                log.error("Parsing exception, port numbers", e);
+            }
+        }
+
+        return ports;
+    }
+
 
 
     public String toString(){
 
         StringBuilder builder = new StringBuilder();
-        builder.append("gateway Ip : "); builder.append(gatewayIp());
+        builder.append("Config is valid : "); builder.append(isValid());
+        builder.append("; gateway Ip : "); builder.append(gatewayIp());
         builder.append(", primary uplink ip : "); builder.append(primaryUplinkIp());
         builder.append(" , primary fabric ip : "); builder.append(primaryFabricIp());
         builder.append(", secondary uplink ip : "); builder.append(secondaryUplinkIp());
@@ -226,7 +251,12 @@ public class Phase1AppConfig extends Config<ApplicationId>{
             builder.append(vlanCrossconnect);
             builder.append("; ");
         }
-
+        builder.append(", internalWanPorts : [");
+        for(PortNumber port : internalWanPorts()) {
+            builder.append(port);
+            builder.append(", ");
+        }
+        builder.append("]");
         return builder.toString();
     }
 

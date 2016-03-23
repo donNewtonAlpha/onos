@@ -13,6 +13,7 @@ import org.onosproject.net.group.*;
 import org.onosproject.phase1.config.Phase1AppConfig;
 import org.onosproject.phase1.config.VlanCrossconnect;
 import org.onosproject.phase1.ofdpagroups.GroupFinder;
+import org.onosproject.phase1.ofdpagroups.L2MulticastGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,11 +32,9 @@ public class NetworkElements{
 
 
     static final int ACL_TABLE = 60;
-    static final int PORT_TABLE = 0;
     static final int VLAN_TABLE = 10;
     static final int TMAC_TABLE = 20;
     static final int UNICAST_ROUTING_TABLE = 30;
-    static final int VLAN1_TABLE = 11;
     static final int BRIDGING_TABLE = 50;
 
 
@@ -49,23 +48,29 @@ public class NetworkElements{
     static Ip4Address primaryUplinkIp = null;
     static VlanId internalInternetVlan = null;
     static List<VlanCrossconnect> vlanCrossconnects = new LinkedList<>();
+    static List<PortNumber> internalWanPorts = null;
+
 
 
 
 
     private FlowRuleService flowRuleService;
     private ApplicationId appId;
+    private GroupService groupService;
     private DeviceId deviceId;
-    private MacAddress torMac;
+    MacAddress torMac;
     private MacAddress primaryUplinkMac;
     private Phase1Component phase1;
 
     private List<NetworkElement> elements;
-    private GroupId serverFloodGroup = null;
+    private FlowRule floodRule = null;
 
-    public NetworkElements(FlowRuleService flowRuleService, ApplicationId appId, DeviceId deviceId, MacAddress mac, Phase1Component component){
+    private long timer = 0;
+
+    public NetworkElements(FlowRuleService flowRuleService, GroupService groupService, ApplicationId appId, DeviceId deviceId, MacAddress mac, Phase1Component component){
         elements = new LinkedList<>();
         this.flowRuleService = flowRuleService;
+        this.groupService = groupService;
         this.appId = appId;
         this.deviceId = deviceId;
         this.torMac = mac;
@@ -78,37 +83,15 @@ public class NetworkElements{
         //TODO: update  flows and flood group
     }
 
-    private List<Olt> getOlts(){
 
-        LinkedList<Olt> olts = new LinkedList<>();
-        for(NetworkElement element : elements){
-            if(element instanceof Olt){
-                olts.add((Olt)element);
-            }
-        }
-        return olts;
 
-    }
-
-    private List<VsgServer> getVsgServers(){
-
-        LinkedList<VsgServer> servers = new LinkedList<>();
-        for(NetworkElement element : elements){
-            if(element instanceof VsgServer){
-                servers.add((VsgServer) element);
-            }
-        }
-
-        return servers;
-    }
-
-    private void removeFlows(List<FlowRule> flows){
+    public void removeFlows(List<FlowRule> flows){
         for(FlowRule flow : flows){
             flowRuleService.removeFlowRules(flow);
         }
     }
 
-    private void addFlows(List<FlowRule> flows){
+    public void addFlows(List<FlowRule> flows){
         for(FlowRule flow : flows){
             flowRuleService.applyFlowRules(flow);
         }
@@ -116,22 +99,24 @@ public class NetworkElements{
 
     public synchronized void update(Phase1AppConfig config){
 
+        log.info("Updating flows based on config");
+
         if(config == null){
             log.info("No config yet");
+            return;
         }
         if(!config.isValid()){
             log.info("Config not valid");
+            return;
         }
 
-
-        List<FlowRule> flowsToRemove = new LinkedList<>();
-        List<FlowRule> flowsToAdd = new LinkedList<>();
 
         ////////// Vlan crossconnects
         //Find the difference between the Vlan crossconnects and the config
         List<VlanCrossconnect> vlanCrossconnectsToAdd = new LinkedList<>(config.vlanCrossconnects());
         List<VlanCrossconnect> vlanCrossconnectsToRemove = new LinkedList<>(config.vlanCrossconnects());
         for(VlanCrossconnect vcc : vlanCrossconnects){
+            log.info("Current VlanCrossConnect : " + vcc.toString());
             if(!vlanCrossconnectsToAdd.remove(vcc)){
                 vlanCrossconnectsToRemove.add(vcc);
             }
@@ -141,13 +126,14 @@ public class NetworkElements{
 
 
         for(VlanCrossconnect vcc : vlanCrossconnectsToRemove){
-            flowsToRemove.addAll(vlanCrossConnectFlows(vcc, deviceId));
+            log.info("VlanCrossconnect to add : " + vcc.toString());
+            removeFlows(vlanCrossConnectFlows(vcc, deviceId));
         }
         for(VlanCrossconnect vcc : vlanCrossconnectsToAdd){
-            flowsToAdd.addAll(vlanCrossConnectFlows(vcc, deviceId));
+            log.info("VlanCrossconnect to remove : " + vcc.toString());
+            addFlows(vlanCrossConnectFlows(vcc, deviceId));
         }
-        removeFlows(flowsToRemove);
-        addFlows(flowsToAdd);
+
 
         //Update with the latest config
         vlanCrossconnects = config.vlanCrossconnects();
@@ -175,23 +161,6 @@ public class NetworkElements{
         }
         /////////////////////
 
-        ///////////////Uplink Port
-        if(!(primaryInternet != null && primaryInternet.equals(config.primaryUplinkPort()))){
-            if(!redetectUplinkMac) {
-                redetectUplinkMac = true;
-                if(primaryInternet != null) {
-                    removeFlows(uplinkFlows(deviceId, primaryInternet, primaryUplinkMac));
-                }
-            }
-            primaryInternet = config.primaryUplinkPort();
-
-        }
-
-        if(redetectUplinkMac){
-            phase1.requestUplinkMac(primaryUplinkIp, primaryInternet);
-        }
-        //////////////////////
-
         //////////////// Internal Internet Vlan
         if(!(internalInternetVlan != null && internalInternetVlan.equals(config.internalInternetVlan()))){
             //New or changed
@@ -203,31 +172,48 @@ public class NetworkElements{
             internalInternetVlan = config.internalInternetVlan();
 
         }
+        ///////////////////
 
-    }
 
-
-    private void connectOltToServer(Olt olt, VsgServer server, DeviceId device){
-
-        List<VlanId> oltVlans = olt.getVlanHandled();
-        List<VlanId> serverVlans = server.getVlanHandled();
-
-        for(VlanId oltVlan : oltVlans){
-            for(VlanId serverVlan : serverVlans){
-
-                if(oltVlan.equals(serverVlan)){
-                    //They need to be connected
-                    twoWayVlanFlow(oltVlan,olt.getPortNumber(), server.getPortNumber(), device, 41000, false);
-                    log.debug("Connecting vlan " + oltVlan +
-                            " from " + olt.getPortNumber() +
-                            " to " + server.getPortNumber() +
-                            " on device : " + device);
+        boolean packetProcessorToReset = false;
+        ///////////////Uplink Port
+        if(!(primaryInternet != null && primaryInternet.equals(config.primaryUplinkPort()))){
+            if(!redetectUplinkMac) {
+                redetectUplinkMac = true;
+                if(primaryInternet != null) {
+                    removeFlows(uplinkFlows(deviceId, primaryInternet, primaryUplinkMac));
                 }
-
             }
+            primaryInternet = config.primaryUplinkPort();
+            packetProcessorToReset = true;
+
         }
 
+        ////////////////Internal Wan ports
+        if(!(internalInternetVlan != null && internalInternetVlan.equals(config.internalWanPorts()))){
+            //New or changed
+
+            internalWanPorts = config.internalWanPorts();
+            updateFlooding(internalWanPorts, internalInternetVlan, deviceId);
+            log.info("Flooding Rule updated");
+            packetProcessorToReset = true;
+        }
+        ///////////////
+
+        if(packetProcessorToReset) {
+            phase1.resetPacketProcessor(internalWanPorts, primaryInternet);
+            log.info("Phase 1 Packet processor created/reset");
+        }
+
+        if(redetectUplinkMac){
+            phase1.requestUplinkMac(primaryUplinkIp, primaryInternet);
+        }
+        //////////////////////
+
+
+
     }
+
 
     private List<FlowRule> vlanCrossConnectFlows(VlanCrossconnect vlanCrossconnect, DeviceId deviceId){
         PortNumber port1 = vlanCrossconnect.getPorts().get(0);
@@ -418,7 +404,7 @@ public class NetworkElements{
         flowRuleService.applyFlowRules(rule.build());
     }
 
-    private FlowRule ipFlow(Ip4Prefix ipDst, PortNumber outPort, int IncomingVlanId, MacAddress thisHopMac, MacAddress nextHopMac, boolean popVlan, int priority){
+    public FlowRule ipFlow(DeviceId deviceId, Ip4Prefix ipDst, PortNumber outPort, VlanId IncomingVlanId, MacAddress thisHopMac, MacAddress nextHopMac, boolean popVlan, int priority){
 
         //Unicast routing flow table
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
@@ -428,7 +414,7 @@ public class NetworkElements{
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
         treatment.transition(ACL_TABLE);
         treatment.deferred();
-        treatment.group(GroupFinder.getL3Interface((int)outPort.toLong(), IncomingVlanId,thisHopMac, nextHopMac, ipDst, popVlan, deviceId));
+        treatment.group(GroupFinder.getL3Interface((int)outPort.toLong(), IncomingVlanId.toShort(),thisHopMac, nextHopMac, ipDst, popVlan, deviceId));
 
 
 
@@ -450,19 +436,82 @@ public class NetworkElements{
 
         List<FlowRule> flows = new LinkedList<>();
 
-        flows.add(ipFlow(Ip4Prefix.valueOf("0.0.0.0/1"), uplinkPort, internalInternetVlan.toShort(), torMac, uplinkMac, true, 5));
-        flows.add(ipFlow(Ip4Prefix.valueOf("128.0.0.0/1"), uplinkPort, internalInternetVlan.toShort(), torMac, uplinkMac, true, 5));
+        flows.add(ipFlow(deviceId, Ip4Prefix.valueOf("0.0.0.0/1"), uplinkPort, internalInternetVlan, torMac, uplinkMac, true, 5));
+        flows.add(ipFlow(deviceId, Ip4Prefix.valueOf("128.0.0.0/1"), uplinkPort, internalInternetVlan, torMac, uplinkMac, true, 5));
 
         return flows;
     }
 
 
 
-    public void setMacUplink(MacAddress mac){
+    public synchronized void setMacUplink(MacAddress mac){
 
         primaryUplinkMac = mac;
-        addFlows(uplinkFlows(deviceId, primaryInternet, primaryUplinkMac ));
+        if(System.currentTimeMillis() - timer > 1000) {
+            timer = System.currentTimeMillis();
+            addFlows(uplinkFlows(deviceId, primaryInternet, primaryUplinkMac));
+        }
     }
+
+    private void updateFlooding(List<PortNumber> ports, VlanId vlanId, DeviceId deviceId) {
+
+        //TODO: update group instead of removing and adding back the flow
+        if(floodRule != null){
+            //Remove it if it exist
+            flowRuleService.removeFlowRules(floodRule);
+        }
+
+        GroupKey oldKey = L2MulticastGroup.key(vlanId);
+        Group floodGroup = groupService.getGroup(deviceId, oldKey);
+        if(floodGroup != null) {
+            //Remove it if it exists
+            groupService.removeGroup(deviceId, oldKey, appId);
+        }
+
+        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+        selector.matchEthDst(MacAddress.BROADCAST);
+        selector.extension(new OfdpaMatchVlanVid(vlanId), deviceId);
+
+        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+        treatment.group(GroupFinder.getL2Multicast(ports, vlanId, deviceId));
+        treatment.transition(ACL_TABLE);
+
+        FlowRule.Builder rule = DefaultFlowRule.builder();
+        rule.withSelector(selector.build());
+        rule.withTreatment(treatment.build());
+        rule.withPriority(2000);
+        rule.fromApp(appId);
+        rule.forTable(BRIDGING_TABLE);
+        rule.makePermanent();
+        rule.forDevice(deviceId);
+
+        flowRuleService.applyFlowRules(rule.build());
+
+    }
+
+
+
+    /*    private void connectOltToServer(Olt olt, VsgServer server, DeviceId device){
+
+        List<VlanId> oltVlans = olt.getVlanHandled();
+        List<VlanId> serverVlans = server.getVlanHandled();
+
+        for(VlanId oltVlan : oltVlans){
+            for(VlanId serverVlan : serverVlans){
+
+                if(oltVlan.equals(serverVlan)){
+                    //They need to be connected
+                    twoWayVlanFlow(oltVlan,olt.getPortNumber(), server.getPortNumber(), device, 41000, false);
+                    log.debug("Connecting vlan " + oltVlan +
+                            " from " + olt.getPortNumber() +
+                            " to " + server.getPortNumber() +
+                            " on device : " + device);
+                }
+
+            }
+        }
+
+    }*/
 
 
     /*    private void lanFlows(DeviceId deviceId){
@@ -563,44 +612,33 @@ public class NetworkElements{
 
     }*/
 
-     /*private void updateFloodGroup(DeviceId deviceId){
-
-        Integer floodGroupId =  ((3 << 28) | ((internalInternetVlan.toShort()) << 16));
-        final GroupKey floodGroupkey = new DefaultGroupKey(ByteBuffer.allocate(4).putInt(floodGroupId).array());
-
-        if(serverFloodGroup != null){
-            groupService.removeGroup(deviceId, floodGroupkey, appId);
-        }
 
 
-        List<GroupBucket> floodBuckets = new LinkedList<>();
+    /*private List<Olt> getOlts(){
 
+        LinkedList<Olt> olts = new LinkedList<>();
         for(NetworkElement element : elements){
+            if(element instanceof Olt){
+                olts.add((Olt)element);
+            }
+        }
+        return olts;
 
-            if(element instanceof VsgServer || element instanceof QuaggaInstance) {
+    }
 
-                GroupBucket floodBucket = DefaultGroupBucket.createAllGroupBucket(DefaultTrafficTreatment.builder().group(GroupFinder.getL2Interface(element.getPortNumber(), internalInternetVlan, deviceId )).build());
-                floodBuckets.add(floodBucket);
-                vlanTableFlows(element.getPortNumber(), internalInternetVlan, deviceId);
+    private List<VsgServer> getVsgServers(){
+
+        LinkedList<VsgServer> servers = new LinkedList<>();
+        for(NetworkElement element : elements){
+            if(element instanceof VsgServer){
+                servers.add((VsgServer) element);
             }
         }
 
-        GroupDescription floodGroupDescription = new DefaultGroupDescription(deviceId,
-                GroupDescription.Type.ALL,
-                new GroupBuckets(floodBuckets),
-                floodGroupkey,
-                floodGroupId,
-                appId);
-
-        groupService.addGroup(floodGroupDescription);
-
-        serverFloodGroup = groupService.getGroup(deviceId, floodGroupkey).id();
-
+        return servers;
     }
+
+
 */
-
-
-
-
 
 }

@@ -103,7 +103,7 @@ public class Phase1Component{
 
 
         ///Elements
-        elements = new NetworkElements(flowRuleService, appId, torId, torMac, this);
+        elements = new NetworkElements(flowRuleService, groupService, appId, torId, torMac, this);
         //ToR as a router flow
         elements.tMacTableFlowUnicastRouting(torMac, 10);
 
@@ -120,15 +120,6 @@ public class Phase1Component{
         hostService.addListener(hostListener);
         ////////////////
 
-        //Setup packet processor and flows to intercept the desired ARP
-        //TODO : change this to config or remove it if already taken care of by qualifiedhost provider
-        List<PortNumber> vsgServerPorts = new LinkedList<>();
-        vsgServerPorts.add(PortNumber.portNumber(3));
-        processor = new Phase1PacketProcessor(vsgServerPorts, NetworkElements.primaryInternet);
-
-        packetService.addProcessor(processor, 2);
-
-        log.debug("processor created and added");
 
 
 
@@ -185,9 +176,16 @@ public class Phase1Component{
     @Deactivate
     protected void deactivate() {
 
+        if(processor != null) {
+            processor.destroy();
+            packetService.removeProcessor(processor);
+        }
+
         flowRuleService.removeFlowRulesById(appId);
 
         cfgService.unregisterConfigFactory(cfgAppFactory);
+        cfgService.removeListener(cfgListener);
+
 
         Iterable<Group> appGroups = groupService.getGroups(torId, appId);
         for(Group group : appGroups) {
@@ -236,6 +234,23 @@ public class Phase1Component{
         }
     }
 
+    public void resetPacketProcessor(List<PortNumber> internalWanPorts, PortNumber uplinkPort){
+
+        //Setup packet processor and flows to intercept the desired ARP
+
+        //Remove old processor if it exists
+        if(processor != null) {
+            processor.destroy();
+            packetService.removeProcessor(processor);
+        }
+        //create and register new one
+        processor = new Phase1PacketProcessor(internalWanPorts, uplinkPort);
+        packetService.addProcessor(processor, 2);
+
+        log.debug("processor created and added");
+
+    }
+
 
     private class Phase1PacketProcessor implements PacketProcessor {
 
@@ -246,8 +261,11 @@ public class Phase1Component{
             this.vsgServerPorts = vsgServerPorts;
             this.uplinkPort = uplinkPort;
 
+            elements.addFlows(arpIntercepts());
+        }
 
-            arpIntercepts(this.vsgServerPorts);
+        public void destroy(){
+            elements.removeFlows(arpIntercepts());
         }
 
 
@@ -285,7 +303,9 @@ public class Phase1Component{
             }
         }
 
-        private void arpIntercepts(List<PortNumber> ports){
+        private List<FlowRule> arpIntercepts(){
+
+            List<FlowRule> rules = new LinkedList<>();
 
             //////////Intercept on the internet uplink port
             TrafficSelector.Builder uplinkSelector = DefaultTrafficSelector.builder();
@@ -304,13 +324,13 @@ public class Phase1Component{
             uplinkArpRule.makePermanent();
             uplinkArpRule.forDevice(torId);
 
-            flowRuleService.applyFlowRules(uplinkArpRule.build());
+            rules.add(uplinkArpRule.build());
 
             ///////////
 
             /////////Intercept on the Vsg servers ports (to use the TOR as the gateway
 
-            for(PortNumber port : ports) {
+            for(PortNumber port : this.vsgServerPorts) {
 
                 TrafficSelector.Builder vsgPortSelector = DefaultTrafficSelector.builder();
                 vsgPortSelector.matchInPort(port);
@@ -325,10 +345,11 @@ public class Phase1Component{
                 vsgArpRule.makePermanent();
                 vsgArpRule.forDevice(torId);
 
-                flowRuleService.applyFlowRules(vsgArpRule.build());
+                rules.add(vsgArpRule.build());
 
             }
 
+            return rules;
 
         }
 
@@ -489,6 +510,20 @@ public class Phase1Component{
 
             //L2 flow to each known host
             elements.bridgingTableFlow(port, vlanId, mac, deviceId);
+
+            //L3 flow to host
+            for(IpAddress ip : host.ipAddresses()) {
+                if (ip instanceof Ip4Address) {
+                    try {
+                        Ip4Prefix ipPrefix = (Ip4Prefix) ip.toIpPrefix();
+                        FlowRule l3Rule = elements.ipFlow(deviceId, ipPrefix, port, NetworkElements.internalInternetVlan,
+                                elements.torMac, mac, false, 5000);
+                        flowRuleService.applyFlowRules(l3Rule);
+                    } catch (Exception e) {
+                    log.error("Exception while adding L3 flow", e);
+                    }
+                }
+            }
         }
 
         private  void removeFlow(Host host){
@@ -500,6 +535,20 @@ public class Phase1Component{
 
             //Remove L2 flow to each known host
             elements.removeBridgingTableFlow(port, vlanId, mac, deviceId);
+
+            //Remove L3 flow to host
+            for(IpAddress ip : host.ipAddresses()) {
+                if (ip instanceof Ip4Address) {
+                    try {
+                        Ip4Prefix ipPrefix = (Ip4Prefix) ip.toIpPrefix();
+                        FlowRule l3Rule = elements.ipFlow(deviceId, ipPrefix, port, NetworkElements.internalInternetVlan,
+                                elements.torMac, mac, false, 5000);
+                        flowRuleService.removeFlowRules(l3Rule);
+                    } catch (Exception e) {
+                        log.error("Exception while adding L3 flow", e);
+                    }
+                }
+            }
         }
 
         @Override
@@ -548,7 +597,15 @@ public class Phase1Component{
                         break;
                     case CONFIG_REMOVED:
                         log.info("Phase 1 Config removed");
-                        break;
+                        //Clear flows and groups
+                        flowRuleService.removeFlowRulesById(appId);
+
+                        Iterable<Group> appGroups = groupService.getGroups(torId, appId);
+                        for(Group group : appGroups) {
+                            groupService.removeGroup(group.deviceId(), group.appCookie(), group.appId());
+                        }
+
+                        return;
                     default:
                         log.info("Phase 1 config, unexpected action "  + event.type());
                 }
