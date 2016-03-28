@@ -16,10 +16,15 @@
 
 package org.onosproject.yangutils.parser.impl.listeners;
 
+import org.onosproject.yangutils.datamodel.YangCase;
 import org.onosproject.yangutils.datamodel.YangContainer;
 import org.onosproject.yangutils.datamodel.YangList;
 import org.onosproject.yangutils.datamodel.YangModule;
 import org.onosproject.yangutils.datamodel.YangNode;
+import org.onosproject.yangutils.datamodel.YangNotification;
+import org.onosproject.yangutils.datamodel.YangInput;
+import org.onosproject.yangutils.datamodel.YangOutput;
+import org.onosproject.yangutils.datamodel.YangAugment;
 import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
 import org.onosproject.yangutils.parser.Parsable;
 import org.onosproject.yangutils.parser.antlrgencode.GeneratedYangParser;
@@ -27,7 +32,8 @@ import org.onosproject.yangutils.parser.exceptions.ParserException;
 import org.onosproject.yangutils.parser.impl.TreeWalkListener;
 import org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation;
 
-import static org.onosproject.yangutils.parser.impl.parserutils.ListenerUtil.getValidIdentifier;
+import static org.onosproject.yangutils.datamodel.utils.GeneratedLanguage.JAVA_GENERATION;
+import static org.onosproject.yangutils.datamodel.utils.YangDataModelFactory.getYangContainerNode;
 import static org.onosproject.yangutils.parser.impl.parserutils.ListenerCollisionDetector.detectCollidingChildUtil;
 import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorLocation.ENTRY;
 import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorLocation.EXIT;
@@ -37,8 +43,9 @@ import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorTyp
 import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.MISSING_CURRENT_HOLDER;
 import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.MISSING_HOLDER;
 import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.UNHANDLED_PARSED_DATA;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerUtil.getValidIdentifier;
 import static org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation.checkStackIsNotEmpty;
-import static org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation.validateCardinality;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation.validateCardinalityMaxOne;
 import static org.onosproject.yangutils.utils.YangConstructType.CONFIG_DATA;
 import static org.onosproject.yangutils.utils.YangConstructType.CONTAINER_DATA;
 import static org.onosproject.yangutils.utils.YangConstructType.DESCRIPTION_DATA;
@@ -110,7 +117,7 @@ public final class ContainerListener {
         int charPositionInLine = ctx.getStart().getCharPositionInLine();
         detectCollidingChildUtil(listener, line, charPositionInLine, identifier, CONTAINER_DATA);
 
-        YangContainer container = new YangContainer();
+        YangContainer container = getYangContainerNode(JAVA_GENERATION);
         container.setName(identifier);
 
         /*
@@ -123,14 +130,17 @@ public final class ContainerListener {
         }
 
         Parsable curData = listener.getParsedDataStack().peek();
-        if ((curData instanceof YangModule) || (curData instanceof YangContainer)
-                || (curData instanceof YangList)) {
+        if (curData instanceof YangModule || curData instanceof YangContainer
+                || curData instanceof YangList || curData instanceof YangCase
+                || curData instanceof YangNotification
+                || curData instanceof YangInput || curData instanceof YangOutput
+                || curData instanceof YangAugment) {
             YangNode curNode = (YangNode) curData;
             try {
                 curNode.addChild(container);
             } catch (DataModelException e) {
                 throw new ParserException(constructExtendedListenerErrorMessage(UNHANDLED_PARSED_DATA,
-                                CONTAINER_DATA, ctx.identifier().getText(), ENTRY, e.getMessage()));
+                        CONTAINER_DATA, ctx.identifier().getText(), ENTRY, e.getMessage()));
             }
             listener.getParsedDataStack().push(container);
         } else {
@@ -163,7 +173,7 @@ public final class ContainerListener {
             listener.getParsedDataStack().pop();
         } else {
             throw new ParserException(constructListenerErrorMessage(MISSING_CURRENT_HOLDER, CONTAINER_DATA,
-                            ctx.identifier().getText(), EXIT));
+                    ctx.identifier().getText(), EXIT));
         }
     }
 
@@ -174,11 +184,12 @@ public final class ContainerListener {
      */
     private static void validateSubStatementsCardinality(GeneratedYangParser.ContainerStatementContext ctx) {
 
-        validateCardinality(ctx.presenceStatement(), PRESENCE_DATA, CONTAINER_DATA, ctx.identifier().getText());
-        validateCardinality(ctx.configStatement(), CONFIG_DATA, CONTAINER_DATA, ctx.identifier().getText());
-        validateCardinality(ctx.descriptionStatement(), DESCRIPTION_DATA, CONTAINER_DATA, ctx.identifier().getText());
-        validateCardinality(ctx.referenceStatement(), REFERENCE_DATA, CONTAINER_DATA, ctx.identifier().getText());
-        validateCardinality(ctx.statusStatement(), STATUS_DATA, CONTAINER_DATA, ctx.identifier().getText());
+        validateCardinalityMaxOne(ctx.presenceStatement(), PRESENCE_DATA, CONTAINER_DATA, ctx.identifier().getText());
+        validateCardinalityMaxOne(ctx.configStatement(), CONFIG_DATA, CONTAINER_DATA, ctx.identifier().getText());
+        validateCardinalityMaxOne(ctx.descriptionStatement(), DESCRIPTION_DATA, CONTAINER_DATA,
+                ctx.identifier().getText());
+        validateCardinalityMaxOne(ctx.referenceStatement(), REFERENCE_DATA, CONTAINER_DATA, ctx.identifier().getText());
+        validateCardinalityMaxOne(ctx.statusStatement(), STATUS_DATA, CONTAINER_DATA, ctx.identifier().getText());
         // TODO when, grouping, typedef.
     }
 }

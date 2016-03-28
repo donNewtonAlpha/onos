@@ -16,22 +16,33 @@
 
 package org.onosproject.yangutils.translator.tojava.utils;
 
-import org.junit.Test;
-import org.onosproject.yangutils.translator.GeneratedFileType;
-import org.onosproject.yangutils.translator.tojava.GeneratedMethodTypes;
-import org.onosproject.yangutils.translator.tojava.TraversalType;
-import org.onosproject.yangutils.utils.UtilConstants;
-
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import static org.junit.Assert.assertNotNull;
+
+import org.junit.Test;
+
 import static org.hamcrest.core.Is.is;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThat;
+import static org.onosproject.yangutils.translator.tojava.GeneratedJavaFileType.BUILDER_CLASS_MASK;
+import static org.onosproject.yangutils.translator.tojava.GeneratedJavaFileType.BUILDER_INTERFACE_MASK;
+import static org.onosproject.yangutils.translator.tojava.GeneratedJavaFileType.GENERATE_TYPEDEF_CLASS;
+import static org.onosproject.yangutils.translator.tojava.GeneratedJavaFileType.IMPL_CLASS_MASK;
+import static org.onosproject.yangutils.translator.tojava.GeneratedJavaFileType.INTERFACE_MASK;
+import static org.onosproject.yangutils.translator.tojava.utils.ClassDefinitionGenerator.generateClassDefinition;
 
 /**
  * Unit tests for class definition generator for generated files.
  */
 public final class ClassDefinitionGeneratorTest {
+
+    private static final String CLASS_NAME = "TestClass";
+    private static final String INTERFACE_CLASS_DEF = "public interface TestClass {\n";
+    private static final String BULDER_INTERFACE_CLASS_DEF = "interface TestClassBuilder {\n\n";
+    private static final String BUILDER_CLASS_DEF = "public class TestClassBuilder implements "
+            + "TestClass.TestClassBuilder {\n";
+    private static final String IMPL_CLASS_DEF = "public final class TestClassImpl implements TestClass {\n";
+    private static final String TYPE_DEF_CLASS_DEF = "public final class TestClass {\n";
 
     /**
      * Unit test for private constructor.
@@ -45,7 +56,8 @@ public final class ClassDefinitionGeneratorTest {
      */
     @Test
     public void callPrivateConstructors() throws SecurityException, NoSuchMethodException, IllegalArgumentException,
-    InstantiationException, IllegalAccessException, InvocationTargetException {
+            InstantiationException, IllegalAccessException, InvocationTargetException {
+
         Class<?>[] classesToConstruct = {ClassDefinitionGenerator.class };
         for (Class<?> clazz : classesToConstruct) {
             Constructor<?> constructor = clazz.getDeclaredConstructor();
@@ -60,10 +72,8 @@ public final class ClassDefinitionGeneratorTest {
     @Test
     public void generateBuilderClassDefinitionTest() {
 
-        String builderClassDefinition = ClassDefinitionGenerator
-                .generateClassDefinition(GeneratedFileType.BUILDER_CLASS_MASK, "BuilderClass");
-        assertThat(true, is(builderClassDefinition.contains(UtilConstants.BUILDER)));
-        assertThat(true, is(builderClassDefinition.contains(UtilConstants.CLASS)));
+        String builderClassDefinition = generateClassDefinition(BUILDER_CLASS_MASK, CLASS_NAME);
+        assertThat(true, is(builderClassDefinition.equals(BUILDER_CLASS_DEF)));
     }
 
     /**
@@ -72,9 +82,8 @@ public final class ClassDefinitionGeneratorTest {
     @Test
     public void generateBuilderInterfaceDefinitionTest() {
 
-        String builderInterfaceDefinition = ClassDefinitionGenerator
-                .generateClassDefinition(GeneratedFileType.BUILDER_INTERFACE_MASK, "BuilderInterfaceClass");
-        assertThat(true, is(builderInterfaceDefinition.contains(UtilConstants.BUILDER)));
+        String builderInterfaceDefinition = generateClassDefinition(BUILDER_INTERFACE_MASK, CLASS_NAME);
+        assertThat(true, is(builderInterfaceDefinition.equals(BULDER_INTERFACE_CLASS_DEF)));
     }
 
     /**
@@ -83,9 +92,8 @@ public final class ClassDefinitionGeneratorTest {
     @Test
     public void generateImplDefinitionTest() {
 
-        String implDefinition = ClassDefinitionGenerator.generateClassDefinition(GeneratedFileType.IMPL_CLASS_MASK,
-                "ImplClass");
-        assertThat(true, is(implDefinition.contains(UtilConstants.IMPL)));
+        String implDefinition = generateClassDefinition(IMPL_CLASS_MASK, CLASS_NAME);
+        assertThat(true, is(implDefinition.equals(IMPL_CLASS_DEF)));
     }
 
     /**
@@ -94,9 +102,8 @@ public final class ClassDefinitionGeneratorTest {
     @Test
     public void generateinterfaceDefinitionTest() {
 
-        String interfaceDefinition = ClassDefinitionGenerator.generateClassDefinition(GeneratedFileType.INTERFACE_MASK,
-                "InterfaceClass");
-        assertThat(true, is(interfaceDefinition.contains(UtilConstants.INTERFACE)));
+        String interfaceDefinition = generateClassDefinition(INTERFACE_MASK, CLASS_NAME);
+        assertThat(true, is(interfaceDefinition.equals(INTERFACE_CLASS_DEF)));
     }
 
     /**
@@ -105,19 +112,7 @@ public final class ClassDefinitionGeneratorTest {
     @Test
     public void generateTypeDefTest() {
 
-        String typeDef = ClassDefinitionGenerator.generateClassDefinition(GeneratedFileType.GENERATE_TYPEDEF_CLASS,
-                "invalid");
-        assertThat(true, is(typeDef.contains(UtilConstants.CLASS)));
-    }
-
-    /**
-     * Unit test for enum data types.
-     */
-    @Test
-    public void enumDataTypesTest() {
-
-        TraversalType.valueOf(TraversalType.CHILD.toString());
-        GeneratedMethodTypes.valueOf(GeneratedMethodTypes.CONSTRUCTOR.toString());
-        TempDataStoreTypes.valueOf(TempDataStoreTypes.CONSTRUCTOR.toString());
+        String typeDef = generateClassDefinition(GENERATE_TYPEDEF_CLASS, CLASS_NAME);
+        assertThat(true, is(typeDef.equals(TYPE_DEF_CLASS_DEF)));
     }
 }

@@ -15,6 +15,7 @@
  */
 package org.onosproject.ui.impl;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.eclipse.jetty.websocket.WebSocket;
 import org.eclipse.jetty.websocket.WebSocketServlet;
 import org.onlab.osgi.DefaultServiceDirectory;
@@ -69,11 +70,40 @@ public class UiWebSocketServlet extends WebSocketServlet {
         if (isStopped) {
             return null;
         }
-        UiWebSocket socket = new UiWebSocket(directory);
+
+        // FIXME: Replace this with globally shared opaque token to allow secure failover
+        String userName = request.getUserPrincipal().getName();
+        UiWebSocket socket = new UiWebSocket(directory, userName);
         synchronized (sockets) {
             sockets.add(socket);
         }
         return socket;
+    }
+
+    /**
+     * Sends the specified message to all the GUI clients.
+     *
+     * @param type    message type
+     * @param payload message payload
+     */
+    static void sendToAll(String type, ObjectNode payload) {
+        if (instance != null) {
+            instance.sockets.forEach(ws -> ws.sendMessage(type, 0, payload));
+        }
+    }
+
+    /**
+     * Sends the specified message to all the GUI clients of the specified user.
+     *
+     * @param userName user name
+     * @param type     message type
+     * @param payload  message payload
+     */
+    static void sendToUser(String userName, String type, ObjectNode payload) {
+        if (instance != null) {
+            instance.sockets.stream().filter(ws -> userName.equals(ws.userName()))
+                    .forEach(ws -> ws.sendMessage(type, 0, payload));
+        }
     }
 
     // Task for pruning web-sockets that are idle.

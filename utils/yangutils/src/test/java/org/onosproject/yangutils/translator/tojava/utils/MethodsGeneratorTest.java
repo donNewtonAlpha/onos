@@ -16,25 +16,79 @@
 
 package org.onosproject.yangutils.translator.tojava.utils;
 
-import org.junit.Test;
-import static org.hamcrest.core.Is.is;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertNotNull;
-import org.onosproject.yangutils.datamodel.YangDataTypes;
-import org.onosproject.yangutils.datamodel.YangType;
-import org.onosproject.yangutils.translator.tojava.AttributeInfo;
-import org.onosproject.yangutils.translator.tojava.ImportInfo;
-import org.onosproject.yangutils.utils.UtilConstants;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+
+import org.junit.Test;
+import org.onosproject.yangutils.datamodel.YangType;
+import org.onosproject.yangutils.translator.tojava.JavaAttributeInfo;
+import org.onosproject.yangutils.translator.tojava.JavaQualifiedTypeInfo;
+
+import static org.hamcrest.core.Is.is;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThat;
+import static org.onosproject.yangutils.datamodel.YangDataTypes.STRING;
+import static org.onosproject.yangutils.translator.tojava.utils.JavaIdentifierSyntax.getCaptialCase;
+import static org.onosproject.yangutils.translator.tojava.utils.MethodsGenerator.getBuild;
+import static org.onosproject.yangutils.translator.tojava.utils.MethodsGenerator.getBuildForInterface;
+import static org.onosproject.yangutils.translator.tojava.utils.MethodsGenerator.getCheckNotNull;
+import static org.onosproject.yangutils.translator.tojava.utils.MethodsGenerator.getConstructor;
+import static org.onosproject.yangutils.translator.tojava.utils.MethodsGenerator.getConstructorStart;
+import static org.onosproject.yangutils.translator.tojava.utils.MethodsGenerator.getEqualsMethod;
+import static org.onosproject.yangutils.translator.tojava.utils.MethodsGenerator.getGetterForClass;
+import static org.onosproject.yangutils.translator.tojava.utils.MethodsGenerator.getGetterForInterface;
+import static org.onosproject.yangutils.translator.tojava.utils.MethodsGenerator.getOfMethod;
+import static org.onosproject.yangutils.translator.tojava.utils.MethodsGenerator.getOverRideString;
+import static org.onosproject.yangutils.translator.tojava.utils.MethodsGenerator.getSetterForClass;
+import static org.onosproject.yangutils.translator.tojava.utils.MethodsGenerator.getSetterForInterface;
+import static org.onosproject.yangutils.translator.tojava.utils.MethodsGenerator.getSetterForTypeDefClass;
+import static org.onosproject.yangutils.translator.tojava.utils.MethodsGenerator.getToStringMethod;
+import static org.onosproject.yangutils.translator.tojava.utils.MethodsGenerator.getTypeDefConstructor;
+import static org.onosproject.yangutils.utils.UtilConstants.ADD_STRING;
+import static org.onosproject.yangutils.utils.UtilConstants.BUILD;
+import static org.onosproject.yangutils.utils.UtilConstants.BUILDER;
+import static org.onosproject.yangutils.utils.UtilConstants.CHECK_NOT_NULL_STRING;
+import static org.onosproject.yangutils.utils.UtilConstants.CLOSE_CURLY_BRACKET;
+import static org.onosproject.yangutils.utils.UtilConstants.CLOSE_PARENTHESIS;
+import static org.onosproject.yangutils.utils.UtilConstants.COMMA;
+import static org.onosproject.yangutils.utils.UtilConstants.EIGHT_SPACE_INDENTATION;
+import static org.onosproject.yangutils.utils.UtilConstants.EQUAL;
+import static org.onosproject.yangutils.utils.UtilConstants.EQUALS_STRING;
+import static org.onosproject.yangutils.utils.UtilConstants.FOUR_SPACE_INDENTATION;
+import static org.onosproject.yangutils.utils.UtilConstants.GET_METHOD_PREFIX;
+import static org.onosproject.yangutils.utils.UtilConstants.IMPL;
+import static org.onosproject.yangutils.utils.UtilConstants.JAVA_LANG;
+import static org.onosproject.yangutils.utils.UtilConstants.NEW;
+import static org.onosproject.yangutils.utils.UtilConstants.NEW_LINE;
+import static org.onosproject.yangutils.utils.UtilConstants.OBJECT;
+import static org.onosproject.yangutils.utils.UtilConstants.OBJECT_STRING;
+import static org.onosproject.yangutils.utils.UtilConstants.OF;
+import static org.onosproject.yangutils.utils.UtilConstants.OPEN_CURLY_BRACKET;
+import static org.onosproject.yangutils.utils.UtilConstants.OPEN_PARENTHESIS;
+import static org.onosproject.yangutils.utils.UtilConstants.OVERRIDE;
+import static org.onosproject.yangutils.utils.UtilConstants.PERIOD;
+import static org.onosproject.yangutils.utils.UtilConstants.PUBLIC;
+import static org.onosproject.yangutils.utils.UtilConstants.QUOTES;
+import static org.onosproject.yangutils.utils.UtilConstants.RETURN;
+import static org.onosproject.yangutils.utils.UtilConstants.SEMI_COLAN;
+import static org.onosproject.yangutils.utils.UtilConstants.SET_METHOD_PREFIX;
+import static org.onosproject.yangutils.utils.UtilConstants.SIXTEEN_SPACE_INDENTATION;
+import static org.onosproject.yangutils.utils.UtilConstants.SPACE;
+import static org.onosproject.yangutils.utils.UtilConstants.STATIC;
+import static org.onosproject.yangutils.utils.UtilConstants.STRING_DATA_TYPE;
+import static org.onosproject.yangutils.utils.UtilConstants.SUFFIX_S;
+import static org.onosproject.yangutils.utils.UtilConstants.THIS;
+import static org.onosproject.yangutils.utils.UtilConstants.TWELVE_SPACE_INDENTATION;
+import static org.onosproject.yangutils.utils.UtilConstants.VALUE;
+import static org.onosproject.yangutils.utils.UtilConstants.VOID;
 
 /**
  * Unit tests for generated methods from the file type.
  */
 public final class MethodsGeneratorTest {
 
-    public static AttributeInfo testAttr = new AttributeInfo();
-    public static YangType<?> attrType = new YangType<>();
+    private static final String CLASS_NAME = "testname";
+    private static final String ATTRIBUTE_NAME = "testname";
 
     /**
      * Unit test for private constructor.
@@ -48,7 +102,7 @@ public final class MethodsGeneratorTest {
      */
     @Test
     public void callPrivateConstructors() throws SecurityException, NoSuchMethodException, IllegalArgumentException,
-    InstantiationException, IllegalAccessException, InvocationTargetException {
+            InstantiationException, IllegalAccessException, InvocationTargetException {
 
         Class<?>[] classesToConstruct = {MethodsGenerator.class };
         for (Class<?> clazz : classesToConstruct) {
@@ -62,97 +116,213 @@ public final class MethodsGeneratorTest {
      * Unit test case for checking the parse builder and typedef constructor.
      */
     @Test
-    public void getParseBuilderInterfaceMethodConstructorTest() {
-        ImportInfo forSetter = new ImportInfo();
-        attrType.setDataTypeName("binary");
-        attrType.getDataTypeName();
-        attrType.setDataType(YangDataTypes.BINARY);
-        attrType.getDataType();
-        testAttr.setAttributeName("attributeTest");
-        testAttr.setAttributeType(attrType);
-        forSetter.setPkgInfo("test1/test3");
-        forSetter.setClassInfo("This class contains");
-        testAttr.setImportInfo(forSetter);
-        String parseBuilderInterface = MethodsGenerator.parseBuilderInterfaceMethodString(testAttr, "newTestName");
-        assertThat(parseBuilderInterface.contains("attributeTest") && parseBuilderInterface.contains("newTestName"),
-                is(true));
-        String parseBuilderInterfaceBuild = MethodsGenerator.parseBuilderInterfaceBuildMethodString("testname7");
-        assertThat(parseBuilderInterfaceBuild.contains("Builds object of")
-                && parseBuilderInterfaceBuild.contains("testname7"), is(true));
-        String stringTypeDef = MethodsGenerator.getTypeDefConstructor(testAttr, "Testname");
+    public void getTypeDefConstructorTest() {
+
+        JavaAttributeInfo testAttr = getTestAttribute();
+        String test = getTypeDefConstructor(testAttr, CLASS_NAME);
+        assertThat(true, is(test.contains(PUBLIC + SPACE + CLASS_NAME + OPEN_PARENTHESIS)));
     }
 
     /**
-     * Unit test case for checking the values received from constructor, default constructor and build string formation.
+     * Test for build method for class.
      */
     @Test
-    public void getValuesTest() {
-        String stringConstructor = MethodsGenerator.getConstructorString("testname");
-        assertThat(stringConstructor.contains(UtilConstants.JAVA_DOC_CONSTRUCTOR)
-                && stringConstructor.contains(UtilConstants.JAVA_DOC_PARAM)
-                && stringConstructor.contains(UtilConstants.BUILDER_OBJECT), is(true));
-        String stringDefaultConstructor = MethodsGenerator.getDefaultConstructorString("testnameBuilder", "public");
-        assertThat(stringDefaultConstructor.contains(UtilConstants.JAVA_DOC_DEFAULT_CONSTRUCTOR)
-                && stringDefaultConstructor.contains(UtilConstants.BUILDER)
-                && stringDefaultConstructor.contains("testname"), is(true));
-        String stringBuild = MethodsGenerator.getBuildString("testname");
-        assertThat(stringBuild.contains(UtilConstants.OVERRIDE) && stringBuild.contains(UtilConstants.BUILD)
-                && stringBuild.contains(UtilConstants.RETURN), is(true));
+    public void getBuildTest() {
+
+        String method = getBuild(CLASS_NAME);
+        assertThat(true, is(method.equals(FOUR_SPACE_INDENTATION + PUBLIC + SPACE + CLASS_NAME + SPACE + BUILD
+                + OPEN_PARENTHESIS + CLOSE_PARENTHESIS + SPACE + OPEN_CURLY_BRACKET + NEW_LINE + EIGHT_SPACE_INDENTATION
+                + RETURN + SPACE + NEW + SPACE + CLASS_NAME + IMPL + OPEN_PARENTHESIS + THIS + CLOSE_PARENTHESIS
+                + SEMI_COLAN + NEW_LINE + FOUR_SPACE_INDENTATION + CLOSE_CURLY_BRACKET)));
 
     }
 
     /**
-     * Unit test for checking the values received for class getter, class and typedef setters with list data type.
+     * Test for build method of interface.
      */
     @Test
-    public void getGetterSetterTest() {
+    public void getBuildForInterfaceTest() {
 
-        ImportInfo forGetterSetter = new ImportInfo();
-        attrType.setDataTypeName("int");
-        attrType.getDataTypeName();
-        attrType.setDataType(YangDataTypes.UINT8);
-        attrType.getDataType();
-        testAttr.setAttributeName("AttributeTest1");
-        testAttr.setAttributeType(attrType);
-        forGetterSetter.setPkgInfo(null);
-        forGetterSetter.setClassInfo("This class contains");
-        testAttr.setImportInfo(forGetterSetter);
-        testAttr.setListAttr(true);
-        String getterForClass = MethodsGenerator.getGetterForClass(testAttr);
-        assertThat(getterForClass.contains(UtilConstants.GET_METHOD_PREFIX) && getterForClass.contains("List<")
-                && getterForClass.contains("attributeTest1"), is(true));
-        String setterForClass = MethodsGenerator.getSetterForClass(testAttr, "TestThis");
-        assertThat(setterForClass.contains(UtilConstants.SET_METHOD_PREFIX) && setterForClass.contains("List<")
-                && setterForClass.contains("attributeTest1"), is(true));
-        String typeDefSetter = MethodsGenerator.getSetterForTypeDefClass(testAttr);
-        assertThat(typeDefSetter.contains(UtilConstants.SET_METHOD_PREFIX) && typeDefSetter.contains("List<")
-                && typeDefSetter.contains("attributeTest1") && typeDefSetter.contains("this."), is(true));
+        String method = getBuildForInterface(CLASS_NAME);
+        assertThat(true, is(method.equals(FOUR_SPACE_INDENTATION + CLASS_NAME + SPACE + BUILD +
+                OPEN_PARENTHESIS + CLOSE_PARENTHESIS + SEMI_COLAN + NEW_LINE)));
     }
 
     /**
-     * Unit test case for checking the parse builder and typedef constructor with list data type.
+     * Test for check not null method.
      */
     @Test
-    public void getConstructorWithListTypeTest() {
-        ImportInfo forSetter = new ImportInfo();
-        attrType.setDataTypeName("binary");
-        attrType.getDataTypeName();
-        attrType.setDataType(YangDataTypes.BINARY);
-        attrType.getDataType();
-        testAttr.setAttributeName("attributeTest");
-        testAttr.setAttributeType(attrType);
-        forSetter.setPkgInfo(null);
-        forSetter.setClassInfo("This class contains");
-        testAttr.setImportInfo(forSetter);
-        testAttr.setListAttr(true);
-        String parseBuilderInterface = MethodsGenerator.parseBuilderInterfaceMethodString(testAttr, "newTestName");
-        assertThat(parseBuilderInterface.contains("attributeTest") && parseBuilderInterface.contains("List<"),
-                is(true));
-        String parseBuilderInterfaceBuild = MethodsGenerator.parseBuilderInterfaceBuildMethodString("testname7");
-        assertThat(parseBuilderInterfaceBuild.contains("Builds object of")
-                && parseBuilderInterfaceBuild.contains("testname7"), is(true));
-        String stringTypeDef = MethodsGenerator.getTypeDefConstructor(testAttr, "Testname");
-        assertThat(stringTypeDef.contains("(List<") && stringTypeDef.contains("Testname")
-                && stringTypeDef.contains(UtilConstants.THIS), is(true));
+    public void getCheckNotNullTest() {
+
+        String method = getCheckNotNull(CLASS_NAME);
+        assertThat(true, is(method.equals(EIGHT_SPACE_INDENTATION + CHECK_NOT_NULL_STRING + OPEN_PARENTHESIS
+                + CLASS_NAME + COMMA + SPACE + CLASS_NAME + CLOSE_PARENTHESIS + SEMI_COLAN + NEW_LINE)));
+    }
+
+    /**
+     * Test case for constructor.
+     */
+    @Test
+    public void getConstructorTest() {
+
+        JavaAttributeInfo testAttr = getTestAttribute();
+        String method = getConstructor(CLASS_NAME, testAttr);
+        assertThat(true, is(method.contains(THIS + PERIOD + CLASS_NAME + SPACE + EQUAL + SPACE + "builder" + OBJECT
+                + PERIOD + GET_METHOD_PREFIX + "Testname" + OPEN_PARENTHESIS + CLOSE_PARENTHESIS + SEMI_COLAN)));
+    }
+
+    /**
+     * Test for constrcutor start method.
+     */
+    @Test
+    public void getConstructorStartTest() {
+
+        String method = getConstructorStart(CLASS_NAME);
+        assertThat(true, is(method.contains(PUBLIC + SPACE + CLASS_NAME + IMPL + OPEN_PARENTHESIS + CLASS_NAME
+                + BUILDER + SPACE + BUILDER.toLowerCase() + OBJECT + CLOSE_PARENTHESIS + SPACE
+                + OPEN_CURLY_BRACKET + NEW_LINE)));
+    }
+
+    /**
+     * Test case for quals method.
+     */
+    @Test
+    public void getEqualsMethodTest() {
+
+        JavaAttributeInfo testAttr = getTestAttribute();
+        String method = getEqualsMethod(testAttr);
+        assertThat(true, is(method.contains(SIXTEEN_SPACE_INDENTATION + SPACE + OBJECT_STRING + SUFFIX_S + PERIOD
+                + EQUALS_STRING + OPEN_PARENTHESIS)));
+    }
+
+    /**
+     * Test for to string method.
+     */
+    @Test
+    public void getToStringMethodTest() {
+
+        JavaAttributeInfo testAttr = getTestAttribute();
+        String method = getToStringMethod(testAttr);
+        assertThat(true, is(method.equals(
+                TWELVE_SPACE_INDENTATION + PERIOD + ADD_STRING + OPEN_PARENTHESIS + QUOTES + testAttr.getAttributeName()
+                        + QUOTES + COMMA + SPACE + testAttr.getAttributeName() + CLOSE_PARENTHESIS)));
+    }
+
+    /**
+     * Test for getter method of class.
+     */
+    @Test
+    public void getGetterForClassTest() {
+
+        JavaAttributeInfo testAttr = getTestAttribute();
+        String method = getGetterForClass(testAttr);
+        assertThat(true, is(method.contains(PUBLIC + SPACE + STRING_DATA_TYPE + SPACE + GET_METHOD_PREFIX)));
+    }
+
+    /**
+     * Test for getter of interface.
+     */
+    @Test
+    public void getGetterForInterfaceTest() {
+
+        String method = getGetterForInterface(CLASS_NAME, STRING_DATA_TYPE, false);
+        assertThat(true, is(method.contains(STRING_DATA_TYPE + SPACE + GET_METHOD_PREFIX)));
+    }
+
+    /**
+     * Test case for setter method of class.
+     */
+    @Test
+    public void getSetterForClassTest() {
+
+        JavaAttributeInfo testAttr = getTestAttribute();
+        String method = getSetterForClass(testAttr, CLASS_NAME);
+        assertThat(true, is(
+                method.contains(PUBLIC + SPACE + CLASS_NAME + BUILDER + SPACE + SET_METHOD_PREFIX
+                        + getCaptialCase(ATTRIBUTE_NAME) + OPEN_PARENTHESIS + STRING_DATA_TYPE + SPACE
+                        + ATTRIBUTE_NAME)));
+    }
+
+    /**
+     * Test for setter method of interface.
+     */
+    @Test
+    public void getSetterForInterfaceTest() {
+
+        String method = getSetterForInterface(CLASS_NAME, STRING_DATA_TYPE, CLASS_NAME, false);
+        assertThat(true, is(method.contains(CLASS_NAME + BUILDER + SPACE + SET_METHOD_PREFIX + "Testname")));
+    }
+
+    /**
+     * Test case for of method.
+     */
+    @Test
+    public void getOfMethodest() {
+
+        JavaAttributeInfo testAttr = getTestAttribute();
+        String method = getOfMethod(CLASS_NAME, testAttr);
+        assertThat(true, is(method.contains(PUBLIC + SPACE + STATIC + SPACE + CLASS_NAME + SPACE + OF + OPEN_PARENTHESIS
+                + STRING_DATA_TYPE + SPACE + VALUE + CLOSE_PARENTHESIS)));
+    }
+
+    /**
+     * Test case for setter in type def class.
+     */
+    @Test
+    public void getSetterForTypeDefClassTest() {
+
+        JavaAttributeInfo testAttr = getTestAttribute();
+        String method = getSetterForTypeDefClass(testAttr);
+        assertThat(true, is(method.contains(PUBLIC + SPACE + VOID + SPACE + SET_METHOD_PREFIX)));
+    }
+
+    /**
+     * Test case for over ride string.
+     */
+    @Test
+    public void getOverRideStringTest() {
+
+        String method = getOverRideString();
+        assertThat(true, is(method.contains(OVERRIDE)));
+    }
+
+    /**
+     * Returns java attribute.
+     *
+     * @return java attribute
+     */
+    private JavaAttributeInfo getTestAttribute() {
+
+        JavaAttributeInfo testAttr = new JavaAttributeInfo(getTestYangType(), ATTRIBUTE_NAME, false, false);
+        testAttr.setAttributeName(ATTRIBUTE_NAME);
+        testAttr.setAttributeType(getTestYangType());
+        testAttr.setImportInfo(getTestJavaQualifiedTypeInfo());
+        return testAttr;
+    }
+
+    /**
+     * Returns java qualified info.
+     *
+     * @return java qualified info
+     */
+    private JavaQualifiedTypeInfo getTestJavaQualifiedTypeInfo() {
+
+        JavaQualifiedTypeInfo info = new JavaQualifiedTypeInfo();
+        info.setPkgInfo(JAVA_LANG);
+        info.setClassInfo(STRING_DATA_TYPE);
+        return info;
+    }
+
+    /**
+     * Returns stub YANG type.
+     *
+     * @return test YANG type
+     */
+    private YangType<?> getTestYangType() {
+
+        YangType<?> attrType = new YangType<>();
+        attrType.setDataTypeName(STRING_DATA_TYPE);
+        attrType.setDataType(STRING);
+        return attrType;
     }
 }

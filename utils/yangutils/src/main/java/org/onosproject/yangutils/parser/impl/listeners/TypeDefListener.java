@@ -16,6 +16,48 @@
 
 package org.onosproject.yangutils.parser.impl.listeners;
 
+import org.onosproject.yangutils.datamodel.YangContainer;
+import org.onosproject.yangutils.datamodel.YangDataTypes;
+import org.onosproject.yangutils.datamodel.YangDerivedType;
+import org.onosproject.yangutils.datamodel.YangList;
+import org.onosproject.yangutils.datamodel.YangModule;
+import org.onosproject.yangutils.datamodel.YangNode;
+import org.onosproject.yangutils.datamodel.YangSubModule;
+import org.onosproject.yangutils.datamodel.YangType;
+import org.onosproject.yangutils.datamodel.YangTypeDef;
+import org.onosproject.yangutils.datamodel.YangInput;
+import org.onosproject.yangutils.datamodel.YangOutput;
+import org.onosproject.yangutils.datamodel.YangNotification;
+import org.onosproject.yangutils.datamodel.YangRpc;
+import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
+import org.onosproject.yangutils.parser.Parsable;
+import org.onosproject.yangutils.parser.antlrgencode.GeneratedYangParser;
+import org.onosproject.yangutils.parser.exceptions.ParserException;
+import org.onosproject.yangutils.parser.impl.TreeWalkListener;
+
+import static org.onosproject.yangutils.datamodel.utils.GeneratedLanguage.JAVA_GENERATION;
+import static org.onosproject.yangutils.datamodel.utils.YangDataModelFactory.getYangTypeDefNode;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorLocation.ENTRY;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorLocation.EXIT;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorMessageConstruction.constructExtendedListenerErrorMessage;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorMessageConstruction.constructListenerErrorMessage;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.INVALID_CONTENT;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.INVALID_HOLDER;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.MISSING_CURRENT_HOLDER;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.MISSING_HOLDER;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.UNHANDLED_PARSED_DATA;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerUtil.getValidIdentifier;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation.checkStackIsNotEmpty;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation.validateCardinalityEqualsOne;
+import static org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation.validateCardinalityMaxOne;
+import static org.onosproject.yangutils.utils.YangConstructType.DEFAULT_DATA;
+import static org.onosproject.yangutils.utils.YangConstructType.DESCRIPTION_DATA;
+import static org.onosproject.yangutils.utils.YangConstructType.REFERENCE_DATA;
+import static org.onosproject.yangutils.utils.YangConstructType.STATUS_DATA;
+import static org.onosproject.yangutils.utils.YangConstructType.TYPEDEF_DATA;
+import static org.onosproject.yangutils.utils.YangConstructType.TYPE_DATA;
+import static org.onosproject.yangutils.utils.YangConstructType.UNITS_DATA;
+
 /*
  * Reference: RFC6020 and YANG ANTLR Grammar
  *
@@ -46,42 +88,6 @@ package org.onosproject.yangutils.parser.impl.listeners;
  *                (typeStatement | unitsStatement | defaultStatement | statusStatement
  *                | descriptionStatement | referenceStatement)* RIGHT_CURLY_BRACE;
  */
-
-import org.onosproject.yangutils.datamodel.YangContainer;
-import org.onosproject.yangutils.datamodel.YangDataTypes;
-import org.onosproject.yangutils.datamodel.YangDerivedType;
-import org.onosproject.yangutils.datamodel.YangList;
-import org.onosproject.yangutils.datamodel.YangModule;
-import org.onosproject.yangutils.datamodel.YangNode;
-import org.onosproject.yangutils.datamodel.YangSubModule;
-import org.onosproject.yangutils.datamodel.YangType;
-import org.onosproject.yangutils.datamodel.YangTypeDef;
-import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
-import org.onosproject.yangutils.parser.Parsable;
-import org.onosproject.yangutils.parser.antlrgencode.GeneratedYangParser;
-import org.onosproject.yangutils.parser.exceptions.ParserException;
-import org.onosproject.yangutils.parser.impl.TreeWalkListener;
-
-import static org.onosproject.yangutils.parser.impl.parserutils.ListenerUtil.getValidIdentifier;
-import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorLocation.ENTRY;
-import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorLocation.EXIT;
-import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorMessageConstruction.constructExtendedListenerErrorMessage;
-import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorMessageConstruction.constructListenerErrorMessage;
-import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.INVALID_CONTENT;
-import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.INVALID_HOLDER;
-import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.MISSING_CURRENT_HOLDER;
-import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.MISSING_HOLDER;
-import static org.onosproject.yangutils.parser.impl.parserutils.ListenerErrorType.UNHANDLED_PARSED_DATA;
-import static org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation.checkStackIsNotEmpty;
-import static org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation.validateCardinality;
-import static org.onosproject.yangutils.parser.impl.parserutils.ListenerValidation.validateCardinalityEqualsOne;
-import static org.onosproject.yangutils.utils.YangConstructType.DEFAULT_DATA;
-import static org.onosproject.yangutils.utils.YangConstructType.DESCRIPTION_DATA;
-import static org.onosproject.yangutils.utils.YangConstructType.REFERENCE_DATA;
-import static org.onosproject.yangutils.utils.YangConstructType.STATUS_DATA;
-import static org.onosproject.yangutils.utils.YangConstructType.TYPEDEF_DATA;
-import static org.onosproject.yangutils.utils.YangConstructType.TYPE_DATA;
-import static org.onosproject.yangutils.utils.YangConstructType.UNITS_DATA;
 
 /**
  * Implements listener based call back function corresponding to the "typedef"
@@ -121,15 +127,17 @@ public final class TypeDefListener {
         derivedType.setDataType(YangDataTypes.DERIVED);
         derivedType.setDataTypeName(identifier);
 
-        YangTypeDef typeDefNode = new YangTypeDef();
+        YangTypeDef typeDefNode = getYangTypeDefNode(JAVA_GENERATION);
         typeDefNode.setDerivedType(derivedType);
 
         Parsable curData = listener.getParsedDataStack().peek();
 
         if (curData instanceof YangModule || curData instanceof YangSubModule || curData instanceof YangContainer
-                || curData instanceof YangList) {
+                || curData instanceof YangList || curData instanceof YangNotification || curData instanceof YangRpc
+                || curData instanceof YangInput || curData instanceof YangOutput) {
+
             /*
-             * TODO YangGrouping, YangRpc, YangInput, YangOutput, Notification.
+             * TODO YangGrouping.
              */
             YangNode curNode = (YangNode) curData;
             try {
@@ -181,11 +189,12 @@ public final class TypeDefListener {
      */
     private static void validateSubStatementsCardinality(GeneratedYangParser.TypedefStatementContext ctx) {
 
-        validateCardinality(ctx.unitsStatement(), UNITS_DATA, TYPEDEF_DATA, ctx.identifier().getText());
-        validateCardinality(ctx.defaultStatement(), DEFAULT_DATA, TYPEDEF_DATA, ctx.identifier().getText());
-        validateCardinalityEqualsOne(ctx.typeStatement(), TYPE_DATA, TYPEDEF_DATA, ctx.identifier().getText());
-        validateCardinality(ctx.descriptionStatement(), DESCRIPTION_DATA, TYPEDEF_DATA, ctx.identifier().getText());
-        validateCardinality(ctx.referenceStatement(), REFERENCE_DATA, TYPEDEF_DATA, ctx.identifier().getText());
-        validateCardinality(ctx.statusStatement(), STATUS_DATA, TYPEDEF_DATA, ctx.identifier().getText());
+        validateCardinalityMaxOne(ctx.unitsStatement(), UNITS_DATA, TYPEDEF_DATA, ctx.identifier().getText());
+        validateCardinalityMaxOne(ctx.defaultStatement(), DEFAULT_DATA, TYPEDEF_DATA, ctx.identifier().getText());
+        validateCardinalityEqualsOne(ctx.typeStatement(), TYPE_DATA, TYPEDEF_DATA, ctx.identifier().getText(), ctx);
+        validateCardinalityMaxOne(ctx.descriptionStatement(), DESCRIPTION_DATA, TYPEDEF_DATA,
+                ctx.identifier().getText());
+        validateCardinalityMaxOne(ctx.referenceStatement(), REFERENCE_DATA, TYPEDEF_DATA, ctx.identifier().getText());
+        validateCardinalityMaxOne(ctx.statusStatement(), STATUS_DATA, TYPEDEF_DATA, ctx.identifier().getText());
     }
 }

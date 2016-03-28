@@ -16,9 +16,20 @@
 
 package org.onosproject.yangutils.translator.tojava.utils;
 
-import org.onosproject.yangutils.translator.GeneratedFileType;
-import org.onosproject.yangutils.translator.tojava.ImportInfo;
-import org.onosproject.yangutils.utils.UtilConstants;
+import org.onosproject.yangutils.translator.tojava.JavaQualifiedTypeInfo;
+
+import static org.onosproject.yangutils.translator.tojava.utils.ClassDefinitionGenerator.generateClassDefinition;
+import static org.onosproject.yangutils.translator.tojava.utils.JavaIdentifierSyntax.getCamelCase;
+import static org.onosproject.yangutils.utils.UtilConstants.CLOSE_CURLY_BRACKET;
+import static org.onosproject.yangutils.utils.UtilConstants.DIAMOND_CLOSE_BRACKET;
+import static org.onosproject.yangutils.utils.UtilConstants.DIAMOND_OPEN_BRACKET;
+import static org.onosproject.yangutils.utils.UtilConstants.IMPORT;
+import static org.onosproject.yangutils.utils.UtilConstants.LIST;
+import static org.onosproject.yangutils.utils.UtilConstants.NEW_LINE;
+import static org.onosproject.yangutils.utils.UtilConstants.PERIOD;
+import static org.onosproject.yangutils.utils.UtilConstants.PRIVATE;
+import static org.onosproject.yangutils.utils.UtilConstants.SEMI_COLAN;
+import static org.onosproject.yangutils.utils.UtilConstants.SPACE;
 
 /**
  * Utility class to generate the java snippet.
@@ -51,9 +62,9 @@ public final class JavaCodeSnippetGen {
      * @return the textual java code information corresponding to the import
      *         list
      */
-    public static String getImportText(ImportInfo importInfo) {
-        return UtilConstants.IMPORT + importInfo.getPkgInfo() + UtilConstants.PERIOD + importInfo.getClassInfo()
-                + UtilConstants.SEMI_COLAN + UtilConstants.NEW_LINE;
+    public static String getImportText(JavaQualifiedTypeInfo importInfo) {
+
+        return IMPORT + importInfo.getPkgInfo() + PERIOD + importInfo.getClassInfo() + SEMI_COLAN + NEW_LINE;
     }
 
     /**
@@ -65,11 +76,12 @@ public final class JavaCodeSnippetGen {
      * @return corresponding textual java code information
      */
     public static String getJavaClassDefStart(int genFileTypes, String yangName) {
+
         /*
          * get the camel case name for java class / interface.
          */
-        yangName = JavaIdentifierSyntax.getCamelCase(yangName);
-        return ClassDefinitionGenerator.generateClassDefinition(genFileTypes, yangName);
+        yangName = getCamelCase(yangName);
+        return generateClassDefinition(genFileTypes, yangName);
     }
 
     /**
@@ -84,30 +96,23 @@ public final class JavaCodeSnippetGen {
     public static String getJavaAttributeDefination(String javaAttributeTypePkg, String javaAttributeType,
             String javaAttributeName, boolean isList) {
 
-        String attributeDefination = UtilConstants.PRIVATE
-                + UtilConstants.SPACE;
+        String attributeDefination = PRIVATE + SPACE;
 
         if (!isList) {
             if (javaAttributeTypePkg != null) {
-                attributeDefination = attributeDefination
-                        + javaAttributeTypePkg + ".";
+                attributeDefination = attributeDefination + javaAttributeTypePkg + PERIOD;
             }
 
-            attributeDefination = attributeDefination
-                    + javaAttributeType
-                    + UtilConstants.SPACE
-                    + javaAttributeName
-                    + UtilConstants.SEMI_COLAN;
+            attributeDefination = attributeDefination + javaAttributeType + SPACE + javaAttributeName + SEMI_COLAN
+                    + NEW_LINE;
         } else {
-            attributeDefination = attributeDefination + UtilConstants.LIST + UtilConstants.DIAMOND_OPEN_BRACKET;
+            attributeDefination = attributeDefination + LIST + DIAMOND_OPEN_BRACKET;
             if (javaAttributeTypePkg != null) {
-                attributeDefination = attributeDefination
-                        + javaAttributeTypePkg + ".";
+                attributeDefination = attributeDefination + javaAttributeTypePkg + PERIOD;
             }
 
-            attributeDefination = attributeDefination
-                    + javaAttributeType + UtilConstants.DIAMOND_CLOSE_BRACKET + UtilConstants.SPACE
-                    + javaAttributeName + UtilConstants.SEMI_COLAN;
+            attributeDefination = attributeDefination + javaAttributeType + DIAMOND_CLOSE_BRACKET + SPACE
+                    + javaAttributeName + SEMI_COLAN + NEW_LINE;
         }
         return attributeDefination;
     }
@@ -119,30 +124,18 @@ public final class JavaCodeSnippetGen {
      * @return list attribute string
      */
     public static String getListAttribute(String type) {
-        return UtilConstants.LIST + UtilConstants.DIAMOND_OPEN_BRACKET + type + UtilConstants.DIAMOND_CLOSE_BRACKET;
+
+        return LIST + DIAMOND_OPEN_BRACKET + type + DIAMOND_CLOSE_BRACKET;
     }
 
     /**
      * Based on the file type and the YANG name of the file, generate the class
      * / interface definition close.
      *
-     * @param genFileTypes type of file being generated
-     * @param yangName YANG name
      * @return corresponding textual java code information
      */
-    public static String getJavaClassDefClose(int genFileTypes, String yangName) {
+    public static String getJavaClassDefClose() {
 
-        if ((genFileTypes & GeneratedFileType.INTERFACE_MASK) != 0) {
-
-            return UtilConstants.CLOSE_CURLY_BRACKET;
-        } else if ((genFileTypes & GeneratedFileType.BUILDER_CLASS_MASK) != 0) {
-
-            return UtilConstants.CLOSE_CURLY_BRACKET;
-        } else if ((genFileTypes & GeneratedFileType.GENERATE_TYPEDEF_CLASS) != 0) {
-
-            return UtilConstants.CLOSE_CURLY_BRACKET;
-        }
-        return null;
+        return CLOSE_CURLY_BRACKET;
     }
-
 }

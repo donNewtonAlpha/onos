@@ -18,7 +18,6 @@ package org.onosproject.yangutils.datamodel;
 import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
 import org.onosproject.yangutils.parser.Parsable;
 import org.onosproject.yangutils.utils.YangConstructType;
-import org.onosproject.yangutils.translator.CachedFileHandle;
 
 /*-
  * Reference RFC 6020.
@@ -56,17 +55,17 @@ import org.onosproject.yangutils.translator.CachedFileHandle;
 public class YangUses extends YangNode implements YangCommonInfo, Parsable {
 
     /**
-     * Name.
+     * Name of YANG uses.
      */
     private String name;
 
     /**
-     * referred group.
+     * Referred group.
      */
     private YangGrouping refGroup;
 
     /**
-     * description.
+     * Description of YANG uses.
      */
     private String description;
 
@@ -76,7 +75,7 @@ public class YangUses extends YangNode implements YangCommonInfo, Parsable {
     private String reference;
 
     /**
-     * Status.
+     * Status of YANG uses.
      */
     private YangStatusType status;
 
@@ -88,7 +87,7 @@ public class YangUses extends YangNode implements YangCommonInfo, Parsable {
     }
 
     /**
-     * Get the name.
+     * Returns the name.
      *
      * @return the name
      */
@@ -106,7 +105,7 @@ public class YangUses extends YangNode implements YangCommonInfo, Parsable {
     }
 
     /**
-     * Get the referred group.
+     * Returns the referred group.
      *
      * @return the referred group
      */
@@ -124,7 +123,7 @@ public class YangUses extends YangNode implements YangCommonInfo, Parsable {
     }
 
     /**
-     * Get the description.
+     * Returns the description.
      *
      * @return the description
      */
@@ -144,7 +143,7 @@ public class YangUses extends YangNode implements YangCommonInfo, Parsable {
     }
 
     /**
-     * Get the textual reference.
+     * Returns the textual reference.
      *
      * @return the reference
      */
@@ -164,7 +163,7 @@ public class YangUses extends YangNode implements YangCommonInfo, Parsable {
     }
 
     /**
-     * Get the status.
+     * Returns the status.
      *
      * @return the status
      */
@@ -215,49 +214,12 @@ public class YangUses extends YangNode implements YangCommonInfo, Parsable {
 
     @Override
     public String getName() {
-        // TODO Auto-generated method stub
-        return null;
+        return name;
     }
 
     @Override
     public void setName(String name) {
-        // TODO Auto-generated method stub
-
+        this.name = name;
     }
 
-    @Override
-    public void generateJavaCodeEntry(String codeGenDir) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public void generateJavaCodeExit() {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public String getPackage() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    @Override
-    public void setPackage(String pkg) {
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public CachedFileHandle getFileHandle() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    @Override
-    public void setFileHandle(CachedFileHandle fileHandle) {
-        // TODO Auto-generated method stub
-
-    }
 }

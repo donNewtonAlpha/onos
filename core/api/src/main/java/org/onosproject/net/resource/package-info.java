@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 Open Networking Laboratory
+ * Copyright 2015-2016 Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,7 @@
  */
 
 /**
- * Abstractions for reserving network resources.
- * <p>
- * Note: Classes under the package will be removed.
- * Developers should not use the classes.
- * </p>
+ * Generic network resource model and services for resource allocation and
+ * resource tracking.
  */
 package org.onosproject.net.resource;

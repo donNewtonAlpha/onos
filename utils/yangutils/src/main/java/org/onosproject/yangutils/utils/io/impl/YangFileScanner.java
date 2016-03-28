@@ -23,9 +23,12 @@ import java.util.List;
 import java.util.Stack;
 
 /**
- * Provides the IO services for Yangutils-maven-Plugin.
+ * Provides utility for searching the files in a directory.
  */
 public final class YangFileScanner {
+
+    private static final String JAVA_FILE_EXTENTION = ".java";
+    private static final String YANG_FILE_EXTENTION = ".yang";
 
     /**
      * Default constructor.
@@ -42,8 +45,9 @@ public final class YangFileScanner {
      * @throws IOException when files get deleted while performing the
      *             operations
      */
-    public static List<String> getJavaFiles(String root) throws NullPointerException, IOException {
-        return getFiles(root, ".java");
+    public static List<String> getJavaFiles(String root) throws IOException {
+
+        return getFiles(root, JAVA_FILE_EXTENTION);
     }
 
     /**
@@ -55,8 +59,9 @@ public final class YangFileScanner {
      * @throws IOException when files get deleted while performing the
      *             operations
      */
-    public static List<String> getYangFiles(String root) throws NullPointerException, IOException {
-        return getFiles(root, ".yang");
+    public static List<String> getYangFiles(String root) throws IOException {
+
+        return getFiles(root, YANG_FILE_EXTENTION);
     }
 
     /**
@@ -65,10 +70,11 @@ public final class YangFileScanner {
      * @param root specified directory
      * @param extension file extension
      * @return list of required files
-     * @throws IOException when files get deleted while performing the
-     *             operations
+     * @throws NullPointerException when no file is there
+     * @throws IOException when files get deleted while performing the operations
      */
-    public static List<String> getFiles(String root, String extension) throws  NullPointerException, IOException {
+    public static List<String> getFiles(String root, String extension) throws IOException {
+
         List<String> store = new LinkedList<>();
         Stack<String> stack = new Stack<>();
         stack.push(root);
@@ -94,8 +100,8 @@ public final class YangFileScanner {
                 }
             }
             return store;
-        } catch (NullPointerException e) {
-            throw new IOException("NullPointerException occured");
+        } catch (IOException e) {
+            throw new IOException("No File found of " + extension + " extension in " + root + " directory.");
         }
     }
 }

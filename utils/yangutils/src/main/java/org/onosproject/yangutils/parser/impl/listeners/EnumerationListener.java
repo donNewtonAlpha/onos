@@ -45,6 +45,7 @@ import org.onosproject.yangutils.datamodel.YangEnumeration;
 import org.onosproject.yangutils.datamodel.YangLeaf;
 import org.onosproject.yangutils.datamodel.YangLeafList;
 import org.onosproject.yangutils.datamodel.YangType;
+import org.onosproject.yangutils.datamodel.YangUnion;
 import org.onosproject.yangutils.parser.Parsable;
 import org.onosproject.yangutils.parser.antlrgencode.GeneratedYangParser;
 import org.onosproject.yangutils.parser.exceptions.ParserException;
@@ -102,7 +103,10 @@ public final class EnumerationListener {
                 case LEAF_LIST_DATA:
                     enumerationNode.setEnumerationName(((YangLeafList) tmpData).getLeafName());
                     break;
-                // TODO typedef, union, deviate.
+                case UNION_DATA:
+                    enumerationNode.setEnumerationName(((YangUnion) tmpData).getUnionName());
+                    break;
+                // TODO typedef, deviate.
                 default:
                     throw new ParserException(constructListenerErrorMessage(INVALID_HOLDER, TYPE_DATA,
                             ((YangType<?>) typeData).getDataTypeName(), ENTRY));

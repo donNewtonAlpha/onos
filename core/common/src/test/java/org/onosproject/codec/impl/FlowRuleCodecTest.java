@@ -51,7 +51,6 @@ import org.onosproject.net.flow.criteria.IcmpCodeCriterion;
 import org.onosproject.net.flow.criteria.IcmpTypeCriterion;
 import org.onosproject.net.flow.criteria.Icmpv6CodeCriterion;
 import org.onosproject.net.flow.criteria.Icmpv6TypeCriterion;
-import org.onosproject.net.flow.criteria.IndexedLambdaCriterion;
 import org.onosproject.net.flow.criteria.MplsCriterion;
 import org.onosproject.net.flow.criteria.OchSignalCriterion;
 import org.onosproject.net.flow.criteria.OchSignalTypeCriterion;
@@ -215,7 +214,7 @@ public class FlowRuleCodecTest {
                             instruction.type().name() + "/" + subType, instruction);
                 });
 
-        assertThat(rule.treatment().allInstructions().size(), is(24));
+        assertThat(rule.treatment().allInstructions().size(), is(23));
 
         Instruction instruction;
 
@@ -321,13 +320,6 @@ public class FlowRuleCodecTest {
                 is(8));
 
         instruction = getInstruction(Instruction.Type.L0MODIFICATION,
-                L0ModificationInstruction.L0SubType.LAMBDA.name());
-        assertThat(instruction.type(), is(Instruction.Type.L0MODIFICATION));
-        assertThat(((L0ModificationInstruction.ModLambdaInstruction) instruction)
-                        .lambda(),
-                is((short) 7));
-
-        instruction = getInstruction(Instruction.Type.L0MODIFICATION,
                 L0ModificationInstruction.L0SubType.OCH.name());
         assertThat(instruction.type(), is(Instruction.Type.L0MODIFICATION));
         L0ModificationInstruction.ModOchSignalInstruction och =
@@ -387,7 +379,7 @@ public class FlowRuleCodecTest {
 
         checkCommonData(rule);
 
-        assertThat(rule.selector().criteria().size(), is(36));
+        assertThat(rule.selector().criteria().size(), is(35));
 
         rule.selector().criteria()
                 .stream()
@@ -515,10 +507,6 @@ public class FlowRuleCodecTest {
         criterion = getCriterion(Criterion.Type.IPV6_EXTHDR);
         assertThat(((IPv6ExthdrFlagsCriterion) criterion).exthdrFlags(),
                 is(99));
-
-        criterion = getCriterion(Criterion.Type.OCH_SIGID);
-        assertThat(((IndexedLambdaCriterion) criterion).lambda(),
-                is(Lambda.indexedLambda(122)));
 
         criterion = getCriterion(Criterion.Type.TUNNEL_ID);
         assertThat(((TunnelIdCriterion) criterion).tunnelId(),

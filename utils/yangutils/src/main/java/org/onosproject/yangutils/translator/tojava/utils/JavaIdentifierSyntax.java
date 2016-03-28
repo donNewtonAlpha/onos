@@ -18,8 +18,24 @@ package org.onosproject.yangutils.translator.tojava.utils;
 
 import java.util.ArrayList;
 
+import org.onosproject.yangutils.datamodel.YangNode;
 import org.onosproject.yangutils.translator.exception.TranslatorException;
-import org.onosproject.yangutils.utils.UtilConstants;
+import org.onosproject.yangutils.translator.tojava.HasJavaFileInfo;
+import org.onosproject.yangutils.translator.tojava.JavaFileInfo;
+
+import static org.onosproject.yangutils.utils.UtilConstants.COLAN;
+import static org.onosproject.yangutils.utils.UtilConstants.DEFAULT_BASE_PKG;
+import static org.onosproject.yangutils.utils.UtilConstants.EMPTY_STRING;
+import static org.onosproject.yangutils.utils.UtilConstants.HYPHEN;
+import static org.onosproject.yangutils.utils.UtilConstants.JAVA_KEY_WORDS;
+import static org.onosproject.yangutils.utils.UtilConstants.PERIOD;
+import static org.onosproject.yangutils.utils.UtilConstants.QUOTES;
+import static org.onosproject.yangutils.utils.UtilConstants.REGEX_FOR_FIRST_DIGIT;
+import static org.onosproject.yangutils.utils.UtilConstants.REGEX_WITH_SPECIAL_CHAR;
+import static org.onosproject.yangutils.utils.UtilConstants.REVISION_PREFIX;
+import static org.onosproject.yangutils.utils.UtilConstants.SLASH;
+import static org.onosproject.yangutils.utils.UtilConstants.UNDER_SCORE;
+import static org.onosproject.yangutils.utils.UtilConstants.VERSION_PREFIX;
 
 /**
  * Utility Class for translating the name from YANG to java convention.
@@ -49,14 +65,53 @@ public final class JavaIdentifierSyntax {
     public static String getRootPackage(byte version, String nameSpace, String revision) {
 
         String pkg;
-        pkg = UtilConstants.DEFAULT_BASE_PKG;
-        pkg = pkg + UtilConstants.PERIOD;
+        pkg = DEFAULT_BASE_PKG;
+        pkg = pkg + PERIOD;
         pkg = pkg + getYangVersion(version);
-        pkg = pkg + UtilConstants.PERIOD;
+        pkg = pkg + PERIOD;
         pkg = pkg + getPkgFromNameSpace(nameSpace);
-        pkg = pkg + UtilConstants.PERIOD;
+        pkg = pkg + PERIOD;
         pkg = pkg + getYangRevisionStr(revision);
 
+        return pkg.toLowerCase();
+    }
+
+    /**
+     * Get the contained data model parent node.
+     *
+     * @param currentNode current node which parent contained node is required
+     * @return parent node in which the current node is an attribute
+     */
+    public static YangNode getParentNodeInGenCode(YangNode currentNode) {
+
+        /*
+         * TODO: recursive parent lookup to support choice/augment/uses. TODO:
+         * need to check if this needs to be updated for
+         * choice/case/augment/grouping
+         */
+        return currentNode.getParent();
+    }
+
+    /**
+     * Get the node package string.
+     *
+     * @param curNode current java node whose package string needs to be set
+     * @return returns the root package string
+     */
+    public static String getCurNodePackage(YangNode curNode) {
+
+        String pkg;
+        if (!(curNode instanceof HasJavaFileInfo)
+                || curNode.getParent() == null) {
+            throw new RuntimeException("missing parent node to get current node's package");
+        }
+
+        YangNode parentNode = getParentNodeInGenCode(curNode);
+        if (!(parentNode instanceof HasJavaFileInfo)) {
+            throw new RuntimeException("missing parent java node to get current node's package");
+        }
+        JavaFileInfo parentJavaFileHandle = ((HasJavaFileInfo) parentNode).getJavaFileInfo();
+        pkg = parentJavaFileHandle.getPackage() + PERIOD + parentJavaFileHandle.getJavaName();
         return pkg.toLowerCase();
     }
 
@@ -67,7 +122,8 @@ public final class JavaIdentifierSyntax {
      * @return version
      */
     private static String getYangVersion(byte ver) {
-        return "v" + ver;
+
+        return VERSION_PREFIX + ver;
     }
 
     /**
@@ -77,10 +133,11 @@ public final class JavaIdentifierSyntax {
      * @return java package name as per java rules
      */
     public static String getPkgFromNameSpace(String nameSpace) {
+
         ArrayList<String> pkgArr = new ArrayList<String>();
-        nameSpace = nameSpace.replace(UtilConstants.QUOTES, UtilConstants.EMPTY_STRING);
-        String properNameSpace = nameSpace.replaceAll(UtilConstants.REGEX_WITH_SPECIAL_CHAR, UtilConstants.COLAN);
-        String[] nameSpaceArr = properNameSpace.split(UtilConstants.COLAN);
+        nameSpace = nameSpace.replace(QUOTES, EMPTY_STRING);
+        String properNameSpace = nameSpace.replaceAll(REGEX_WITH_SPECIAL_CHAR, COLAN);
+        String[] nameSpaceArr = properNameSpace.split(COLAN);
 
         for (String nameSpaceString : nameSpaceArr) {
             pkgArr.add(nameSpaceString);
@@ -96,12 +153,13 @@ public final class JavaIdentifierSyntax {
      * @throws TranslatorException when date is invalid.
      */
     public static String getYangRevisionStr(String date) throws TranslatorException {
-        String[] revisionArr = date.split(UtilConstants.HYPHEN);
 
-        String rev = "rev";
+        String[] revisionArr = date.split(HYPHEN);
+
+        String rev = REVISION_PREFIX;
         rev = rev + revisionArr[INDEX_ZERO];
 
-        if ((Integer.parseInt(revisionArr[INDEX_ONE]) <= MAX_MONTHS)
+        if (Integer.parseInt(revisionArr[INDEX_ONE]) <= MAX_MONTHS
                 && Integer.parseInt(revisionArr[INDEX_TWO]) <= MAX_DAYS) {
             for (int i = INDEX_ONE; i < revisionArr.length; i++) {
 
@@ -126,32 +184,21 @@ public final class JavaIdentifierSyntax {
      */
     public static String getPkgFrmArr(ArrayList<String> pkgArr) {
 
-        String pkg = UtilConstants.EMPTY_STRING;
+        String pkg = EMPTY_STRING;
         int size = pkgArr.size();
         int i = 0;
         for (String member : pkgArr) {
-            boolean presenceOfKeyword = UtilConstants.JAVA_KEY_WORDS.contains(member);
-            if (presenceOfKeyword || (member.matches(UtilConstants.REGEX_FOR_FIRST_DIGIT))) {
-                member = UtilConstants.UNDER_SCORE + member;
+            boolean presenceOfKeyword = JAVA_KEY_WORDS.contains(member);
+            if (presenceOfKeyword || member.matches(REGEX_FOR_FIRST_DIGIT)) {
+                member = UNDER_SCORE + member;
             }
             pkg = pkg + member;
             if (i != size - 1) {
-                pkg = pkg + UtilConstants.PERIOD;
+                pkg = pkg + PERIOD;
             }
             i++;
         }
         return pkg;
-    }
-
-    /**
-     * Get the package from parent's package and string.
-     *
-     * @param parentPkg parent's package
-     * @param parentName parent's name
-     * @return package string
-     */
-    public static String getPackageFromParent(String parentPkg, String parentName) {
-        return (parentPkg + UtilConstants.PERIOD + getSubPkgFromName(parentName)).toLowerCase();
     }
 
     /**
@@ -161,8 +208,9 @@ public final class JavaIdentifierSyntax {
      * @return java package sub name as per java rules
      */
     public static String getSubPkgFromName(String name) {
+
         ArrayList<String> pkgArr = new ArrayList<String>();
-        String[] nameArr = name.split(UtilConstants.COLAN);
+        String[] nameArr = name.split(COLAN);
 
         for (String nameString : nameArr) {
             pkgArr.add(nameString);
@@ -177,7 +225,8 @@ public final class JavaIdentifierSyntax {
      * @return corresponding java identifier
      */
     public static String getCamelCase(String yangIdentifier) {
-        String[] strArray = yangIdentifier.split(UtilConstants.HYPHEN);
+
+        String[] strArray = yangIdentifier.split(HYPHEN);
         String camelCase = strArray[0];
         for (int i = 1; i < strArray.length; i++) {
             camelCase = camelCase + strArray[i].substring(0, 1).toUpperCase() + strArray[i].substring(1);
@@ -193,16 +242,41 @@ public final class JavaIdentifierSyntax {
      * @return corresponding java identifier
      */
     public static String getCaptialCase(String yangIdentifier) {
+
         return yangIdentifier.substring(0, 1).toUpperCase() + yangIdentifier.substring(1);
     }
 
     /**
-     * Translate the YANG identifier name to java identifier with first letter in small.
+     * Translate the YANG identifier name to java identifier with first letter
+     * in small.
      *
      * @param yangIdentifier identifier in YANG file.
      * @return corresponding java identifier
      */
-    public static String getLowerCase(String yangIdentifier) {
+    public static String getSmallCase(String yangIdentifier) {
+
         return yangIdentifier.substring(0, 1).toLowerCase() + yangIdentifier.substring(1);
+    }
+
+    /**
+     * Get the java Package from package path.
+     *
+     * @param packagePath package path
+     * @return java package
+     */
+    public static String getJavaPackageFromPackagePath(String packagePath) {
+
+        return packagePath.replace(SLASH, PERIOD);
+    }
+
+    /**
+     * Get the directory path corresponding to java package.
+     *
+     * @param packagePath package path
+     * @return java package
+     */
+    public static String getPackageDirPathFromJavaJPackage(String packagePath) {
+
+        return packagePath.replace(PERIOD, SLASH);
     }
 }

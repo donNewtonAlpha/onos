@@ -26,6 +26,7 @@ import java.util.Set;
 public class CPManWebApplication extends AbstractWebApplication {
     @Override
     public Set<Class<?>> getClasses() {
-        return getClasses(ControlMetricsCollectorWebResource.class);
+        return getClasses(SystemMetricsCollectorWebResource.class,
+                          ControlMetricsWebResource.class);
     }
 }

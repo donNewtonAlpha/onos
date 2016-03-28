@@ -17,11 +17,11 @@ package org.onosproject.yangutils.datamodel;
 
 import java.util.LinkedList;
 import java.util.List;
-
 import org.onosproject.yangutils.datamodel.exceptions.DataModelException;
 import org.onosproject.yangutils.parser.Parsable;
 import org.onosproject.yangutils.utils.YangConstructType;
-import org.onosproject.yangutils.translator.CachedFileHandle;
+
+import static org.onosproject.yangutils.datamodel.utils.DataModelUtils.detectCollidingChildUtil;
 
 /*-
  * Reference RFC 6020.
@@ -77,7 +77,7 @@ import org.onosproject.yangutils.translator.CachedFileHandle;
  * Data model node to maintain information defined in YANG grouping.
  */
 public class YangGrouping extends YangNode
-        implements YangLeavesHolder, YangCommonInfo, Parsable {
+        implements YangLeavesHolder, YangCommonInfo, Parsable, CollisionDetector {
 
     /**
      * Name of the grouping.
@@ -110,15 +110,12 @@ public class YangGrouping extends YangNode
     private YangStatusType status;
 
     /**
-     * Package of the generated java code.
-     */
-    private String pkg;
-
-    /**
      * Creates the grouping node.
      */
     public YangGrouping() {
         super(YangNodeType.GROUPING_NODE);
+        listOfLeaf = new LinkedList<YangLeaf>();
+        listOfLeafList = new LinkedList<YangLeafList>();
     }
 
     /**
@@ -187,10 +184,6 @@ public class YangGrouping extends YangNode
      */
     @Override
     public void addLeaf(YangLeaf leaf) {
-        if (getListOfLeaf() == null) {
-            setListOfLeaf(new LinkedList<YangLeaf>());
-        }
-
         getListOfLeaf().add(leaf);
     }
 
@@ -220,10 +213,6 @@ public class YangGrouping extends YangNode
      */
     @Override
     public void addLeafList(YangLeafList leafList) {
-        if (getListOfLeafList() == null) {
-            setListOfLeafList(new LinkedList<YangLeafList>());
-        }
-
         getListOfLeafList().add(leafList);
     }
 
@@ -297,57 +286,30 @@ public class YangGrouping extends YangNode
         // TODO auto-generated method stub, to be implemented by parser
     }
 
-    /**
-     * Generate the code for YANG grouping.
+    /*
+     * Reference RFC6020
      *
-     * @param codeGenDir code generated directory.
-     */
-    @Override
-    public void generateJavaCodeEntry(String codeGenDir) {
-        // TODO Auto-generated method stub
-
-    }
-
-    /**
-     * Free the resources used to generate java files corresponding to YANG
-     * grouping info and generate valid java files.
-     */
-    @Override
-    public void generateJavaCodeExit() {
-        // TODO Auto-generated method stub
-
-    }
-
-    /**
-     * Get the mapped java package.
+     * Once a grouping is defined, it can be referenced in a "uses"
+     * statement (see Section 7.12).  A grouping MUST NOT reference itself,
+     * neither directly nor indirectly through a chain of other groupings.
      *
-     * @return the java package
+     * If the grouping is defined at the top level of a YANG module or
+     * submodule, the grouping's identifier MUST be unique within the
+     * module.
      */
     @Override
-    public String getPackage() {
-        return pkg;
-    }
+    public void detectCollidingChild(String identifierName, YangConstructType dataType) throws DataModelException {
 
-    /**
-     * Set the mapped java package.
-     *
-     * @param pakg the package to set
-     */
-    @Override
-    public void setPackage(String pakg) {
-        pkg = pakg;
-
+        // Asks helper to detect colliding child.
+        detectCollidingChildUtil(identifierName, dataType, this);
     }
 
     @Override
-    public CachedFileHandle getFileHandle() {
-        // TODO Auto-generated method stub
-        return null;
+    public void detectSelfCollision(String identifierName, YangConstructType dataType) throws DataModelException {
+        if (getName().equals(identifierName)) {
+            throw new DataModelException("YANG file error: Duplicate input identifier detected, same as grouping \"" +
+                    getName() + "\"");
+        }
     }
-
-    @Override
-    public void setFileHandle(CachedFileHandle fileHandle) {
-        // TODO Auto-generated method stub
-
-    }
+    // TODO  A grouping MUST NOT reference itself, neither directly nor indirectly through a chain of other groupings.
 }

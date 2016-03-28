@@ -67,7 +67,6 @@ import org.onosproject.net.Element;
 import org.onosproject.net.GridType;
 import org.onosproject.net.HostId;
 import org.onosproject.net.HostLocation;
-import org.onosproject.net.IndexedLambda;
 import org.onosproject.net.Link;
 import org.onosproject.net.LinkKey;
 import org.onosproject.net.OchPort;
@@ -126,7 +125,6 @@ import org.onosproject.net.flow.criteria.IcmpCodeCriterion;
 import org.onosproject.net.flow.criteria.IcmpTypeCriterion;
 import org.onosproject.net.flow.criteria.Icmpv6CodeCriterion;
 import org.onosproject.net.flow.criteria.Icmpv6TypeCriterion;
-import org.onosproject.net.flow.criteria.IndexedLambdaCriterion;
 import org.onosproject.net.flow.criteria.LambdaCriterion;
 import org.onosproject.net.flow.criteria.MetadataCriterion;
 import org.onosproject.net.flow.criteria.MplsBosCriterion;
@@ -172,7 +170,6 @@ import org.onosproject.net.intent.SinglePointToMultiPointIntent;
 import org.onosproject.net.intent.constraint.AnnotationConstraint;
 import org.onosproject.net.intent.constraint.BandwidthConstraint;
 import org.onosproject.net.intent.constraint.BooleanConstraint;
-import org.onosproject.net.intent.constraint.LambdaConstraint;
 import org.onosproject.net.intent.constraint.LatencyConstraint;
 import org.onosproject.net.intent.constraint.LinkTypeConstraint;
 import org.onosproject.net.intent.constraint.ObstacleConstraint;
@@ -180,27 +177,15 @@ import org.onosproject.net.intent.constraint.PartialFailureConstraint;
 import org.onosproject.net.intent.constraint.WaypointConstraint;
 import org.onosproject.net.link.DefaultLinkDescription;
 import org.onosproject.net.meter.MeterId;
-import org.onosproject.net.newresource.ContinuousResource;
-import org.onosproject.net.newresource.ContinuousResourceId;
-import org.onosproject.net.newresource.DiscreteResource;
-import org.onosproject.net.newresource.DiscreteResourceId;
-import org.onosproject.net.newresource.ResourceAllocation;
+import org.onosproject.net.resource.ContinuousResource;
+import org.onosproject.net.resource.ContinuousResourceId;
+import org.onosproject.net.resource.DiscreteResource;
+import org.onosproject.net.resource.DiscreteResourceId;
+import org.onosproject.net.resource.ResourceAllocation;
 import org.onosproject.net.packet.DefaultOutboundPacket;
 import org.onosproject.net.packet.DefaultPacketRequest;
 import org.onosproject.net.packet.PacketPriority;
 import org.onosproject.net.provider.ProviderId;
-import org.onosproject.net.resource.link.BandwidthResource;
-import org.onosproject.net.resource.link.BandwidthResourceAllocation;
-import org.onosproject.net.resource.link.BandwidthResourceRequest;
-import org.onosproject.net.resource.link.DefaultLinkResourceAllocations;
-import org.onosproject.net.resource.link.DefaultLinkResourceRequest;
-import org.onosproject.net.resource.link.LambdaResource;
-import org.onosproject.net.resource.link.LambdaResourceAllocation;
-import org.onosproject.net.resource.link.LambdaResourceRequest;
-import org.onosproject.net.resource.link.LinkResourceRequest;
-import org.onosproject.net.resource.link.MplsLabel;
-import org.onosproject.net.resource.link.MplsLabelResourceAllocation;
-import org.onosproject.net.resource.link.MplsLabelResourceRequest;
 import org.onosproject.security.Permission;
 import org.onosproject.store.Timestamp;
 import org.onosproject.store.primitives.MapUpdate;
@@ -369,7 +354,6 @@ public final class KryoNamespaces {
                     TunnelIdCriterion.class,
                     IPv6ExthdrFlagsCriterion.class,
                     LambdaCriterion.class,
-                    IndexedLambdaCriterion.class,
                     OchSignalCriterion.class,
                     OchSignalTypeCriterion.class,
                     OduSignalIdCriterion.class,
@@ -386,7 +370,6 @@ public final class KryoNamespaces {
                     Instructions.TableTypeTransition.class,
                     L0ModificationInstruction.class,
                     L0ModificationInstruction.L0SubType.class,
-                    L0ModificationInstruction.ModLambdaInstruction.class,
                     L0ModificationInstruction.ModOchSignalInstruction.class,
                     L1ModificationInstruction.class,
                     L1ModificationInstruction.L1SubType.class,
@@ -439,22 +422,12 @@ public final class KryoNamespaces {
                     OpticalConnectivityIntent.class,
                     OpticalPathIntent.class,
                     OpticalCircuitIntent.class,
-                    LinkResourceRequest.class,
-                    DefaultLinkResourceRequest.class,
-                    BandwidthResourceRequest.class,
-                    LambdaResourceRequest.class,
-                    LambdaResource.class,
-                    BandwidthResource.class,
-                    DefaultLinkResourceAllocations.class,
-                    BandwidthResourceAllocation.class,
-                    LambdaResourceAllocation.class,
                     DiscreteResource.class,
                     ContinuousResource.class,
                     DiscreteResourceId.class,
                     ContinuousResourceId.class,
                     ResourceAllocation.class,
                     // Constraints
-                    LambdaConstraint.class,
                     BandwidthConstraint.class,
                     LinkTypeConstraint.class,
                     LatencyConstraint.class,
@@ -510,7 +483,6 @@ public final class KryoNamespaces {
             .register(ChannelSpacing.class)
             .register(OduCltPort.class)
             .register(CltSignalType.class)
-            .register(IndexedLambda.class)
             .register(OchSignal.class)
             .register(OduSignalId.class)
             .register(OduCltPortDescription.class)
@@ -523,9 +495,6 @@ public final class KryoNamespaces {
             .register(
                     MplsIntent.class,
                     MplsPathIntent.class,
-                    MplsLabelResourceAllocation.class,
-                    MplsLabelResourceRequest.class,
-                    MplsLabel.class,
                     org.onlab.packet.MplsLabel.class,
                     org.onlab.packet.MPLS.class
             )

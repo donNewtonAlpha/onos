@@ -29,6 +29,8 @@ import org.onosproject.yangutils.parser.impl.listeners.BaseFileListener;
 import org.onosproject.yangutils.parser.impl.listeners.BelongsToListener;
 import org.onosproject.yangutils.parser.impl.listeners.BitListener;
 import org.onosproject.yangutils.parser.impl.listeners.BitsListener;
+import org.onosproject.yangutils.parser.impl.listeners.CaseListener;
+import org.onosproject.yangutils.parser.impl.listeners.ChoiceListener;
 import org.onosproject.yangutils.parser.impl.listeners.ConfigListener;
 import org.onosproject.yangutils.parser.impl.listeners.ContactListener;
 import org.onosproject.yangutils.parser.impl.listeners.ContainerListener;
@@ -36,6 +38,7 @@ import org.onosproject.yangutils.parser.impl.listeners.DefaultListener;
 import org.onosproject.yangutils.parser.impl.listeners.DescriptionListener;
 import org.onosproject.yangutils.parser.impl.listeners.EnumListener;
 import org.onosproject.yangutils.parser.impl.listeners.EnumerationListener;
+import org.onosproject.yangutils.parser.impl.listeners.GroupingListener;
 import org.onosproject.yangutils.parser.impl.listeners.ImportListener;
 import org.onosproject.yangutils.parser.impl.listeners.IncludeListener;
 import org.onosproject.yangutils.parser.impl.listeners.KeyListener;
@@ -46,6 +49,7 @@ import org.onosproject.yangutils.parser.impl.listeners.MandatoryListener;
 import org.onosproject.yangutils.parser.impl.listeners.MaxElementsListener;
 import org.onosproject.yangutils.parser.impl.listeners.MinElementsListener;
 import org.onosproject.yangutils.parser.impl.listeners.ModuleListener;
+import org.onosproject.yangutils.parser.impl.listeners.NotificationListener;
 import org.onosproject.yangutils.parser.impl.listeners.NamespaceListener;
 import org.onosproject.yangutils.parser.impl.listeners.OrganizationListener;
 import org.onosproject.yangutils.parser.impl.listeners.PositionListener;
@@ -54,11 +58,14 @@ import org.onosproject.yangutils.parser.impl.listeners.PresenceListener;
 import org.onosproject.yangutils.parser.impl.listeners.ReferenceListener;
 import org.onosproject.yangutils.parser.impl.listeners.RevisionDateListener;
 import org.onosproject.yangutils.parser.impl.listeners.RevisionListener;
+import org.onosproject.yangutils.parser.impl.listeners.ShortCaseListener;
 import org.onosproject.yangutils.parser.impl.listeners.StatusListener;
 import org.onosproject.yangutils.parser.impl.listeners.SubModuleListener;
 import org.onosproject.yangutils.parser.impl.listeners.TypeDefListener;
 import org.onosproject.yangutils.parser.impl.listeners.TypeListener;
+import org.onosproject.yangutils.parser.impl.listeners.UnionListener;
 import org.onosproject.yangutils.parser.impl.listeners.UnitsListener;
+import org.onosproject.yangutils.parser.impl.listeners.UsesListener;
 import org.onosproject.yangutils.parser.impl.listeners.ValueListener;
 import org.onosproject.yangutils.parser.impl.listeners.VersionListener;
 
@@ -684,12 +691,12 @@ public class TreeWalkListener implements GeneratedYangListener {
 
     @Override
     public void enterUnionSpecification(GeneratedYangParser.UnionSpecificationContext ctx) {
-        // TODO: implement the method.
+        UnionListener.processUnionEntry(this, ctx);
     }
 
     @Override
     public void exitUnionSpecification(GeneratedYangParser.UnionSpecificationContext ctx) {
-        // TODO: implement the method.
+        UnionListener.processUnionExit(this, ctx);
     }
 
     @Override
@@ -833,16 +840,6 @@ public class TreeWalkListener implements GeneratedYangListener {
     }
 
     @Override
-    public void enterMaxValueArgument(GeneratedYangParser.MaxValueArgumentContext ctx) {
-        // TODO: implement the method.
-    }
-
-    @Override
-    public void exitMaxValueArgument(GeneratedYangParser.MaxValueArgumentContext ctx) {
-        // TODO: implement the method.
-    }
-
-    @Override
     public void enterValueStatement(GeneratedYangParser.ValueStatementContext ctx) {
         ValueListener.processValueEntry(this, ctx);
     }
@@ -854,12 +851,12 @@ public class TreeWalkListener implements GeneratedYangListener {
 
     @Override
     public void enterGroupingStatement(GeneratedYangParser.GroupingStatementContext ctx) {
-        // TODO: implement the method.
+        GroupingListener.processGroupingEntry(this, ctx);
     }
 
     @Override
     public void exitGroupingStatement(GeneratedYangParser.GroupingStatementContext ctx) {
-        // TODO: implement the method.
+        GroupingListener.processGroupingExit(this, ctx);
     }
 
     @Override
@@ -924,42 +921,42 @@ public class TreeWalkListener implements GeneratedYangListener {
 
     @Override
     public void enterChoiceStatement(GeneratedYangParser.ChoiceStatementContext ctx) {
-        // TODO: implement the method.
+        ChoiceListener.processChoiceEntry(this, ctx);
     }
 
     @Override
     public void exitChoiceStatement(GeneratedYangParser.ChoiceStatementContext ctx) {
-        // TODO: implement the method.
+        ChoiceListener.processChoiceExit(this, ctx);
     }
 
     @Override
     public void enterShortCaseStatement(GeneratedYangParser.ShortCaseStatementContext ctx) {
-        // TODO: implement the method.
+        ShortCaseListener.processShortCaseEntry(this, ctx);
     }
 
     @Override
     public void exitShortCaseStatement(GeneratedYangParser.ShortCaseStatementContext ctx) {
-        // TODO: implement the method.
+        ShortCaseListener.processShortCaseExit(this, ctx);
     }
 
     @Override
     public void enterCaseStatement(GeneratedYangParser.CaseStatementContext ctx) {
-        // TODO: implement the method.
+        CaseListener.processCaseEntry(this, ctx);
     }
 
     @Override
     public void exitCaseStatement(GeneratedYangParser.CaseStatementContext ctx) {
-        // TODO: implement the method.
+        CaseListener.processCaseExit(this, ctx);
     }
 
     @Override
     public void enterUsesStatement(GeneratedYangParser.UsesStatementContext ctx) {
-        // TODO: implement the method.
+        UsesListener.processUsesEntry(this, ctx);
     }
 
     @Override
     public void exitUsesStatement(GeneratedYangParser.UsesStatementContext ctx) {
-        // TODO: implement the method.
+        UsesListener.processUsesExit(this, ctx);
     }
 
     @Override
@@ -1094,12 +1091,12 @@ public class TreeWalkListener implements GeneratedYangListener {
 
     @Override
     public void enterNotificationStatement(GeneratedYangParser.NotificationStatementContext ctx) {
-        // TODO: implement the method.
+        NotificationListener.processNotificationEntry(this, ctx);
     }
 
     @Override
     public void exitNotificationStatement(GeneratedYangParser.NotificationStatementContext ctx) {
-        // TODO: implement the method.
+        NotificationListener.processNotificationExit(this, ctx);
     }
 
     @Override
@@ -1179,6 +1176,176 @@ public class TreeWalkListener implements GeneratedYangListener {
 
     @Override
     public void exitDateArgumentString(GeneratedYangParser.DateArgumentStringContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void enterRange(GeneratedYangParser.RangeContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void exitRange(GeneratedYangParser.RangeContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void enterLength(GeneratedYangParser.LengthContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void exitLength(GeneratedYangParser.LengthContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void enterPath(GeneratedYangParser.PathContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void exitPath(GeneratedYangParser.PathContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void enterPosition(GeneratedYangParser.PositionContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void exitPosition(GeneratedYangParser.PositionContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void enterStatus(GeneratedYangParser.StatusContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void exitStatus(GeneratedYangParser.StatusContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void enterConfig(GeneratedYangParser.ConfigContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void exitConfig(GeneratedYangParser.ConfigContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void enterMandatory(GeneratedYangParser.MandatoryContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void exitMandatory(GeneratedYangParser.MandatoryContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void enterOrderedBy(GeneratedYangParser.OrderedByContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void exitOrderedBy(GeneratedYangParser.OrderedByContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void enterMinValue(GeneratedYangParser.MinValueContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void exitMinValue(GeneratedYangParser.MinValueContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void enterMaxValue(GeneratedYangParser.MaxValueContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void exitMaxValue(GeneratedYangParser.MaxValueContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void enterKey(GeneratedYangParser.KeyContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void exitKey(GeneratedYangParser.KeyContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void enterUnique(GeneratedYangParser.UniqueContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void exitUnique(GeneratedYangParser.UniqueContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void enterRefine(GeneratedYangParser.RefineContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void exitRefine(GeneratedYangParser.RefineContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void enterAugment(GeneratedYangParser.AugmentContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void exitAugment(GeneratedYangParser.AugmentContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void enterDeviation(GeneratedYangParser.DeviationContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void exitDeviation(GeneratedYangParser.DeviationContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void enterYangConstruct(GeneratedYangParser.YangConstructContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void exitYangConstruct(GeneratedYangParser.YangConstructContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void enterVersion(GeneratedYangParser.VersionContext ctx) {
+        // TODO: implement the method.
+    }
+
+    @Override
+    public void exitVersion(GeneratedYangParser.VersionContext ctx) {
         // TODO: implement the method.
     }
 
