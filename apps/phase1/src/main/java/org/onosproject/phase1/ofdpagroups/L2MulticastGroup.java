@@ -22,6 +22,7 @@ public class L2MulticastGroup {
 
     private static ApplicationId appId;
     private static GroupService groupService;
+    private static short i = 0;
 
     public static void initiate(ApplicationId appId, GroupService groupService){
         L2MulticastGroup.appId = appId;
@@ -30,7 +31,7 @@ public class L2MulticastGroup {
     }
 
     private static Integer intKey(int vlanId){
-        Integer integerGroupId =  ((3 << 28) | (vlanId << 16));
+        Integer integerGroupId =  ((3 << 28) | (vlanId << 16) | i);
         return integerGroupId;
     }
 
@@ -42,6 +43,7 @@ public class L2MulticastGroup {
 
     public static GroupId create(List<PortNumber> ports, VlanId  vlanId, DeviceId device){
 
+        i++;
 
         final GroupKey groupkey = key(vlanId);
         List<GroupBucket> buckets = new LinkedList<>();
@@ -50,13 +52,13 @@ public class L2MulticastGroup {
             TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
             treatment.group(GroupFinder.getL2Interface(port, vlanId, false, device));
 
-            GroupBucket bucket = DefaultGroupBucket.createIndirectGroupBucket(treatment.build());
+            GroupBucket bucket = DefaultGroupBucket.createAllGroupBucket(treatment.build());
 
             buckets.add(bucket);
         }
 
         GroupDescription groupDescription = new DefaultGroupDescription(device,
-                GroupDescription.Type.INDIRECT,
+                GroupDescription.Type.ALL,
                 new GroupBuckets(buckets),
                 groupkey,
                 intKey(vlanId.toShort()),
@@ -65,6 +67,11 @@ public class L2MulticastGroup {
 
         return groupService.getGroup(device, groupkey).id();
 
+    }
+
+    public static GroupKey newKey(VlanId vlanId) {
+        i++;
+        return key(vlanId);
     }
 
 }

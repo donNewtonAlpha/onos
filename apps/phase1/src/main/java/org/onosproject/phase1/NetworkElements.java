@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Random;
 
 /**
 * Created by nick on 2/11/16.
@@ -114,7 +115,7 @@ public class NetworkElements{
         ////////// Vlan crossconnects
         //Find the difference between the Vlan crossconnects and the config
         List<VlanCrossconnect> vlanCrossconnectsToAdd = new LinkedList<>(config.vlanCrossconnects());
-        List<VlanCrossconnect> vlanCrossconnectsToRemove = new LinkedList<>(config.vlanCrossconnects());
+        List<VlanCrossconnect> vlanCrossconnectsToRemove = new LinkedList<>();
         for(VlanCrossconnect vcc : vlanCrossconnects){
             log.info("Current VlanCrossConnect : " + vcc.toString());
             if(!vlanCrossconnectsToAdd.remove(vcc)){
@@ -126,11 +127,11 @@ public class NetworkElements{
 
 
         for(VlanCrossconnect vcc : vlanCrossconnectsToRemove){
-            log.info("VlanCrossconnect to add : " + vcc.toString());
+            log.info("VlanCrossconnect to remove : " + vcc.toString());
             removeFlows(vlanCrossConnectFlows(vcc, deviceId));
         }
         for(VlanCrossconnect vcc : vlanCrossconnectsToAdd){
-            log.info("VlanCrossconnect to remove : " + vcc.toString());
+            log.info("VlanCrossconnect to add : " + vcc.toString());
             addFlows(vlanCrossConnectFlows(vcc, deviceId));
         }
 
@@ -458,35 +459,71 @@ public class NetworkElements{
         //TODO: update group instead of removing and adding back the flow
         if(floodRule != null){
             //Remove it if it exist
-            flowRuleService.removeFlowRules(floodRule);
+
+            GroupKey oldKey = L2MulticastGroup.key(vlanId);
+            Group floodGroup = groupService.getGroup(deviceId, oldKey);
+            List<GroupBucket> currentBuckets = floodGroup.buckets().buckets();
+            List<GroupBucket> bucketsToRemove = new LinkedList<>(currentBuckets);
+            List<GroupBucket> bucketsToAdd = new LinkedList<>();
+
+            for(PortNumber port : ports) {
+                TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                                                .group(GroupFinder.getL2Interface(port,vlanId,false, deviceId)).build();
+                boolean toAdd = true;
+
+
+                for(GroupBucket bucket : currentBuckets) {
+                    if(bucket.treatment().equals(treatment)){
+                        //The output to this port is already configured, we do not add it
+                        toAdd = false;
+                        //We do not remove it
+                        bucketsToRemove.remove(bucket);
+                    }
+                }
+                if(toAdd) {
+                    GroupBucket newBucket = DefaultGroupBucket.createAllGroupBucket(treatment);
+                    bucketsToAdd.add(newBucket);
+                }
+            }
+
+            log.info("Buckets to remove : " + bucketsToRemove.size() + ", Buckets to add : " + bucketsToAdd.size());
+            /*boolean random = (new Random()).nextBoolean();
+            if(random) {
+                log.info("Trying case same key (old)");*/
+
+                groupService.removeBucketsFromGroup(deviceId, oldKey, new GroupBuckets(bucketsToRemove), oldKey, appId);
+                groupService.addBucketsToGroup(deviceId, oldKey, new GroupBuckets(bucketsToAdd), oldKey, appId);
+
+          /*  } else {
+
+                log.info("Trying case new key");
+                GroupKey newKey = L2MulticastGroup.newKey(vlanId);
+                groupService.removeBucketsFromGroup(deviceId, oldKey, new GroupBuckets(bucketsToRemove), newKey, appId);
+                groupService.addBucketsToGroup(deviceId, newKey, new GroupBuckets(bucketsToAdd),  L2MulticastGroup.newKey(vlanId), appId);
+            }*/
+        } else {
+
+            TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+            selector.matchEthDst(MacAddress.BROADCAST);
+            selector.extension(new OfdpaMatchVlanVid(vlanId), deviceId);
+
+            TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+            treatment.group(GroupFinder.getL2Multicast(ports, vlanId, deviceId));
+            treatment.transition(ACL_TABLE);
+
+            FlowRule.Builder rule = DefaultFlowRule.builder();
+            rule.withSelector(selector.build());
+            rule.withTreatment(treatment.build());
+            rule.withPriority(2000);
+            rule.fromApp(appId);
+            rule.forTable(BRIDGING_TABLE);
+            rule.makePermanent();
+            rule.forDevice(deviceId);
+
+            floodRule = rule.build();
+
+            flowRuleService.applyFlowRules(floodRule);
         }
-
-        GroupKey oldKey = L2MulticastGroup.key(vlanId);
-        Group floodGroup = groupService.getGroup(deviceId, oldKey);
-        if(floodGroup != null) {
-            //Remove it if it exists
-            groupService.removeGroup(deviceId, oldKey, appId);
-        }
-
-        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
-        selector.matchEthDst(MacAddress.BROADCAST);
-        selector.extension(new OfdpaMatchVlanVid(vlanId), deviceId);
-
-        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
-        treatment.group(GroupFinder.getL2Multicast(ports, vlanId, deviceId));
-        treatment.transition(ACL_TABLE);
-
-        FlowRule.Builder rule = DefaultFlowRule.builder();
-        rule.withSelector(selector.build());
-        rule.withTreatment(treatment.build());
-        rule.withPriority(2000);
-        rule.fromApp(appId);
-        rule.forTable(BRIDGING_TABLE);
-        rule.makePermanent();
-        rule.forDevice(deviceId);
-
-        flowRuleService.applyFlowRules(rule.build());
-
     }
 
 

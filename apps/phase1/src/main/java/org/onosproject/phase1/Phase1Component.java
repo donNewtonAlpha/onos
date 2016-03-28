@@ -163,7 +163,6 @@ public class Phase1Component{
 
         hostListener.readInitialHosts();
 
-        logConfig();
 
 
         //Limitation for now, single tor
