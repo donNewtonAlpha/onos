@@ -122,41 +122,6 @@ public class Phase1Component{
 
 
 
-
-
-/*
-        log.debug("Packet sent to get MAC from uplink");
-
-        //Creation of the network objects
-        
-        LinkedList<Integer> oltVlans = new LinkedList<>();
-        LinkedList<Integer> vm1Vlans = new LinkedList<>();
-
-        oltVlans.add(5);
-        vm1Vlans.add(5);
-
-        Olt olt = new Olt(9, oltVlans);
-
-        VsgVm vm1 = new VsgVm(Ip4Address.valueOf("10.255.255.2"), MacAddress.valueOf("52:54:00:E5:28:CF"),vm1Vlans);
-        vm1.addVsgs(1, Ip4Address.valueOf("29.29.0.2"), MacAddress.valueOf("52:54:00:3D:29:81"));
-        LinkedList<VsgVm> vms1 = new LinkedList<>();
-        vms1.add(vm1);
-
-
-        VsgServer vsgServer1 = new VsgServer(3,MacAddress.valueOf("e4:1d:2d:08:4b:80"), vms1, Ip4Prefix.valueOf("29.29.0.0/22"));
-
-
-
-        log.debug("Olt and server objects created");
-        log.debug(" Olt : " + olt.toString());
-        log.debug("VsgServer 1 : " + vsgServer1.toString());
-
-
-
-
-        elements.addElement(olt);
-        elements.addElement(vsgServer1);*/
-
         Phase1AppConfig config = cfgService.getConfig(appId, Phase1AppConfig.class);
         elements.update(config);
 
@@ -327,7 +292,7 @@ public class Phase1Component{
 
             ///////////
 
-            /////////Intercept on the Vsg servers ports (to use the TOR as the gateway
+            /////////Intercept on the vSG servers ports (to use the TOR as the gateway
 
             for(PortNumber port : this.vsgServerPorts) {
 

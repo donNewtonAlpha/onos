@@ -63,25 +63,18 @@ public class NetworkElements{
     private MacAddress primaryUplinkMac;
     private Phase1Component phase1;
 
-    private List<NetworkElement> elements;
     private FlowRule floodRule = null;
 
     private long timer = 0;
 
     public NetworkElements(FlowRuleService flowRuleService, GroupService groupService, ApplicationId appId, DeviceId deviceId, MacAddress mac, Phase1Component component){
-        elements = new LinkedList<>();
+
         this.flowRuleService = flowRuleService;
         this.groupService = groupService;
         this.appId = appId;
         this.deviceId = deviceId;
         this.torMac = mac;
         this.phase1 = component;
-    }
-
-    public void addElement(NetworkElement newElement){
-        elements.add(newElement);
-        log.debug("New element added");
-        //TODO: update  flows and flood group
     }
 
 
@@ -561,42 +554,7 @@ public class NetworkElements{
         }
     }*/
 
-    /*private void internetFlows(DeviceId deviceId){
 
-        //////Flows from uplink to Vsgs
-
-        //Tagging the untagged traffic from the internet
-        untaggedPacketsTagging(primaryInternet, internalInternetVlan, deviceId);
-        //Treating it as ip unicast traffic, this ToR is now (partially) a router
-        tMacTableFlowUnicastRouting(torMac, 10);
-        //Setting the Ip flows for all Vsgs
-        for(VsgServer server : getVsgServers()){
-            for(VsgVm vm : server.getVms()){
-                for(Vsg vsg : vm.getVsgs()){
-                    log.info("Vsg mac : " + vsg.getWanSideMac() + "Vsg public ip : " + vsg.getPublicIp());
-                    ipFlow(vsg.getPublicIp().toIpPrefix().getIp4Prefix(), server.getPortNumber(), internalInternetVlan.toShort(), torMac, vsg.getWanSideMac(),false, 2000);
-                }
-            }
-        }
-
-        //////////////
-
-
-        ////////Flows from the Vsgs to the Internet
-
-        for(VsgServer server : getVsgServers()){
-            //Allowing the internet Vlan on this port
-            vlanTableFlows(server.getPortNumber(), internalInternetVlan, deviceId);
-            // TMAC flow already in
-
-            //Ip flow to the internet, 2 /1 prefix with low priority
-
-            ipFlow(Ip4Prefix.valueOf("0.0.0.0/1"), primaryInternet, internalInternetVlan.toShort(), torMac, primaryUplinkMac, true, 5);
-            ipFlow(Ip4Prefix.valueOf("128.0.0.0/1"), primaryInternet, internalInternetVlan.toShort(), torMac, primaryUplinkMac, true, 5);
-
-        }
-
-    }*/
 
 
 /*    private void floodFlow(DeviceId deviceId){
@@ -624,58 +582,5 @@ public class NetworkElements{
         flowRuleService.applyFlowRules(floodRule.build());
     }*/
 
-/*
-    private void innerNetworkFlows(DeviceId deviceId){
-
-        //TODO : add the incoming port condition ???
-
-        for(NetworkElement element:elements){
-            if(element instanceof  VsgServer){
-                VsgServer server = (VsgServer) element;
-                innerNetworkMacFlow(server.getPortNumber(), server.getMac(), deviceId);
-                List<VsgVm> vms = server.getVms();
-                for(VsgVm vm : vms){
-                    innerNetworkMacFlow(server.getPortNumber(), vm.getMac(), deviceId);
-                }
-            } else if(element instanceof QuaggaInstance){
-                QuaggaInstance quagga = (QuaggaInstance) element;
-                innerNetworkMacFlow(quagga.getPortNumber(), quagga.getMac(), deviceId);
-            } else if(element instanceof IndependentServer){
-                IndependentServer independentServer = (IndependentServer) element;
-                innerNetworkMacFlow(independentServer.getPortNumber(), independentServer.getMac(), deviceId);
-            }
-
-        }
-
-    }*/
-
-
-
-    /*private List<Olt> getOlts(){
-
-        LinkedList<Olt> olts = new LinkedList<>();
-        for(NetworkElement element : elements){
-            if(element instanceof Olt){
-                olts.add((Olt)element);
-            }
-        }
-        return olts;
-
-    }
-
-    private List<VsgServer> getVsgServers(){
-
-        LinkedList<VsgServer> servers = new LinkedList<>();
-        for(NetworkElement element : elements){
-            if(element instanceof VsgServer){
-                servers.add((VsgServer) element);
-            }
-        }
-
-        return servers;
-    }
-
-
-*/
 
 }

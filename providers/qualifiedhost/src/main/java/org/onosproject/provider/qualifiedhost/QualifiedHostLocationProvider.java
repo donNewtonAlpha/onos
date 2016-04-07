@@ -575,7 +575,8 @@ public class QualifiedHostLocationProvider extends AbstractProvider implements H
                         break;
                     case CONFIG_REGISTERED:
                         log.info("Qualified Host config registered");
-                        QualifiedHostProviderConfig registeredConfig = netCfgService.getConfig(appId, QualifiedHostProviderConfig.class);
+                        QualifiedHostProviderConfig registeredConfig =
+                                netCfgService.getConfig(appId, QualifiedHostProviderConfig.class);
                         applyConfig(registeredConfig);
                     default:
                         break;
