@@ -105,4 +105,8 @@ public class OFActionNoviflowVxLan implements OFActionExperimenter {
         sink.putInt(vni);
 
     }
+
+    public boolean isSetVxLan() {
+        return true;
+    }
 }

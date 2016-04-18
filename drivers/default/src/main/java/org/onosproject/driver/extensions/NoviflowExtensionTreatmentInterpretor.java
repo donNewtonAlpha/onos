@@ -1,6 +1,8 @@
 package org.onosproject.driver.extensions;
 
 
+import org.onosproject.driver.extensions.ofmessages.OFActionNoviflowDecapsulateVxLan;
+import org.onosproject.driver.extensions.ofmessages.OFActionNoviflowExperimenter;
 import org.onosproject.driver.extensions.ofmessages.OFActionNoviflowVxLan;
 import org.onosproject.net.behaviour.ExtensionTreatmentResolver;
 import org.onosproject.net.driver.AbstractHandlerBehaviour;
@@ -25,6 +27,10 @@ public class NoviflowExtensionTreatmentInterpretor extends AbstractHandlerBehavi
                 ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_SET_VXLAN.type())) {
             return true;
         }
+        if (extensionTreatmentType.equals(
+                ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_POP_VXLAN.type())) {
+            return true;
+        }
         return false;
     }
 
@@ -41,6 +47,13 @@ public class NoviflowExtensionTreatmentInterpretor extends AbstractHandlerBehavi
 
             return action;
         }
+
+        if (type.equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_POP_VXLAN.type())) {
+
+            OFActionNoviflowDecapsulateVxLan action = new OFActionNoviflowDecapsulateVxLan();
+
+            return action;
+        }
         throw new UnsupportedOperationException(
                 "Unexpected ExtensionTreatment: " + extensionTreatment.toString());
     }
@@ -51,10 +64,14 @@ public class NoviflowExtensionTreatmentInterpretor extends AbstractHandlerBehavi
         if (action.getType().equals(OFActionType.EXPERIMENTER)) {
             OFActionExperimenter experimenterAction = (OFActionExperimenter) action;
             if (experimenterAction.getExperimenter() == 0xff000002) {
-                return new NoviflowSetVxLan();
-            }
-            //TODO : improve and add pop vxlan tunnel
+                if (experimenterAction instanceof OFActionNoviflowExperimenter) {
+                    if (((OFActionNoviflowExperimenter) experimenterAction).isSetVxLan()) {
+                        return new NoviflowSetVxLan();
+                    }
+                }
+                return new NoviflowPopVxLan();
 
+            }
 
 
         }
@@ -66,6 +83,9 @@ public class NoviflowExtensionTreatmentInterpretor extends AbstractHandlerBehavi
     public ExtensionTreatment getExtensionInstruction(ExtensionTreatmentType type) {
         if (type.equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_SET_VXLAN.type())) {
             return new NoviflowSetVxLan();
+        }
+        if (type.equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_POP_VXLAN.type())) {
+            return new NoviflowPopVxLan();
         }
         throw new UnsupportedOperationException(
                 "Driver does not support extension type " + type.toString());

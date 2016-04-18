@@ -46,7 +46,8 @@ public final class ExtensionTreatmentType {
         NICIRA_SET_NSH_CH3(36),
         NICIRA_SET_NSH_CH4(37),
         OFDPA_SET_VLAN_ID(64),
-        NOVIFLOW_SET_VXLAN(128);
+        NOVIFLOW_SET_VXLAN(128),
+        NOVIFLOW_POP_VXLAN(129);
 
         private ExtensionTreatmentType type;
 

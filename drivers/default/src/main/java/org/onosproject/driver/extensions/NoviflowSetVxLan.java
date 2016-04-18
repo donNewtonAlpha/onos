@@ -3,7 +3,6 @@ package org.onosproject.driver.extensions;
 import com.google.common.base.MoreObjects;
 import org.onlab.packet.Ip4Address;
 import org.onlab.packet.MacAddress;
-import org.onlab.util.KryoNamespace;
 import org.onosproject.net.flow.AbstractExtension;
 import org.onosproject.net.flow.instructions.ExtensionTreatment;
 import org.onosproject.net.flow.instructions.ExtensionTreatmentType;
@@ -26,13 +25,6 @@ public class NoviflowSetVxLan extends AbstractExtension implements ExtensionTrea
     private Integer udpPort;
     private Integer vXlanId;
 
-    private static final KryoNamespace APPKRYO = new KryoNamespace.Builder()
-            .register(MacAddress.class)
-            //.register(MacAddress.class)
-            .register(Ip4Address.class)
-            //.register(Ip4Address.class)
-            .register(Integer.class)
-            .build();
 
     /**
      * Constructs a new set VxLAN instruction.
