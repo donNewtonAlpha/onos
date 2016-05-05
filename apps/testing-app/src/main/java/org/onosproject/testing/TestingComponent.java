@@ -26,6 +26,9 @@ import org.onosproject.net.packet.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.ByteBuffer;
+import java.util.LinkedList;
+import java.util.List;
 
 
 /**
@@ -52,6 +55,7 @@ public class TestingComponent {
 
     static ApplicationId appId;
     static final DeviceId deviceId = DeviceId.deviceId("of:000000223d5a00d9");
+    static final DeviceId ovsId = DeviceId.deviceId("of:0000b214876af640");
 
 
     @Activate
@@ -71,43 +75,16 @@ public class TestingComponent {
         MacAddress vxlanMacSrc = MacAddress.valueOf("22:22:22:22:22:22");
 
 
-        vxlanFlow(1, 2,vxlanDst, vxlanSrc, vxlanMacDst, vxlanMacSrc,15,8);
-        popVxLanFlow(4,1);
+        vxlanFlow(2, 4,vxlanDst, vxlanSrc, vxlanMacDst, vxlanMacSrc,15,8);
+        popVxLanFlow(4,2);
 
-        vlanCrossconnect(1,3,5);
-
-
+        vlanCrossconnect(2,4,5);
 
 
-        /*FlowRule flow1 = testFlow1(15,16,436);
-        FlowRule flow2 = testFlow1(17,18,-1);
+        inbandOltControl();
 
-        try {
-            //Test 1, should add 1 flow in the vlan table, one flow in the acl table, one group (L2 interface)
-            testFlowTranslation(flow1);
-        } catch (Exception e){
-            log.error("Test 1 error",e);
-        }
-        log.info("Test 1 ended");
+        ovsTest(ovsId);
 
-        try {
-            //Test 2, can a treatment have multiple Output instructions ??
-            testMultipleOutputTreatment();
-        } catch(Exception e){
-            log.error("Test 2 error", e);
-        }
-
-        log.info("Test 2 ended");
-
-        try {
-            //Test3, can a translation be use to remove the flows
-            //testRemoveFlowTranslation1(flow1);
-            testFlowTranslation(flow2);
-        } catch (Exception e){
-            log.error("Test 3 error", e);
-        }
-
-        log.info("Test 3 ended");*/
 
     }
 
@@ -124,6 +101,96 @@ public class TestingComponent {
         }
 
         log.info("Stopped");
+    }
+
+    private void ovsTest(DeviceId ovsId) {
+
+        TrafficSelector.Builder selector1 = DefaultTrafficSelector.builder();
+        selector1.matchEthType(Ethernet.TYPE_IPV4);
+        selector1.matchIPDst(IpPrefix.valueOf("192.168.1.192/26"));
+
+        TrafficSelector.Builder selector2 = DefaultTrafficSelector.builder();
+        selector2.matchEthType(Ethernet.TYPE_IPV4);
+        selector2.matchIPDst(IpPrefix.valueOf("192.168.1.254/32"));
+
+        TrafficSelector.Builder selector3 = DefaultTrafficSelector.builder();
+        selector3.matchEthType(Ethernet.TYPE_ARP);
+        selector3.matchArpTpa(Ip4Address.valueOf("192.168.1.199"));
+
+
+        TrafficTreatment.Builder outPort1 = DefaultTrafficTreatment.builder();
+        outPort1.setOutput(PortNumber.portNumber(1));
+
+        TrafficTreatment.Builder outPort2 = DefaultTrafficTreatment.builder();
+        outPort2.setOutput(PortNumber.portNumber(2));
+
+        addFlow(selector1.build(), outPort1.build(), 1000, ovsId);
+        addFlow(selector2.build(), outPort2.build(), 5000, ovsId);
+        addFlow(selector3.build(), outPort1.build(), 500, ovsId);
+
+    }
+
+    private void addFlow(TrafficSelector selector, TrafficTreatment treatment, int priority, DeviceId deviceId) {
+
+        FlowRule.Builder rule = DefaultFlowRule.builder();
+        rule.withSelector(selector);
+        rule.withTreatment(treatment);
+        rule.withPriority(priority);
+        rule.fromApp(appId);
+        rule.makePermanent();
+        rule.forTable(0);
+        rule.forDevice(deviceId);
+
+        flowRuleService.applyFlowRules(rule.build());
+    }
+
+    private void inbandOltControl(){
+
+        flowPort1to2(25,1);
+        flowPort1to2(26,1);
+        flowPort1to2(27,1);
+        flowPort1to2(28,1);
+
+        GroupKey groupKey = new DefaultGroupKey(ByteBuffer.allocate(4).putInt(42).array());
+        List<GroupBucket> buckets = new LinkedList<>();
+
+        for(int i = 25; i < 29; i++) {
+
+            TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+            treatment.setOutput(PortNumber.portNumber(i));
+
+            GroupBucket bucket = DefaultGroupBucket.createAllGroupBucket(treatment.build());
+
+            buckets.add(bucket);
+        }
+
+        GroupDescription groupDescription = new DefaultGroupDescription(deviceId,
+                GroupDescription.Type.ALL,
+                new GroupBuckets(buckets),
+                groupKey,
+                42,
+                appId);
+        groupService.addGroup(groupDescription);
+
+
+        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+        selector.matchInPort(PortNumber.portNumber(2));
+
+        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+        treatment.group(groupService.getGroup(deviceId, groupKey).id());
+
+        FlowRule.Builder rule = DefaultFlowRule.builder();
+        rule.withSelector(selector.build());
+        rule.withTreatment(treatment.build());
+        rule.withPriority(8000);
+        rule.fromApp(appId);
+        rule.makePermanent();
+        rule.forTable(0);
+        rule.forDevice(deviceId);
+
+        flowRuleService.applyFlowRules(rule.build());
+
+
     }
 
     private void linkPorts(int port1, int port2) {
@@ -259,7 +326,7 @@ public class TestingComponent {
         FlowRule.Builder rule = DefaultFlowRule.builder();
         rule.withSelector(selector.build());
         rule.withTreatment(treatment.build());
-        rule.withPriority(1000);
+        rule.withPriority(7000);
         rule.fromApp(appId);
         rule.makePermanent();
         rule.forTable(0);
