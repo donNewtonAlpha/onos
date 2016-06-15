@@ -153,7 +153,7 @@ public class TestingComponent {
 
     }
 
-    private FlowRule vlanTableFlows(PortNumber port, VlanId vlanId, DeviceId deviceId){
+    private void vlanTableFlows(PortNumber port, VlanId vlanId, DeviceId deviceId){
 
         TrafficSelector.Builder vlanTableSelector = DefaultTrafficSelector.builder();
         vlanTableSelector.matchInPort(port);
@@ -171,7 +171,7 @@ public class TestingComponent {
         vlanTableRule.forDevice(deviceId);
         vlanTableRule.makePermanent();
 
-        return vlanTableRule.build();
+        flowRuleService.applyFlowRules(vlanTableRule.build());
 
     }
 
@@ -179,13 +179,20 @@ public class TestingComponent {
         // Assuming shithook port n is connected to port n+1
 
         //Cumulus vlans : 3793
-        for(int i = 2; i< 3793; i++) {
+        for(int i = 2; i< 5; i++) {
 
             VlanId vlan = VlanId.vlanId((short)i);
 
             for(PortNumber port : inPorts) {
-                flowRuleService.applyFlowRules(vlanTableFlows(port, vlan, deviceId));
+                vlanTableFlows(port, vlan, deviceId);
             }
+
+            try {
+                Thread.sleep(30000);
+            } catch (InterruptedException e) {
+
+            }
+
             multicastTraffic(inPorts, shitHookPorts, vlan, deviceId);
             mergeTraffic(shitHookPorts, outPort, vlan, deviceId);
 
@@ -242,6 +249,8 @@ public class TestingComponent {
             rule.fromApp(appId);
             rule.forDevice(deviceId);
             rule.makePermanent();
+
+            flowRuleService.applyFlowRules(rule.build());
         }
 
 
