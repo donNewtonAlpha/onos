@@ -72,6 +72,8 @@ public class TestingComponent {
         log.debug("trying to activate");
         appId = coreService.registerApplication("org.onosproject.testing");
 
+        GroupFinder.initiate(appId, groupService);
+
 
         List<PortNumber> generatorPorts = new LinkedList<>();
         generatorPorts.add(PortNumber.portNumber(33));
