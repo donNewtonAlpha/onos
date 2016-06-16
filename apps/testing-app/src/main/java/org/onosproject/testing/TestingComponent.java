@@ -224,6 +224,14 @@ public class TestingComponent {
 
         }
 
+        //Vlan flows for incoming shithook
+
+        for(PortNumber outport : outPorts) {
+            PortNumber shitHookIn = PortNumber.portNumber(outport.toLong());
+
+            vlanTableFlows(shitHookIn, vlanId, deviceId);
+        }
+
 
     }
 
