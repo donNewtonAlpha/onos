@@ -96,7 +96,7 @@ public class NoviFlowTest {
         rule.withSelector(selector.build());
         rule.withTreatment(treatment.build());
         rule.withPriority(200);
-        rule.forTable(0);
+        rule.forTable(1);
         rule.fromApp(appId);
         rule.forDevice(deviceId);
         rule.makePermanent();
@@ -115,7 +115,7 @@ public class NoviFlowTest {
         rule.withSelector(selector.build());
         rule.withTreatment(treatment.build());
         rule.withPriority(1);
-        rule.forTable(0);
+        rule.forTable(1);
         rule.fromApp(appId);
         rule.forDevice(deviceId);
         rule.makePermanent();
@@ -156,7 +156,7 @@ public class NoviFlowTest {
         rule.withSelector(selector.build());
         rule.withTreatment(treatment.build());
         rule.withPriority(1);
-        rule.forTable(0);
+        rule.forTable(2);
         rule.fromApp(appId);
         rule.forDevice(deviceId);
         rule.makePermanent();
