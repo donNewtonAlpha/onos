@@ -23,6 +23,7 @@ import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.flow.TrafficSelector;
 import org.onosproject.net.flow.TrafficTreatment;
 import org.onosproject.net.group.*;
+import org.onosproject.net.meter.MeterService;
 import org.onosproject.net.packet.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,11 +53,15 @@ public class TestingComponent {
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected GroupService groupService;
 
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected MeterService meterService;
+
 
 
     static ApplicationId appId;
     static final DeviceId deviceId = DeviceId.deviceId("of:000000000000da7a");
     static final DeviceId ovsId = DeviceId.deviceId("of:0000b214876af640");
+    static final DeviceId noviflowDevice = DeviceId.deviceId("of:000000223d5a00d9");
 
 
     static final int ACL_TABLE = 60;
@@ -72,41 +77,9 @@ public class TestingComponent {
         log.debug("trying to activate");
         appId = coreService.registerApplication("org.onosproject.testing");
 
-        GroupFinder.initiate(appId, groupService);
+        NoviFlowTest.bng(noviflowDevice, appId, flowRuleService, meterService);
 
 
-        List<PortNumber> generatorPorts = new LinkedList<>();
-        generatorPorts.add(PortNumber.portNumber(33));
-        generatorPorts.add(PortNumber.portNumber(34));
-        generatorPorts.add(PortNumber.portNumber(35));
-        generatorPorts.add(PortNumber.portNumber(36));
-
-        List<PortNumber> shitHookPorts = new LinkedList<>();
-        shitHookPorts.add(PortNumber.portNumber(10));
-        shitHookPorts.add(PortNumber.portNumber(12));
-
-        multiplyTraffic(generatorPorts, shitHookPorts, PortNumber.portNumber(32), deviceId);
-
-
-        //linkPorts(1, 2);
-        //ipFlow(Ip4Address.valueOf("192.168.1.4"), 3);
-        //vxlanTest(1, 2, VlanId.vlanId((short)5));
-
-       /* Ip4Address vxlanSrc = Ip4Address.valueOf("10.21.12.13");
-        Ip4Address vxlanDst = Ip4Address.valueOf("10.55.12.13");
-        MacAddress vxlanMacDst = MacAddress.valueOf("11:11:11:11:11:11");
-        MacAddress vxlanMacSrc = MacAddress.valueOf("22:22:22:22:22:22");
-
-
-        vxlanFlow(2, 4,vxlanDst, vxlanSrc, vxlanMacDst, vxlanMacSrc,15,8);
-        popVxLanFlow(4,2);
-
-        vlanCrossconnect(2,4,5);
-
-
-        inbandOltControl();
-
-        ovsTest(ovsId);*/
 
 
     }
