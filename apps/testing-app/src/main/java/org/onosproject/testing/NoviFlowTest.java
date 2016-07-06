@@ -23,7 +23,7 @@ public class NoviFlowTest {
     private static FlowRuleService flowRuleService;
     private static MeterService meterService;
 
-    private static PortNumber outPort = PortNumber.portNumber(10);
+    private static PortNumber outPort = PortNumber.portNumber(8);
     private static MacAddress nextHopMac = MacAddress.valueOf("11:22:33:11:22:33");
 
 
