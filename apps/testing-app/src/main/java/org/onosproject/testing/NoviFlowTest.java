@@ -24,7 +24,7 @@ public class NoviFlowTest {
     private static MeterService meterService;
 
     private static PortNumber outPort = PortNumber.portNumber(8);
-    private static MacAddress nextHopMac = MacAddress.valueOf("11:22:33:11:22:33");
+    private static MacAddress nextHopMac = MacAddress.valueOf("a0:36:9f:27:88:f0");
 
 
     public static void bng(DeviceId deviceId, ApplicationId appId, FlowRuleService flowRuleService, MeterService meterService) {

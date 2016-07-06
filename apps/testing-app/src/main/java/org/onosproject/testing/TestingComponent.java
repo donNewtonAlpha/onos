@@ -96,6 +96,8 @@ public class TestingComponent {
             groupService.removeGroup(group.deviceId(), group.appCookie(), group.appId());
         }
 
+
+
         log.info("Stopped");
     }
 
