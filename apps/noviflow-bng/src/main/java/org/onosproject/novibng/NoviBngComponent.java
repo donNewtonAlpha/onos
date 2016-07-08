@@ -159,8 +159,8 @@ public class NoviBngComponent {
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
         treatment.setVlanId(VlanId.vlanId((short) cTag));
-        treatment.deferred();
-        treatment.pushVlan();
+        //treatment.deferred();
+        //treatment.pushVlan();
         treatment.transition(11);
 
         FlowRule.Builder rule = DefaultFlowRule.builder();
