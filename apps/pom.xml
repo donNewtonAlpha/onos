@@ -74,6 +74,7 @@
         <module>openstacknetworking</module>
         <module>openstackinterface</module>
         <module>influxdbmetrics</module>
+        <module>noviflow-bng</module>
 
   </modules>
 
