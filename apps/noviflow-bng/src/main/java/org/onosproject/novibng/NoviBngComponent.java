@@ -166,7 +166,7 @@ public class NoviBngComponent {
         FlowRule.Builder rule = DefaultFlowRule.builder();
         rule.withSelector(selector.build());
         rule.withTreatment(treatment.build());
-        rule.withPriority(2000 + sTag * 100 + cTag);
+        rule.withPriority(2000);
         rule.forTable(10);
         rule.fromApp(appId);
         rule.forDevice(deviceId);
@@ -180,7 +180,7 @@ public class NoviBngComponent {
     private void downstreamStag(int sTag, int cTag, int port) {
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
-        selector.matchIPDst(IpPrefix.valueOf(tagsToIpMatching(sTag, cTag), 31));
+        selector.matchIPDst(tagsToIpMatching(sTag, cTag).toIpPrefix());
 
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
