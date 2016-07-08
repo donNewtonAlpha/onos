@@ -158,7 +158,8 @@ public class NoviBngComponent {
 
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
-        treatment.pushVlan();
+        //treatment.pushVlan();
+        //treatment.deferred();
         treatment.setVlanId(VlanId.vlanId((short) cTag));
         treatment.transition(11);
 
@@ -184,6 +185,7 @@ public class NoviBngComponent {
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
         treatment.pushVlan();
+        treatment.deferred();
         treatment.setVlanId(VlanId.vlanId((short) sTag));
         treatment.setQueue(3);
         treatment.setOutput(PortNumber.portNumber(port));
