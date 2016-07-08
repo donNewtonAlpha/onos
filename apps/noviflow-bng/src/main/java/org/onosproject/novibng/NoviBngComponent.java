@@ -75,6 +75,8 @@ public class NoviBngComponent {
 
     private LinkedList<Integer> sTagsEnabled = new LinkedList<>();
 
+    private PacketProcessor processor;
+
 
 
 
@@ -85,6 +87,10 @@ public class NoviBngComponent {
 
         log.debug("trying to activate");
         appId = coreService.registerApplication("org.onosproject.novibng");
+
+        processor = new NoviBngPacketProcessor();
+
+        packetService.addProcessor(processor, 1);
 
         acl();
         arpIntercept();
