@@ -73,6 +73,8 @@ public class NoviBngComponent {
     private static Ip4Address torIp = Ip4Address.valueOf("20.20.0.1");
     private static Ip4Address torRoutedInterfaceIp = Ip4Address.valueOf("10.1.4.0");
 
+    private LinkedList<Integer> sTagsEnabled = new LinkedList<>();
+
 
 
 
@@ -84,22 +86,23 @@ public class NoviBngComponent {
         log.debug("trying to activate");
         appId = coreService.registerApplication("org.onosproject.novibng");
 
+        acl();
+        arpIntercept();
+        voIpDetection();
+        downstreamTrafficHandling();
 
         for(int i = 2; i < 4 ; i++) {
 
-            sTagMatch(5, i);
-
             for(int j = 2; j < 4 ; j++) {
 
-                meterAssignmentAndOut(i, j, (i + j) * 1000);
+                addCustomer(i, j, 5, (2*i+3*j)*1000);
 
             }
         }
 
-        acl();
-        arpIntercept();
 
 
+        log.info("NoviFlow BNG activated");
 
     }
 
@@ -118,6 +121,108 @@ public class NoviBngComponent {
 
 
         log.info("Stopped");
+    }
+
+    private Ip4Address tagsToIpMatching(int sTag, int cTag) {
+
+        return Ip4Address.valueOf("20.20." + sTag + "." + cTag);
+    }
+
+    private boolean isStagEnabled(int sTag) {
+        return sTagsEnabled.contains(sTag);
+    }
+
+    private void addCustomer(int sTag, int cTag, int port, int kbpsRate) {
+
+        //Upstream
+
+        if(!isStagEnabled(sTag)){
+            sTagMatch(port, sTag);
+        }
+
+        meterAssignmentAndOut(sTag, cTag, kbpsRate);
+
+
+        //Downstream
+
+        downstreamCtag(sTag, cTag, port);
+        downstreamStag(sTag, cTag, port);
+
+
+    }
+
+    private void downstreamCtag(int sTag, int cTag, int port) {
+
+        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+        selector.matchIPDst(tagsToIpMatching(sTag, cTag).toIpPrefix());
+
+
+        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+        treatment.pushVlan();
+        treatment.setVlanId(VlanId.vlanId((short) cTag));
+        treatment.transition(11);
+
+        FlowRule.Builder rule = DefaultFlowRule.builder();
+        rule.withSelector(selector.build());
+        rule.withTreatment(treatment.build());
+        rule.withPriority(2000);
+        rule.forTable(10);
+        rule.fromApp(appId);
+        rule.forDevice(deviceId);
+        rule.makePermanent();
+
+        flowRuleService.applyFlowRules(rule.build());
+
+
+    }
+
+    private void downstreamStag(int sTag, int cTag, int port) {
+
+        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+        selector.matchIPDst(tagsToIpMatching(sTag, cTag).toIpPrefix());
+
+
+        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+        treatment.pushVlan();
+        treatment.setVlanId(VlanId.vlanId((short) sTag));
+        treatment.setQueue(3);
+        treatment.setOutput(PortNumber.portNumber(port));
+
+
+        FlowRule.Builder rule = DefaultFlowRule.builder();
+        rule.withSelector(selector.build());
+        rule.withTreatment(treatment.build());
+        rule.withPriority(2000);
+        rule.forTable(11);
+        rule.fromApp(appId);
+        rule.forDevice(deviceId);
+        rule.makePermanent();
+
+        flowRuleService.applyFlowRules(rule.build());
+
+
+    }
+
+    private void downstreamTrafficHandling(){
+
+        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+        selector.matchInPort(uplinkPort);
+
+
+        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+        treatment.transition(10);
+
+
+        FlowRule.Builder rule = DefaultFlowRule.builder();
+        rule.withSelector(selector.build());
+        rule.withTreatment(treatment.build());
+        rule.withPriority(5000);
+        rule.forTable(0);
+        rule.fromApp(appId);
+        rule.forDevice(deviceId);
+        rule.makePermanent();
+
+        flowRuleService.applyFlowRules(rule.build());
     }
 
     private void sTagMatch(int port, int sTag){
