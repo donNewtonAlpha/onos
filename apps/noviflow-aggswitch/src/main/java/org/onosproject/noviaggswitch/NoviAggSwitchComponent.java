@@ -97,7 +97,7 @@ public class NoviAggSwitchComponent {
 
         bngPort =  PortNumber.portNumber(2);
 
-        arpIntercept();
+        arpIntercept(Ip4Address.valueOf("10.20.1.1"));
 
 
         addAccessDevice(5, 5000, VXLAN_UDP_STANDARD, "10.20.1.2", "68:05:ca:30:00:68", "10.20.1.1", "11:22:33:44:55:66");
@@ -197,12 +197,13 @@ public class NoviAggSwitchComponent {
 
 
 
-    private void arpIntercept() {
+    private void arpIntercept(Ip4Address respondFor) {
         
         //TODO : make a table rule and integrate IGMP  (table 20) ?
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchEthType(Ethernet.TYPE_ARP);
+        selector.matchArpTpa(respondFor);
 
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
