@@ -11,7 +11,6 @@ import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.driver.extensions.NoviflowPopVxLan;
 import org.onosproject.driver.extensions.NoviflowSetVxLan;
-import org.onosproject.driver.extensions.OfdpaMatchVlanVid;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.flow.*;
@@ -28,6 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -101,7 +101,8 @@ public class NoviBngComponent {
 
             for(int j = 2; j < 4 ; j++) {
 
-                addCustomer(i, j, 5, (2*i+3*j)*1000);
+                int kbpsRate = (2*i+3*j)*1000;
+                addCustomer(i, j, 5, kbpsRate, kbpsRate);
 
             }
         }
@@ -124,6 +125,14 @@ public class NoviBngComponent {
             groupService.removeGroup(group.deviceId(), group.appCookie(), group.appId());
         }
 
+        //Clear meters
+        Collection<Meter> meters = meterService.getMeters(deviceId);
+        for(Meter meter : meters) {
+            if(meter.appId().equals(appId)){
+                meterService.withdraw(DefaultMeterRequest.builder().remove(), meter.id());
+            }
+        }
+
 
 
         log.info("Stopped");
@@ -138,7 +147,7 @@ public class NoviBngComponent {
         return sTagsEnabled.contains(sTag);
     }
 
-    private void addCustomer(int sTag, int cTag, int port, int kbpsRate) {
+    private void addCustomer(int sTag, int cTag, int port, int upstreamRate, int downstreamRate) {
 
         //Upstream
 
@@ -146,18 +155,18 @@ public class NoviBngComponent {
             sTagMatch(port, sTag);
         }
 
-        meterAssignmentAndOut(sTag, cTag, kbpsRate);
+        meterAssignmentAndOut(sTag, cTag, upstreamRate);
 
 
         //Downstream
 
-        downstreamCtag(sTag, cTag, port);
-        downstreamStag(sTag, cTag, port);
+        downstreamCtag(sTag, cTag);
+        downstreamStag(sTag, cTag, port, downstreamRate);
 
 
     }
 
-    private void downstreamCtag(int sTag, int cTag, int port) {
+    private void downstreamCtag(int sTag, int cTag) {
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchIPDst(tagsToIpMatching(sTag, cTag).toIpPrefix());
@@ -165,8 +174,6 @@ public class NoviBngComponent {
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
         treatment.setVlanId(VlanId.vlanId((short) cTag));
-        //treatment.deferred();
-        //treatment.pushVlan();
         treatment.transition(11);
 
         FlowRule.Builder rule = DefaultFlowRule.builder();
@@ -183,7 +190,20 @@ public class NoviBngComponent {
 
     }
 
-    private void downstreamStag(int sTag, int cTag, int port) {
+    private void downstreamStag(int sTag, int cTag, int port, int kbps) {
+
+        //create a new meter
+        MeterRequest.Builder meter = DefaultMeterRequest.builder();
+        meter.forDevice(deviceId);
+        meter.fromApp(appId);
+        meter.withUnit(Meter.Unit.KB_PER_SEC);
+        Band.Builder band = DefaultBand.builder();
+        band.withRate(kbps);
+        band.ofType(Band.Type.DROP);
+        meter.withBands(Collections.singleton(band.build()));
+
+        Meter finalMeter = meterService.submit(meter.add());
+
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchIPDst(tagsToIpMatching(sTag, cTag).toIpPrefix());
@@ -194,6 +214,7 @@ public class NoviBngComponent {
         treatment.deferred();
         treatment.setVlanId(VlanId.vlanId((short) sTag));
         treatment.setQueue(3);
+        treatment.meter(finalMeter.id());
         treatment.setOutput(PortNumber.portNumber(port));
 
 
