@@ -69,7 +69,7 @@ public class NoviAggSwitchComponent {
     private static MacAddress uplinkMac = MacAddress.valueOf("a0:36:9f:27:88:f0");
     private static Ip4Address uplinkIp = Ip4Address.valueOf("10.1.4.1");
 
-    private static MacAddress torMac = MacAddress.valueOf("11:22:33:44:55:66");
+    private static MacAddress torMac = MacAddress.valueOf("68:05:33:44:55:66");
     private static Ip4Address torIp = Ip4Address.valueOf("10.20.1.1");
     private static Ip4Address torRoutedInterfaceIp = Ip4Address.valueOf("10.1.4.0");
 
@@ -98,7 +98,7 @@ public class NoviAggSwitchComponent {
 
         Random rand = new Random();
 
-        addAccessDevice(5, 5000, rand.nextInt(), "10.20.1.2", "68:05:ca:30:00:68", "10.20.1.1", "11:22:33:44:55:66");
+        addAccessDevice(5, 5000, rand.nextInt(), "10.20.1.2", "68:05:ca:30:00:68", "10.20.1.1", "68:05:33:44:55:66");
 
 
 
