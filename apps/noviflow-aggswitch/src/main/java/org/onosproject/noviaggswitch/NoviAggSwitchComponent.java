@@ -28,10 +28,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.crypto.Mac;
 import java.nio.ByteBuffer;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 
 
 /**
@@ -61,7 +58,7 @@ public class NoviAggSwitchComponent {
     protected PacketService packetService;
 
 
-    private static final int VXLAN_UDP_STANDARD = 4789;
+
 
 
     static ApplicationId appId;
@@ -99,8 +96,9 @@ public class NoviAggSwitchComponent {
 
         arpIntercept(Ip4Address.valueOf("10.20.1.1"));
 
+        Random rand = new Random();
 
-        addAccessDevice(5, 5000, VXLAN_UDP_STANDARD, "10.20.1.2", "68:05:ca:30:00:68", "10.20.1.1", "11:22:33:44:55:66");
+        addAccessDevice(5, 5000, rand.nextInt(), "10.20.1.2", "68:05:ca:30:00:68", "10.20.1.1", "11:22:33:44:55:66");
 
 
 
@@ -248,7 +246,7 @@ public class NoviAggSwitchComponent {
                     PortNumber inPort = pkt.receivedFrom().port();
 
                     if (arp.getOpCode() == ARP.OP_REQUEST) {
-                        log.debug("It is an ARP request");
+                        log.info("It is an ARP request");
                         handleArpRequest(inPort, ethPkt);
                     } else {
                         log.debug("It is an ARP reply");
@@ -328,6 +326,9 @@ public class NoviAggSwitchComponent {
         }
 
         private void sendArpResponse(Ethernet eth, ARP arpRequest, PortNumber dstPort) {
+
+            log.info("Preparing to send ARP response");
+
             ARP arpReply = new ARP();
             arpReply.setHardwareType(ARP.HW_TYPE_ETHERNET)
                     .setProtocolType(ARP.PROTO_TYPE_IP)
@@ -353,6 +354,7 @@ public class NoviAggSwitchComponent {
                     treatment.build(), ByteBuffer.wrap(eth.serialize()));
 
             packetService.emit(outPacket);
+            log.info("ARP response sent");
         }
     }
 
