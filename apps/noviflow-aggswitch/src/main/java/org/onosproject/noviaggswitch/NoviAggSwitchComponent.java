@@ -100,8 +100,8 @@ public class NoviAggSwitchComponent {
         Random rand = new Random();
 
         addAccessDevice(5, 5000, rand.nextInt(), "10.20.1.2", "68:05:ca:30:00:68", "10.20.1.1", "68:05:33:44:55:66", true);
-        addAccessDevice(6, 6000, rand.nextInt(), "10.20.1.2", "68:05:ca:30:00:68", "10.20.1.1", "68:05:33:44:55:66", false);
-        addAccessDevice(7, 7000, rand.nextInt(), "10.20.1.2", "68:05:ca:30:00:68", "10.20.1.1", "68:05:33:44:55:66", false);
+        addAccessDevice(6, 5001, rand.nextInt(), "10.20.1.2", "68:05:ca:30:00:68", "10.20.1.1", "68:05:33:44:55:66", false);
+        addAccessDevice(7, 5002, rand.nextInt(), "10.20.1.2", "68:05:ca:30:00:68", "10.20.1.1", "68:05:33:44:55:66", false);
 
 
 
@@ -284,24 +284,27 @@ public class NoviAggSwitchComponent {
                     }
                 } else if(payload instanceof IPv4) {
 
+                    log.info("IP packet received");
                     IPv4 ipPkt = (IPv4) payload;
 
                     IPacket ipPayload = ipPkt.getPayload();
 
-                    if(ipPayload instanceof ICMP)
+                    if(ipPayload instanceof ICMP) {
 
-                    log.debug("ICMP packet received");
+                        log.info("ICMP packet received");
 
-                    ICMP ping = (ICMP) ipPayload;
+                        ICMP ping = (ICMP) ipPayload;
 
-                    PortNumber inPort = pkt.receivedFrom().port();
+                        PortNumber inPort = pkt.receivedFrom().port();
 
-                    if (ping.getIcmpCode() == ICMP.TYPE_ECHO_REQUEST) {
-                        log.info("It is a ping request");
-                        handlePingRequest(inPort, ethPkt);
-                    } else {if (ping.getIcmpCode() == ICMP.TYPE_ECHO_REPLY)
-                        log.debug("It is a ping reply");
-                        //TODO
+                        if (ping.getIcmpCode() == ICMP.TYPE_ECHO_REQUEST) {
+                            log.info("It is a ping request");
+                            handlePingRequest(inPort, ethPkt);
+                        } else {
+                            if (ping.getIcmpCode() == ICMP.TYPE_ECHO_REPLY)
+                                log.debug("It is a ping reply");
+                            //TODO
+                        }
                     }
                 }
             } catch(Exception e){
@@ -442,12 +445,11 @@ public class NoviAggSwitchComponent {
                             (byte) Ethernet.DATALAYER_ADDRESS_LENGTH)
                     .setProtocolAddressLength((byte) Ip4Address.BYTE_LENGTH)
                     .setOpCode(ARP.OP_REPLY)
-                    .setSenderHardwareAddress(torMac.toBytes());
-                    log.info("still not crashed");
-            arpReply.setSenderProtocolAddress(arpRequest.getTargetProtocolAddress())
+                    .setSenderHardwareAddress(torMac.toBytes())
+                    .setSenderProtocolAddress(arpRequest.getTargetProtocolAddress())
                     .setTargetHardwareAddress(arpRequest.getSenderHardwareAddress())
                     .setTargetProtocolAddress(arpRequest.getSenderProtocolAddress());
-            log.info("ARP ready to integrate to Ethernet packet");
+
 
             //Modify the original request and send it back : It keeps the proper vlan tagging
             eth.setDestinationMACAddress(arpRequest.getSenderHardwareAddress())
@@ -455,7 +457,7 @@ public class NoviAggSwitchComponent {
                     .setEtherType(Ethernet.TYPE_ARP)
                     .setPayload(arpReply);
 
-            log.info("ARP integrated to Ethernet packet, ready to send");
+            //log.info("ARP integrated to Ethernet packet, ready to send");
 
             TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
             treatment.setOutput(dstPort);
