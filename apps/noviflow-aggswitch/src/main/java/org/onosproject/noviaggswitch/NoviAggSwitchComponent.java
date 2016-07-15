@@ -344,7 +344,7 @@ public class NoviAggSwitchComponent {
             IPv4 ipPkt = (IPv4) ethPkt.getPayload();
 
 
-            Ip4Address requestIpAddress = Ip4Address.valueOf(ipPkt.getSourceAddress());
+            Ip4Address requestIpAddress = Ip4Address.valueOf(ipPkt.getDestinationAddress());
             if(requestIpAddress.equals(torIp)) {
 
                 log.info("This ping request is for this switch");
