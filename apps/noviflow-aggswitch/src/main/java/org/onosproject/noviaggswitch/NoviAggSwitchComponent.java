@@ -98,7 +98,9 @@ public class NoviAggSwitchComponent {
 
         Random rand = new Random();
 
-        addAccessDevice(5, 5000, rand.nextInt(), "10.20.1.2", "68:05:ca:30:00:68", "10.20.1.1", "68:05:33:44:55:66");
+        addAccessDevice(5, 5000, rand.nextInt(), "10.20.1.2", "68:05:ca:30:00:68", "10.20.1.1", "68:05:33:44:55:66", true);
+        addAccessDevice(5, 6000, rand.nextInt(), "10.20.1.2", "68:05:ca:30:00:68", "10.20.1.1", "68:05:33:44:55:66", false);
+
 
 
 
@@ -133,12 +135,13 @@ public class NoviAggSwitchComponent {
         log.info("Stopped");
     }
 
-    private void addAccessDevice(int port, int vni, int udpPort, String bngVxlanIp, String bngVxlanMac, String switchVxlanIp, String switchVxlanMac) {
+    private void addAccessDevice(int port, int vni, int udpPort, String bngVxlanIp, String bngVxlanMac, String switchVxlanIp, String switchVxlanMac, boolean twoWay) {
 
         try {
             accessToBng(PortNumber.portNumber(port), vni, udpPort, Ip4Address.valueOf(bngVxlanIp), MacAddress.valueOf(bngVxlanMac), Ip4Address.valueOf(switchVxlanIp), MacAddress.valueOf(switchVxlanMac));
-            bngToAccess(PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp));
-
+            if(twoWay) {
+                bngToAccess(PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp));
+            }
         } catch(Exception e) {
             log.warn("Exception", e);
         }
