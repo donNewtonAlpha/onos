@@ -100,6 +100,7 @@ public class NoviAggSwitchComponent {
 
         addAccessDevice(5, 5000, rand.nextInt(), "10.20.1.2", "68:05:ca:30:00:68", "10.20.1.1", "68:05:33:44:55:66", true);
         addAccessDevice(6, 6000, rand.nextInt(), "10.20.1.2", "68:05:ca:30:00:68", "10.20.1.1", "68:05:33:44:55:66", false);
+        addAccessDevice(7, 7000, rand.nextInt(), "10.20.1.2", "68:05:ca:30:00:68", "10.20.1.1", "68:05:33:44:55:66", false);
 
 
 
