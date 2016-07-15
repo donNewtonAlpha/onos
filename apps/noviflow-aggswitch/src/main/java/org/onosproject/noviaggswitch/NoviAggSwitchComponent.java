@@ -94,7 +94,8 @@ public class NoviAggSwitchComponent {
 
         bngPort =  PortNumber.portNumber(2);
 
-        arpIntercept(Ip4Address.valueOf("10.20.1.1"));
+        arpIntercept(torIp);
+        icmpIntercept(torIp);
 
         Random rand = new Random();
 
@@ -223,6 +224,29 @@ public class NoviAggSwitchComponent {
         rule.makePermanent();
 
         flowRuleService.applyFlowRules(rule.build());
+    }
+
+    private void icmpIntercept(Ip4Address respondFor) {
+
+        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+        selector.matchIPDst(respondFor.toIpPrefix());
+        selector.matchIPProtocol(IPv4.PROTOCOL_ICMP);
+
+
+        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+        treatment.punt();
+
+        FlowRule.Builder rule = DefaultFlowRule.builder();
+        rule.withSelector(selector.build());
+        rule.withTreatment(treatment.build());
+        rule.withPriority(10000);
+        rule.forTable(0);
+        rule.fromApp(appId);
+        rule.forDevice(deviceId);
+        rule.makePermanent();
+
+        flowRuleService.applyFlowRules(rule.build());
+
     }
 
 
