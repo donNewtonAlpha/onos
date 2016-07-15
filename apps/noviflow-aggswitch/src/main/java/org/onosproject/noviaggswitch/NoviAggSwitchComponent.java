@@ -99,7 +99,7 @@ public class NoviAggSwitchComponent {
         Random rand = new Random();
 
         addAccessDevice(5, 5000, rand.nextInt(), "10.20.1.2", "68:05:ca:30:00:68", "10.20.1.1", "68:05:33:44:55:66", true);
-        addAccessDevice(5, 6000, rand.nextInt(), "10.20.1.2", "68:05:ca:30:00:68", "10.20.1.1", "68:05:33:44:55:66", false);
+        addAccessDevice(6, 6000, rand.nextInt(), "10.20.1.2", "68:05:ca:30:00:68", "10.20.1.1", "68:05:33:44:55:66", false);
 
 
 
@@ -406,7 +406,7 @@ public class NoviAggSwitchComponent {
 
         private void sendArpResponse(Ethernet eth, ARP arpRequest, PortNumber dstPort) {
 
-            log.info("Preparing to send ARP response");
+            log.info("Preparing to send ARP response !!");
 
             ARP arpReply = new ARP();
             arpReply.setHardwareType(ARP.HW_TYPE_ETHERNET)
@@ -415,8 +415,9 @@ public class NoviAggSwitchComponent {
                             (byte) Ethernet.DATALAYER_ADDRESS_LENGTH)
                     .setProtocolAddressLength((byte) Ip4Address.BYTE_LENGTH)
                     .setOpCode(ARP.OP_REPLY)
-                    .setSenderHardwareAddress(torMac.toBytes())
-                    .setSenderProtocolAddress(arpRequest.getTargetProtocolAddress())
+                    .setSenderHardwareAddress(torMac.toBytes());
+                    log.info("still not crashed");
+            arpReply.setSenderProtocolAddress(arpRequest.getTargetProtocolAddress())
                     .setTargetHardwareAddress(arpRequest.getSenderHardwareAddress())
                     .setTargetProtocolAddress(arpRequest.getSenderProtocolAddress());
             log.info("ARP ready to integrate to Ethernet packet");
