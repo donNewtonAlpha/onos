@@ -230,7 +230,7 @@ public class NoviAggSwitchComponent {
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchIPDst(respondFor.toIpPrefix());
-        selector.matchIPProtocol(IPv4.PROTOCOL_ICMP);
+        //selector.matchIPProtocol(IPv4.PROTOCOL_ICMP);
 
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
@@ -297,11 +297,11 @@ public class NoviAggSwitchComponent {
 
                         PortNumber inPort = pkt.receivedFrom().port();
 
-                        if (ping.getIcmpCode() == ICMP.TYPE_ECHO_REQUEST) {
+                        if (ping.getIcmpType() == ICMP.TYPE_ECHO_REQUEST) {
                             log.info("It is a ping request");
                             handlePingRequest(inPort, ethPkt);
                         } else {
-                            if (ping.getIcmpCode() == ICMP.TYPE_ECHO_REPLY)
+                            if (ping.getIcmpType() == ICMP.TYPE_ECHO_REPLY)
                                 log.debug("It is a ping reply");
                             //TODO
                         }
