@@ -131,6 +131,8 @@ public class NoviAggSwitchComponent {
             }
         }
 
+        packetService.removeProcessor(processor);
+
 
 
         log.info("Stopped");
