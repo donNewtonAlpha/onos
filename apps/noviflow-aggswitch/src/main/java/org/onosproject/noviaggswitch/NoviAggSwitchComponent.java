@@ -65,7 +65,7 @@ public class NoviAggSwitchComponent {
 
     static final DeviceId deviceId = DeviceId.deviceId("of:000000223d5a00d9");
 
-    private static PortNumber uplinkPort = PortNumber.portNumber(8);
+
     private static MacAddress uplinkMac = MacAddress.valueOf("a0:36:9f:27:88:f0");
     private static Ip4Address uplinkIp = Ip4Address.valueOf("10.1.4.1");
 
@@ -242,7 +242,7 @@ public class NoviAggSwitchComponent {
 
                 if (payload instanceof ARP) {
 
-                    log.debug("ARP packet received by phase 1");
+                    log.debug("ARP packet received");
 
                     ARP arp = (ARP) payload;
 
@@ -254,6 +254,27 @@ public class NoviAggSwitchComponent {
                     } else {
                         log.debug("It is an ARP reply");
                         handleArpReply(inPort, ethPkt);
+                    }
+                } else if(payload instanceof IPv4) {
+
+                    IPv4 ipPkt = (IPv4) payload;
+
+                    IPacket ipPayload = ipPkt.getPayload();
+
+                    if(ipPayload instanceof ICMP)
+
+                    log.debug("ICMP packet received");
+
+                    ICMP ping = (ICMP) ipPayload;
+
+                    PortNumber inPort = pkt.receivedFrom().port();
+
+                    if (ping.getIcmpCode() == ICMP.TYPE_ECHO_REQUEST) {
+                        log.info("It is a ping request");
+                        handlePingRequest(inPort, ethPkt);
+                    } else {if (ping.getIcmpCode() == ICMP.TYPE_ECHO_REPLY)
+                        log.debug("It is a ping reply");
+                        //TODO
                     }
                 }
             } catch(Exception e){
@@ -286,6 +307,61 @@ public class NoviAggSwitchComponent {
                 }
                 log.info("Uplink MAC found : "  +newUplinkMac.toString());
             }
+        }
+
+        private void handlePingRequest(PortNumber inPort, Ethernet ethPkt) {
+
+            IPv4 ipPkt = (IPv4) ethPkt.getPayload();
+
+
+            Ip4Address requestIpAddress = Ip4Address.valueOf(ipPkt.getSourceAddress());
+            if(requestIpAddress.equals(torIp)) {
+
+                log.info("This ping request is for this switch");
+                sendICMPreply(inPort, ethPkt);
+
+            }
+
+        }
+
+        private void sendICMPreply(PortNumber port, Ethernet ethPkt) {
+
+            log.info("creation of the ICMP reply");
+
+            IPv4 ipPkt = (IPv4) ethPkt.getPayload();
+            ICMP ping = (ICMP) ipPkt.getPayload();
+
+            ICMP pingResponse = new ICMP();
+            pingResponse.setIcmpType(ICMP.TYPE_ECHO_REPLY);
+            pingResponse.setIcmpCode(ICMP.SUBTYPE_ECHO_REPLY);
+            pingResponse.setChecksum((short) 0);
+            pingResponse.setPayload(ping.getPayload());
+
+            IPv4 ipResponse = new IPv4();
+            ipResponse.setDestinationAddress(ipPkt.getSourceAddress());
+            ipResponse.setSourceAddress(ipPkt.getDestinationAddress());
+            ipResponse.setTtl((byte) 64);
+            ipResponse.setChecksum((short)0);
+
+            ipResponse.setPayload(pingResponse);
+            //pingResponse.setParent(ipResponse);
+
+
+            //Modify the original request and send it back : It keeps the proper vlan tagging
+            ethPkt.setDestinationMACAddress(ethPkt.getSourceMAC())
+                    .setSourceMACAddress(torMac)
+                    .setEtherType(Ethernet.TYPE_IPV4)
+                    .setPayload(ipResponse);
+
+
+            TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+            treatment.setOutput(port);
+            OutboundPacket outPacket = new DefaultOutboundPacket(deviceId,
+                    treatment.build(), ByteBuffer.wrap(ethPkt.serialize()));
+
+            packetService.emit(outPacket);
+            log.info("ICMP reply response sent");
+
         }
 
 
@@ -343,13 +419,15 @@ public class NoviAggSwitchComponent {
                     .setSenderProtocolAddress(arpRequest.getTargetProtocolAddress())
                     .setTargetHardwareAddress(arpRequest.getSenderHardwareAddress())
                     .setTargetProtocolAddress(arpRequest.getSenderProtocolAddress());
+            log.info("ARP ready to integrate to Ethernet packet");
 
             //Modify the original request and send it back : It keeps the proper vlan tagging
             eth.setDestinationMACAddress(arpRequest.getSenderHardwareAddress())
                     .setSourceMACAddress(torMac)
                     .setEtherType(Ethernet.TYPE_ARP)
                     .setPayload(arpReply);
-            
+
+            log.info("ARP integrated to Ethernet packet, ready to send");
 
             TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
             treatment.setOutput(dstPort);
