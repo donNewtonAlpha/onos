@@ -78,7 +78,7 @@ public class OFActionNoviflowVxLan implements OFActionExperimenter {
         //udp port
         channelBuffer.writeShort(U16.t(udpPort));
         //vni
-        channelBuffer.writeInt(U32.t(vni));
+        channelBuffer.writeInt(U32.t(vni & 0xffffff));
 
     }
 

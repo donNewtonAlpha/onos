@@ -23,6 +23,8 @@ import org.onosproject.net.flow.TrafficTreatment;
 import org.onosproject.net.group.*;
 import org.onosproject.net.meter.*;
 import org.onosproject.net.packet.*;
+import org.onosproject.openflow.controller.Dpid;
+import org.onosproject.openflow.controller.OpenFlowController;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,6 +59,9 @@ public class NoviAggSwitchComponent {
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected PacketService packetService;
 
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected OpenFlowController openFlowController;
+
 
 
 
@@ -87,6 +92,8 @@ public class NoviAggSwitchComponent {
 
         log.debug("trying to activate");
         appId = coreService.registerApplication("org.onosproject.noviaggswitch");
+
+        openFlowController.write(Dpid.dpid(deviceId.uri()), new OFNoviflowVniExperimenterMsg());
 
         processor = new NoviBngPacketProcessor();
 
