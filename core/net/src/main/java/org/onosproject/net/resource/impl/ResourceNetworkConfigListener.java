@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.config.NetworkConfigEvent;
 import org.onosproject.net.config.NetworkConfigListener;
 import org.onosproject.net.config.NetworkConfigService;
-import org.onosproject.net.resource.BandwidthCapacity;
+import org.onosproject.net.config.basics.BandwidthCapacity;
 import org.onosproject.net.resource.ResourceAdminService;
 import org.onosproject.net.resource.Resources;
 import org.slf4j.Logger;

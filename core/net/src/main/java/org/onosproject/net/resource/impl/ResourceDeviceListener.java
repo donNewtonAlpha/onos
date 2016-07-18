@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2016 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,14 +17,17 @@ package org.onosproject.net.resource.impl;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+
 import org.onlab.packet.MplsLabel;
 import org.onlab.packet.VlanId;
 import org.onlab.util.Bandwidth;
 import org.onlab.util.ItemNotFoundException;
 import org.onosproject.mastership.MastershipService;
+import org.onosproject.net.ChannelSpacing;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.Device;
 import org.onosproject.net.DeviceId;
+import org.onosproject.net.GridType;
 import org.onosproject.net.OchSignal;
 import org.onosproject.net.Port;
 import org.onosproject.net.PortNumber;
@@ -41,10 +44,10 @@ import org.onosproject.net.driver.DriverHandler;
 import org.onosproject.net.driver.DriverService;
 import org.onosproject.net.resource.DiscreteResource;
 import org.onosproject.net.resource.ResourceAdminService;
-import org.onosproject.net.resource.BandwidthCapacity;
+import org.onosproject.net.config.basics.BandwidthCapacity;
 import org.onosproject.net.resource.Resource;
+import org.onosproject.net.resource.ResourceQueryService;
 import org.onosproject.net.resource.Resources;
-import org.onosproject.net.resource.ResourceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +58,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -66,7 +70,7 @@ final class ResourceDeviceListener implements DeviceListener {
     private static final Logger log = LoggerFactory.getLogger(ResourceDeviceListener.class);
 
     private final ResourceAdminService adminService;
-    private final ResourceService resourceService;
+    private final ResourceQueryService resourceService;
     private final DeviceService deviceService;
     private final MastershipService mastershipService;
     private final DriverService driverService;
@@ -78,14 +82,14 @@ final class ResourceDeviceListener implements DeviceListener {
      * Creates an instance with the specified ResourceAdminService and ExecutorService.
      *
      * @param adminService instance invoked to register resources
-     * @param resourceService {@link ResourceService} to be used
+     * @param resourceService {@link ResourceQueryService} to be used
      * @param deviceService {@link DeviceService} to be used
      * @param mastershipService {@link MastershipService} to be used
      * @param driverService {@link DriverService} to be used
      * @param netcfgService {@link NetworkConfigService} to be used.
      * @param executor executor used for processing resource registration
      */
-    ResourceDeviceListener(ResourceAdminService adminService, ResourceService resourceService,
+    ResourceDeviceListener(ResourceAdminService adminService, ResourceQueryService resourceService,
                            DeviceService deviceService, MastershipService mastershipService,
                            DriverService driverService, NetworkConfigService netcfgService,
                            ExecutorService executor) {
@@ -159,7 +163,7 @@ final class ResourceDeviceListener implements DeviceListener {
                 .map(adminService::register)
                 .ifPresent(success -> {
                    if (!success) {
-                       log.error("Failed to register Bandwidth for {}", portPath.id());
+                       log.warn("Failed to register Bandwidth for {}", portPath.id());
                    }
                 });
 
@@ -259,7 +263,7 @@ final class ResourceDeviceListener implements DeviceListener {
             LambdaQuery query = handler.behaviour(LambdaQuery.class);
             if (query != null) {
                 return query.queryLambdas(port).stream()
-                        .flatMap(x -> OchSignal.toFlexGrid(x).stream())
+                        .flatMap(ResourceDeviceListener::toResourceGrid)
                         .collect(Collectors.toSet());
             } else {
                 return Collections.emptySet();
@@ -267,6 +271,28 @@ final class ResourceDeviceListener implements DeviceListener {
         } catch (ItemNotFoundException e) {
             return Collections.emptySet();
         }
+    }
+
+    /**
+     * Convert {@link OchSignal} into gridtype used to track Resource.
+     *
+     * @param ochSignal {@link OchSignal}
+     * @return {@code ochSignal} mapped to Stream of flex grid slots with 6.25 GHz spacing
+     *         and 12.5 GHz slot width.
+     */
+    private static Stream<OchSignal> toResourceGrid(OchSignal ochSignal) {
+        if (ochSignal.gridType() != GridType.FLEX) {
+            return OchSignal.toFlexGrid(ochSignal).stream();
+        }
+        if (ochSignal.gridType() == GridType.FLEX &&
+            ochSignal.channelSpacing() == ChannelSpacing.CHL_6P25GHZ &&
+            ochSignal.slotGranularity() == 1) {
+                // input was already flex grid slots with 6.25 GHz spacing and 12.5 GHz slot width.
+                return Stream.of(ochSignal);
+        }
+        // FIXME handle FLEX but not 6.25 GHz spacing or 12.5 GHz slot width case.
+        log.error("Converting {} to resource tracking grid not supported yet.", ochSignal);
+        return Stream.<OchSignal>builder().build();
     }
 
     private Set<VlanId> queryVlanIds(DeviceId device, PortNumber port) {

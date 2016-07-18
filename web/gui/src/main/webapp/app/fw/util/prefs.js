@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,11 +24,22 @@
     var $log, fs, wss;
 
     // internal state
-    var cache = {}, listeners = [];
+    var cache = {}, 
+        listeners = [];
 
-    // returns the preference by the specified name
-    function getPrefs(name, defaults) {
-        return cache[name] || defaults;
+    // returns the preference settings for the specified key
+    function getPrefs(name, defaults, qparams) {
+        var obj = angular.extend({}, defaults || {}, cache[name] || {});
+
+        // if query params are specified, they override...
+        if (fs.isO(qparams)) {
+            angular.forEach(obj, function (v, k) {
+                if (qparams.hasOwnProperty(k)) {
+                    obj[k] = qparams[k];
+                }
+            });
+        }
+        return obj;
     }
 
     // converts string values to numbers for selected (or all) keys
@@ -57,7 +68,7 @@
     function updatePrefs(data) {
         $log.info('User properties updated');
         cache = data;
-        listeners.forEach(function (l) { l(); });
+        listeners.forEach(function (lsnr) { lsnr(); });
     }
 
     function addListener(listener) {
@@ -75,7 +86,13 @@
             fs = _fs_;
             wss = _wss_;
 
-            cache = userPrefs;
+            try {
+                cache = angular.isDefined(userPrefs) ? userPrefs : {};
+            }
+            catch(e){
+                // browser throws error for non-existing globals
+                cache = {}
+            }
 
             wss.bindHandlers({
                 updatePrefs: updatePrefs

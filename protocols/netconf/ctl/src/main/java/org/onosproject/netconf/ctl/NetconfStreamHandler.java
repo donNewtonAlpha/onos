@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package org.onosproject.netconf.ctl;
 
+import com.google.common.annotations.Beta;
 import org.onosproject.netconf.NetconfDeviceOutputEventListener;
 
 import java.util.concurrent.CompletableFuture;
@@ -46,4 +47,13 @@ public interface NetconfStreamHandler {
      * @param listener Netconf device event listener
      */
     void removeDeviceEventListener(NetconfDeviceOutputEventListener listener);
+
+    @Beta
+    /**
+     * Sets instance variable that when true allows receipt of notifications.
+     *
+     * @param enableNotifications if true, allows action based off notifications
+     *                             else, stops action based off notifications
+     */
+    void setEnableNotifications(boolean enableNotifications);
 }

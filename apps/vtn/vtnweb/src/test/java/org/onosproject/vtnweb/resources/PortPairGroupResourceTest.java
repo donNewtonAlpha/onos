@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import com.eclipsesource.json.Json;
 import com.eclipsesource.json.JsonObject;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import java.util.Map;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -116,6 +117,20 @@ public class PortPairGroupResourceTest extends VtnResourceTest {
         }
 
         @Override
+        public void addLoad(PortPairId portPairId) {
+        }
+
+        @Override
+        public int getLoad(PortPairId portPairId) {
+            return 0;
+        }
+
+        @Override
+        public Map<PortPairId, Integer> portPairLoadMap() {
+            return null;
+        }
+
+        @Override
         public boolean exactMatch(PortPairGroup portPairGroup) {
             return this.equals(portPairGroup) &&
                     Objects.equals(this.portPairGroupId, portPairGroup.portPairGroupId()) &&
@@ -123,14 +138,7 @@ public class PortPairGroupResourceTest extends VtnResourceTest {
         }
 
         @Override
-        public void addLoad(PortPairId portPairId) {
-            // TODO Auto-generated method stub
-        }
-
-        @Override
-        public int getLoad(PortPairId portPairId) {
-            // TODO Auto-generated method stub
-            return 0;
+        public void resetLoad() {
         }
     }
 
@@ -239,7 +247,7 @@ public class PortPairGroupResourceTest extends VtnResourceTest {
         String location = "port_pair_groups/4512d643-24fc-4fae-af4b-321c5e2eb3d1";
 
         Response deleteResponse = wt.path(location)
-                .request(MediaType.APPLICATION_JSON_TYPE)
+                .request(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_PLAIN_TYPE)
                 .delete();
         assertThat(deleteResponse.getStatus(),
                    is(HttpURLConnection.HTTP_NO_CONTENT));

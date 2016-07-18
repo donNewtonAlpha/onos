@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,6 +72,18 @@ public class MetricsServiceAdapter implements MetricsService {
     public <T extends Metric> T registerMetric(MetricsComponent component,
                                                MetricsFeature feature, String metricName, T metric) {
         return null;
+    }
+
+    @Override
+    public void registerReporter(MetricsReporter reporter) {
+    }
+
+    @Override
+    public void unregisterReporter(MetricsReporter reporter) {
+    }
+
+    @Override
+    public void notifyReporters() {
     }
 
     @Override

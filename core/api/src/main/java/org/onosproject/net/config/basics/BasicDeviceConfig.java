@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ public final class BasicDeviceConfig extends BasicElementConfig<DeviceId> {
      * @return device type override
      */
     public Device.Type type() {
-        return get(TYPE, Device.Type.SWITCH, Device.Type.class);
+        return get(TYPE, null, Device.Type.class);
     }
 
     /**

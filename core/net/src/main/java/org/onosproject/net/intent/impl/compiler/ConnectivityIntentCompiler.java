@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import org.onosproject.net.intent.Constraint;
 import org.onosproject.net.intent.IntentCompiler;
 import org.onosproject.net.intent.IntentExtensionService;
 import org.onosproject.net.intent.impl.PathNotFoundException;
-import org.onosproject.net.resource.ResourceService;
+import org.onosproject.net.resource.ResourceQueryService;
 import org.onosproject.net.provider.ProviderId;
 import org.onosproject.net.topology.LinkWeight;
 import org.onosproject.net.topology.PathService;
@@ -55,7 +55,7 @@ public abstract class ConnectivityIntentCompiler<T extends ConnectivityIntent>
     protected PathService pathService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected ResourceService resourceService;
+    protected ResourceQueryService resourceService;
 
     /**
      * Returns an edge-weight capable of evaluating links on the basis of the

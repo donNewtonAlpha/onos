@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static org.onlab.util.Tools.delay;
 
@@ -96,7 +97,9 @@ public class OvsdbControllerConfig extends AbstractHandlerBehaviour implements C
     }
 
     private static boolean dpidMatches(OvsdbBridge bridge, DeviceId deviceId) {
-        String bridgeDpid = "of:" + bridge.datapathId().value();
+        checkArgument(bridge.datapathId().isPresent());
+
+        String bridgeDpid = "of:" + bridge.datapathId().get();
         String ofDpid = deviceId.toString();
         return bridgeDpid.equals(ofDpid);
     }

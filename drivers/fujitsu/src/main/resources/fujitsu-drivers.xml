@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  ~ Copyright 2016 Open Networking Laboratory
+  ~ Copyright 2016-present Open Networking Laboratory
   ~
   ~ Licensed under the Apache License, Version 2.0 (the "License");
   ~ you may not use this file except in compliance with the License.
@@ -16,8 +16,19 @@
   -->
 <drivers>
     <driver name="fujitsu-netconf" manufacturer="Fujitsu" hwVersion="T100" swVersion="01-01-X">
-        <behaviour api="org.onosproject.net.behaviour.PortDiscovery"
-                   impl="org.onosproject.drivers.fujitsu.PortGetterFujitsuImpl"/>
+        <behaviour api="org.onosproject.net.optical.OpticalDevice"
+                   impl="org.onosproject.net.optical.DefaultOpticalDevice"/>
+        <behaviour api="org.onosproject.net.device.DeviceDescriptionDiscovery"
+                   impl="org.onosproject.drivers.fujitsu.FujitsuT100DeviceDescription"/>
+    </driver>
+    <driver name="fujitsu-volt-netconf" manufacturer="Fujitsu" hwVersion="svkOLT" swVersion="v1.0">
+        <behaviour api="org.onosproject.net.behaviour.ControllerConfig"
+                   impl="org.onosproject.drivers.fujitsu.FujitsuVoltControllerConfig"/>
+        <behaviour api="org.onosproject.drivers.fujitsu.behaviour.VoltPonLinkConfig"
+                   impl="org.onosproject.drivers.fujitsu.FujitsuVoltPonLinkConfig"/>
+        <behaviour api="org.onosproject.drivers.fujitsu.behaviour.VoltOnuConfig"
+                   impl="org.onosproject.drivers.fujitsu.FujitsuVoltOnuConfig"/>
+        <behaviour api="org.onosproject.drivers.fujitsu.behaviour.VoltOnuOperConfig"
+                   impl="org.onosproject.drivers.fujitsu.FujitsuVoltOnuOperConfig"/>
     </driver>
 </drivers>
-

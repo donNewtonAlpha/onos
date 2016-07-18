@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,40 +17,45 @@ package org.onosproject.rest.resources;
 
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
-
-import java.io.IOException;
-import java.net.ServerSocket;
+import org.glassfish.jersey.test.TestProperties;
+import org.glassfish.jersey.test.jetty.JettyTestContainerFactory;
+import org.glassfish.jersey.test.spi.TestContainerException;
+import org.glassfish.jersey.test.spi.TestContainerFactory;
 
 /**
- * Base class for REST API tests.  Performs common configuration operations.
+ * Base class for REST API tests.
+ * Performs common configuration operations.
  */
 public class ResourceTest extends JerseyTest {
-    private static final int DEFAULT_PORT = 9998;
 
     /**
      * Creates a new web-resource test.
      */
     public ResourceTest() {
         super(ResourceConfig.forApplicationClass(CoreWebApplication.class));
-        this.set("jersey.config.test.container.port", getRandomPort(DEFAULT_PORT));
+        configureProperties();
     }
 
     /**
-     * Returns an unused port number to make sure that each unit test runs in
-     * different port number.
-     *
-     * @param defaultPort default port number
-     * @return a randomized unique port number
+     * Creates a new web-resource test.
      */
-    private int getRandomPort(int defaultPort) {
-        try {
-            ServerSocket socket = new ServerSocket(0);
-            socket.setReuseAddress(true);
-            int port = socket.getLocalPort();
-            socket.close();
-            return port;
-        } catch (IOException ioe) {
-            return defaultPort;
-        }
+    public ResourceTest(ResourceConfig config) {
+        super(config);
+        configureProperties();
+    }
+
+    private void configureProperties() {
+        set(TestProperties.CONTAINER_PORT, 0);
+    }
+
+    /**
+     * Configures the jetty test container as default test container.
+     *
+     * @return test container factory
+     * @throws TestContainerException
+     */
+    @Override
+    protected TestContainerFactory getTestContainerFactory() throws TestContainerException {
+        return new JettyTestContainerFactory();
     }
 }

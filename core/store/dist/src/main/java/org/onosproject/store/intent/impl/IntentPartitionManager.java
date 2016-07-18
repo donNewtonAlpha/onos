@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,6 +43,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Manages the assignment of intent keyspace partitions to instances.
@@ -135,7 +136,8 @@ public class IntentPartitionManager implements IntentPartitionService {
 
     @Override
     public boolean isMine(Key intentKey) {
-        return Objects.equals(leadershipService.getLeader(getPartitionPath(getPartitionForKey(intentKey))),
+        return Objects.equals(leadershipService.getLeadership(getPartitionPath(getPartitionForKey(intentKey)))
+                                               .leaderNodeId(),
                               localNodeId);
     }
 
@@ -177,24 +179,33 @@ public class IntentPartitionManager implements IntentPartitionService {
 
         int myShare = (int) Math.ceil((double) NUM_PARTITIONS / activeNodes);
 
-        List<Leadership> myPartitions = leadershipService.getLeaderBoard().values()
-                .stream()
-                .filter(l -> localNodeId.equals(l.leaderNodeId()))
-                .filter(l -> l.topic().startsWith(ELECTION_PREFIX))
-                .collect(Collectors.toList());
+        // First make sure this node is a candidate for all partitions.
+        IntStream.range(0, NUM_PARTITIONS)
+                 .mapToObj(this::getPartitionPath)
+                 .map(leadershipService::getLeadership)
+                 .filter(leadership -> !leadership.candidates().contains(localNodeId))
+                 .map(Leadership::topic)
+                 .forEach(leadershipService::runForLeadership);
+
+        List<String> myPartitions = IntStream.range(0, NUM_PARTITIONS)
+                                             .mapToObj(this::getPartitionPath)
+                                             .map(leadershipService::getLeadership)
+                                             .filter(Objects::nonNull)
+                                             .filter(leadership -> localNodeId.equals(leadership.leaderNodeId()))
+                                             .map(Leadership::topic)
+                                             .collect(Collectors.toList());
 
         int relinquish = myPartitions.size() - myShare;
 
-        if (relinquish <= 0) {
-            return;
-        }
 
         for (int i = 0; i < relinquish; i++) {
-            String topic = myPartitions.get(i).topic();
-            leadershipService.withdraw(topic);
-
-            executor.schedule(() -> recontest(topic),
-                              BACKOFF_TIME, TimeUnit.SECONDS);
+            String topic = myPartitions.get(i);
+            // Wait till all active nodes are in contention for partition ownership.
+            // This avoids too many relinquish/reclaim cycles.
+            if (leadershipService.getCandidates(topic).size() == activeNodes) {
+                leadershipService.withdraw(topic);
+                executor.schedule(() -> recontest(topic), BACKOFF_TIME, TimeUnit.SECONDS);
+            }
         }
     }
 

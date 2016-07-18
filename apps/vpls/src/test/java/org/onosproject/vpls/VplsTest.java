@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,9 +15,15 @@
  */
 package org.onosproject.vpls;
 
-import com.google.common.collect.Sets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
+
+import org.junit.After;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.onlab.packet.Ip4Address;
 import org.onlab.packet.MacAddress;
@@ -28,6 +34,7 @@ import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.core.IdGenerator;
 import org.onosproject.incubator.net.intf.Interface;
+import org.onosproject.incubator.net.intf.InterfaceListener;
 import org.onosproject.incubator.net.intf.InterfaceService;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.DefaultHost;
@@ -55,17 +62,13 @@ import org.onosproject.net.provider.ProviderId;
 import org.onosproject.routing.IntentSynchronizationAdminService;
 import org.onosproject.routing.IntentSynchronizationService;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
+import com.google.common.collect.Sets;
 
 import static java.lang.String.format;
+import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.createMock;
 import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.expectLastCall;
 import static org.easymock.EasyMock.replay;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -133,14 +136,13 @@ public class VplsTest {
 
     private static final ProviderId PID = new ProviderId("of", "foo");
 
-    @BeforeClass
-    public static void setUpClass() {
-        IdGenerator idGenerator = new TestIdGenerator();
-        Intent.bindIdGenerator(idGenerator);
-    }
+    private static IdGenerator idGenerator;
 
     @Before
     public void setUp() throws Exception {
+        idGenerator = new TestIdGenerator();
+        Intent.bindIdGenerator(idGenerator);
+
         applicationService = createMock(ApplicationService.class);
 
         coreService = createMock(CoreService.class);
@@ -157,6 +159,8 @@ public class VplsTest {
                 new TestIntentSynchronizer(intentService);
 
         interfaceService = createMock(InterfaceService.class);
+        interfaceService.addListener(anyObject(InterfaceListener.class));
+        expectLastCall().anyTimes();
         addIntfConfig();
 
         vpls = new Vpls();
@@ -169,6 +173,11 @@ public class VplsTest {
         vpls.intentSynchronizerAdmin = intentSynchronizer;
     }
 
+    @After
+    public void tearDown() {
+        Intent.unbindIdGenerator(idGenerator);
+    }
+
     /**
      * Creates the interface configuration. On devices 1, 2 and 3 is configured
      * an interface on port 1 with vlan 1. On devices 4, 5 and 6 is configured
@@ -177,21 +186,24 @@ public class VplsTest {
      */
     private void addIntfConfig() {
         Set<Interface> interfaces = Sets.newHashSet();
-        Set<Interface> vlanOneSet = new HashSet<>();
-        Set<Interface> vlanTwoSet = new HashSet<>();
+        Set<Interface> vlanOneSet = Sets.newHashSet();
+        Set<Interface> vlanTwoSet = Sets.newHashSet();
 
         for (int i = 1; i <= NUM_DEVICES - 1; i++) {
             ConnectPoint cp = new ConnectPoint(getDeviceId(i), P1);
 
             Interface intf =
-                    new Interface(cp, Collections.emptySet(), null, VlanId.NONE);
+                    new Interface("intfOne", cp, Collections.emptyList(), null,
+                                  VlanId.NONE);
 
             if (i <= 3) {
-                intf = new Interface(cp, Collections.emptySet(), null, VLAN1);
+                intf = new Interface("intfTwo", cp, Collections.emptyList(),
+                                     null, VLAN1);
                 interfaces.add(intf);
                 vlanOneSet.add(intf);
             } else if (i > 3 && i <= 6) {
-                intf = new Interface(cp, Collections.emptySet(), null, VLAN2);
+                intf = new Interface("intfThree", cp, Collections.emptyList(),
+                                     null, VLAN2);
                 interfaces.add(intf);
                 vlanTwoSet.add(intf);
             }
@@ -662,12 +674,14 @@ public class VplsTest {
 
         @Override
         public void modifyPrimary(boolean isPrimary) {
-
         }
 
         @Override
         public void removeIntents() {
+        }
 
+        @Override
+        public void removeIntentsByAppId(ApplicationId applicationId) {
         }
     }
 

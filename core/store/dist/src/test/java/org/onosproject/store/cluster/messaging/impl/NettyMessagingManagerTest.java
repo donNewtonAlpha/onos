@@ -1,3 +1,18 @@
+/*
+ * Copyright 2016-present Open Networking Laboratory
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.onosproject.store.cluster.messaging.impl;
 
 import java.util.Arrays;
@@ -6,10 +21,12 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 
 import com.google.common.collect.Sets;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -19,6 +36,8 @@ import org.onosproject.cluster.ClusterMetadataEventListener;
 import org.onosproject.cluster.ClusterMetadataService;
 import org.onosproject.cluster.ControllerNode;
 import org.onosproject.cluster.NodeId;
+import org.onosproject.core.HybridLogicalClockService;
+import org.onosproject.core.HybridLogicalTime;
 import org.onosproject.net.provider.ProviderId;
 import org.onosproject.store.cluster.messaging.Endpoint;
 
@@ -32,6 +51,18 @@ import static org.onlab.junit.TestTools.findAvailablePort;
  * Unit tests for NettyMessaging.
  */
 public class NettyMessagingManagerTest {
+
+    HybridLogicalClockService testClockService = new HybridLogicalClockService() {
+        AtomicLong counter = new AtomicLong();
+        @Override
+        public HybridLogicalTime timeNow() {
+            return new HybridLogicalTime(counter.incrementAndGet(), 0);
+        }
+
+        @Override
+        public void recordEventTime(HybridLogicalTime time) {
+        }
+    };
 
     NettyMessagingManager netty1;
     NettyMessagingManager netty2;
@@ -48,11 +79,13 @@ public class NettyMessagingManagerTest {
         ep1 = new Endpoint(IpAddress.valueOf("127.0.0.1"), findAvailablePort(5001));
         netty1 = new NettyMessagingManager();
         netty1.clusterMetadataService = dummyMetadataService(DUMMY_NAME, IP_STRING, ep1);
+        netty1.clockService = testClockService;
         netty1.activate();
 
         ep2 = new Endpoint(IpAddress.valueOf("127.0.0.1"), findAvailablePort(5003));
         netty2 = new NettyMessagingManager();
         netty2.clusterMetadataService = dummyMetadataService(DUMMY_NAME, IP_STRING, ep2);
+        netty2.clockService = testClockService;
         netty2.activate();
     }
 
@@ -118,8 +151,16 @@ public class NettyMessagingManagerTest {
         AtomicReference<String> handlerThreadName = new AtomicReference<>();
         AtomicReference<String> completionThreadName = new AtomicReference<>();
 
+        final CountDownLatch latch = new CountDownLatch(1);
+
         BiFunction<Endpoint, byte[], byte[]> handler = (ep, data) -> {
             handlerThreadName.set(Thread.currentThread().getName());
+            try {
+                latch.await();
+            } catch (InterruptedException e1) {
+                Thread.currentThread().interrupt();
+                fail("InterruptedException");
+            }
             return "hello there".getBytes();
         };
         netty2.registerHandler("test-subject", handler, handlerExecutor);
@@ -131,6 +172,7 @@ public class NettyMessagingManagerTest {
         response.whenComplete((r, e) -> {
             completionThreadName.set(Thread.currentThread().getName());
         });
+        latch.countDown();
 
         // Verify that the message was request handling and response completion happens on the correct thread.
         assertTrue(Arrays.equals("hello there".getBytes(), response.join()));

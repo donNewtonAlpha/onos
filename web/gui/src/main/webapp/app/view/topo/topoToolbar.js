@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,6 +49,7 @@
         M: { id: 'offline-tog', gid: 'switch', isel: true },
         P: { id: 'ports-tog', gid: 'ports', isel: true },
         B: { id: 'bkgrnd-tog', gid: 'map', isel: false },
+        G: { id: 'bkgrnd-sel', gid: 'filters' },
         S: { id: 'sprite-tog', gid: 'cloud', isel: false },
 
         // TODO: add reset-node-locations button to toolbar
@@ -79,6 +80,7 @@
             porthl: 1,
             bg: 0,
             spr: 0,
+            ovidx: 1,   // default to traffic overlay
             toolbar: 0
         },
         prefsMap = {
@@ -95,7 +97,6 @@
 
     function init(_api_) {
         api = _api_;
-
         // retrieve initial toggle button settings from user prefs
         setInitToggleState();
     }
@@ -151,6 +152,7 @@
         addToggle('M');
         addToggle('P', true);
         addToggle('B');
+        addButton('G');
         addToggle('S', true);
     }
 
@@ -197,6 +199,9 @@
         // ensure dialog has closed (if opened by outgoing overlay)
         tds.closeDialog();
         thirdRow.clear();
+
+        // persist our choice of overlay...
+        persistTopoPrefs('ovidx', ovIndex[oid] || 0);
 
         if (!order.length) {
             thirdRow.setText(selOver);
@@ -263,15 +268,22 @@
         }
     }
 
-    function toggleToolbar() {
-        toolbar.toggle();
+    function persistTopoPrefs(key, val) {
         var prefs = ps.getPrefs(cooktag, defaultPrefsState);
-        prefs.toolbar = !prefs.toolbar;
+        prefs[key] = val === undefined ? !prefs[key] : val;
         ps.setPrefs('topo_prefs', prefs);
     }
 
-    function setDefaultOverlay() {
+    function toggleToolbar() {
+        toolbar.toggle();
+        persistTopoPrefs('toolbar');
+    }
+    
+    function setDefaultOverlay(prefsIdx) {
         var idx = ovIndex[defaultOverlay] || 0;
+        if (prefsIdx >= 0 && prefsIdx < ovRset.size()) {
+            idx = prefsIdx;
+        }
         ovRset.selectedIndex(idx);
     }
 

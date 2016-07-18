@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,16 +15,10 @@
  */
 package org.onosproject.net.intent.impl.compiler;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
+import org.apache.commons.lang.math.RandomUtils;
 import org.onlab.packet.EthType;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.MplsLabel;
@@ -52,8 +46,15 @@ import org.onosproject.net.resource.ResourceService;
 import org.onosproject.net.resource.Resources;
 import org.slf4j.Logger;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Sets;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.onosproject.net.LinkKey.linkKey;
 
@@ -62,6 +63,8 @@ import static org.onosproject.net.LinkKey.linkKey;
  */
 
 public class PathCompiler<T> {
+
+    public static final boolean RANDOM_SELECTION = true;
 
     /**
      * Defines methods used to create objects representing flows.
@@ -115,10 +118,48 @@ public class PathCompiler<T> {
         List<ResourceAllocation> allocations =
                 creator.resourceService().allocate(intent.id(), ImmutableList.copyOf(resources));
         if (allocations.isEmpty()) {
-            Collections.emptyMap();
+            return Collections.emptyMap();
         }
 
         return vlanIds;
+    }
+
+    /**
+     * Implements the first fit selection behavior.
+     *
+     * @param available the set of available VLAN ids.
+     * @return the chosen VLAN id.
+     */
+    private VlanId firsFitSelection(Set<VlanId> available) {
+        if (!available.isEmpty()) {
+            return available.iterator().next();
+        }
+        return VlanId.vlanId(VlanId.NO_VID);
+    }
+
+    /**
+     * Implements the random selection behavior.
+     *
+     * @param available the set of available VLAN ids.
+     * @return the chosen VLAN id.
+     */
+    private VlanId randomSelection(Set<VlanId> available) {
+        if (!available.isEmpty()) {
+            int size = available.size();
+            int index = RandomUtils.nextInt(size);
+            return Iterables.get(available, index);
+        }
+        return VlanId.vlanId(VlanId.NO_VID);
+    }
+
+    /**
+    * Select a VLAN id from the set of available VLAN ids.
+    *
+    * @param available the set of available VLAN ids.
+    * @return the chosen VLAN id.
+    */
+    private VlanId selectVlanId(Set<VlanId> available) {
+        return RANDOM_SELECTION ? randomSelection(available) : firsFitSelection(available);
     }
 
     private Map<LinkKey, VlanId> findVlanIds(PathCompilerCreateFlow creator, Set<LinkKey> links) {
@@ -130,7 +171,11 @@ public class PathCompiler<T> {
             if (common.isEmpty()) {
                 continue;
             }
-            vlanIds.put(link, common.iterator().next());
+            VlanId selected = selectVlanId(common);
+            if (selected.toShort() == VlanId.NO_VID) {
+                continue;
+            }
+            vlanIds.put(link, selected);
         }
         return vlanIds;
     }
@@ -186,7 +231,6 @@ public class PathCompiler<T> {
                 if (egressVlanId == null) {
                     throw new IntentCompilationException("No available VLAN ID for " + link);
                 }
-                prevVlanId = egressVlanId;
 
                 TrafficSelector transitSelector = DefaultTrafficSelector.builder()
                         .matchInPort(prev.port())
@@ -201,6 +245,11 @@ public class PathCompiler<T> {
                 creator.createFlow(transitSelector,
                                    transitTreat.build(), prev, link.src(),
                                    intent.priority(), true, flows, devices);
+                /* For the next hop we have to remember
+                 * the previous egress VLAN id and the egress
+                 * node
+                 */
+                prevVlanId = egressVlanId;
                 prev = link.dst();
             } else {
                 // Egress traffic
@@ -214,10 +263,11 @@ public class PathCompiler<T> {
                                 instruction -> instruction instanceof L2ModificationInstruction.ModVlanIdInstruction)
                         .map(x -> (L2ModificationInstruction.ModVlanIdInstruction) x).findAny();
 
-                Optional<L2ModificationInstruction.PopVlanInstruction> popVlanInstruction = intent.treatment()
+                Optional<L2ModificationInstruction.ModVlanHeaderInstruction> popVlanInstruction = intent.treatment()
                         .allInstructions().stream().filter(
-                                instruction -> instruction instanceof L2ModificationInstruction.PopVlanInstruction)
-                        .map(x -> (L2ModificationInstruction.PopVlanInstruction) x).findAny();
+                                instruction -> instruction instanceof
+                                        L2ModificationInstruction.ModVlanHeaderInstruction)
+                        .map(x -> (L2ModificationInstruction.ModVlanHeaderInstruction) x).findAny();
 
                 if (!modVlanIdInstruction.isPresent() && !popVlanInstruction.isPresent()) {
                     if (vlanCriterion.isPresent()) {
@@ -264,7 +314,7 @@ public class PathCompiler<T> {
         List<ResourceAllocation> allocations =
                 creator.resourceService().allocate(intent.id(), ImmutableList.copyOf(resources));
         if (allocations.isEmpty()) {
-            Collections.emptyMap();
+            return Collections.emptyMap();
         }
 
         return labels;

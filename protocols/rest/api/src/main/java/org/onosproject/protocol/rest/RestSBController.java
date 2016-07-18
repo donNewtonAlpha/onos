@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -76,6 +76,20 @@ public interface RestSBController {
      * @return true if operation returned 200, 201, 202, false otherwise
      */
     boolean post(DeviceId device, String request, InputStream payload, String mediaType);
+
+    /**
+     * Does a REST POST request with specified parameters to the device.
+     *
+     * @param device        device to make the request to
+     * @param request       url of the request
+     * @param payload       payload of the request as an InputStream
+     * @param mediaType     type of content in the payload i.e. application/json
+     * @param responseClass the type of response object we are interested in,
+     *                      such as String, InputStream.
+     * @return Object of type requested via responseClass.
+     */
+    <T> T post(DeviceId device, String request, InputStream payload,
+               String mediaType, Class<T> responseClass);
 
     /**
      * Does a REST PUT request with specified parameters to the device.

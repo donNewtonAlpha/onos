@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2014-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -659,8 +659,8 @@ public abstract class Tools {
      * @param <T> type of enclosed value
      * @return optional as a stream
      */
-    public static <T> Stream<T> stream(Optional<T> optional) {
-        return optional.map(Stream::of).orElse(Stream.empty());
+    public static <T> Stream<T> stream(Optional<? extends T> optional) {
+        return optional.map(x -> Stream.<T>of(x)).orElse(Stream.empty());
     }
 
     // Auxiliary path visitor for recursive directory structure copying.

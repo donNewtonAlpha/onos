@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2016 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -105,6 +105,15 @@ public interface OpenstackInterfaceService {
      * @param id security group id
      * @return security group information
      */
-    OpenstackSecurityGroup getSecurityGroup(String id);
+    OpenstackSecurityGroup securityGroup(String id);
+
+    /**
+     * Returns collection of OpenStack floating IP information.
+     *
+     * @return collection of OpenStack floating IP information
+     */
+    Collection<OpenstackFloatingIP> floatingIps();
+
+
 
 }

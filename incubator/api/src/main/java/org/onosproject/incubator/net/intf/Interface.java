@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,60 +61,6 @@ public class Interface {
         this.ipAddresses = ipAddresses == null ? Lists.newArrayList() : ipAddresses;
         this.macAddress = macAddress == null ? MacAddress.NONE : macAddress;
         this.vlan = vlan == null ? VlanId.NONE : vlan;
-    }
-
-    /**
-     * Creates new Interface with the provided configuration.
-     *
-     * @param name name of the interface
-     * @param connectPoint the connect point this interface maps to
-     * @param ipAddresses set of IP addresses
-     * @param macAddress MAC address
-     * @param vlan VLAN ID
-     * @deprecated in Falcon release, in favour of ordered list
-     */
-    @Deprecated
-    public Interface(String name, ConnectPoint connectPoint,
-                     Set<InterfaceIpAddress> ipAddresses,
-                     MacAddress macAddress, VlanId vlan) {
-        this.name = name == null ? NO_INTERFACE_NAME : name;
-        this.connectPoint = checkNotNull(connectPoint);
-        this.ipAddresses = ipAddresses == null ? Lists.newArrayList() :
-                           ipAddresses.stream().collect(Collectors.toList());
-        this.macAddress = macAddress == null ? MacAddress.NONE : macAddress;
-        this.vlan = vlan == null ? VlanId.NONE : vlan;
-    }
-
-    /**
-     * Creates new Interface with the provided configuration.
-     *
-     * @param connectPoint the connect point this interface maps to
-     * @param ipAddresses Set of IP addresses
-     * @param macAddress MAC address
-     * @param vlan VLAN ID
-     * @deprecated in Falcon release - use constructors with names instead
-     */
-    @Deprecated
-    public Interface(ConnectPoint connectPoint,
-                     Set<InterfaceIpAddress> ipAddresses,
-                     MacAddress macAddress, VlanId vlan) {
-        this(NO_INTERFACE_NAME, connectPoint, ipAddresses, macAddress, vlan);
-    }
-
-    /**
-     * Creates new Interface with the provided configuration.
-     *
-     * @param connectPoint the connect point this interface maps to
-     * @param ipAddresses Set of IP addresses
-     * @param macAddress MAC address
-     * @param vlan VLAN ID
-     * @deprecated in Falcon release - use constructors with names instead
-     */
-    @Deprecated
-    public Interface(ConnectPoint connectPoint,
-                     List<InterfaceIpAddress> ipAddresses,
-                     MacAddress macAddress, VlanId vlan) {
-        this(NO_INTERFACE_NAME, connectPoint, ipAddresses, macAddress, vlan);
     }
 
     /**

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2014-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -317,7 +317,7 @@ public abstract class ConnectivityIntentCommand extends AbstractShellCommand {
         }
 
         if (!isNullOrEmpty(setIpDstString)) {
-            treatmentBuilder.setIpSrc(IpAddress.valueOf(setIpDstString));
+            treatmentBuilder.setIpDst(IpAddress.valueOf(setIpDstString));
             emptyTreatment = false;
         }
         if (!isNullOrEmpty(setVlan)) {

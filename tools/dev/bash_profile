@@ -41,14 +41,14 @@ export ONOS_SCENARIOS=$ONOS_ROOT/tools/test/scenarios
 # Convenience utility to warp to various ONOS source projects
 # e.g. 'o api', 'o dev', 'o'
 function o {
-    cd $(find $ONOS_ROOT/ -type d -and \( -name '.git' -o -name 'target' -o -name 'gen-src' -o -name 'src' \) -prune -o -type d | \
+    cd $(find $ONOS_ROOT/ -type d -and \( -name 'buck-out' -o -name '.git' -o -name 'target' -o -name 'gen-src' -o -name 'src' \) -prune -o -type d | \
         egrep "${1:-$ONOS_ROOT}" | head -n 1)
 }
 
 # Short-hand for 'mvn clean install' for us lazy folk
 alias mci='mvn clean install'
-alias mcis='mvn clean install -DskipTests -Dcheckstyle.skip -U -T 1C'
-alias mis='mvn install -DskipTests -Dcheckstyle.skip -U -T 1C'
+alias mcis='mvn clean install -DskipTests -Dcheckstyle.skip'
+alias mis='mvn install -DskipTests -Dcheckstyle.skip'
 
 # Short-hand for ONOS build, package and test.
 alias ob='onos-build'
@@ -97,40 +97,117 @@ alias sshctl='onos-ssh'
 alias sshnet='onos-ssh $OCN'
 
 
+
+# Applies the settings in the specified topology recipe file or lists current
+# topo recipe definition if no topo recipe file is given.
+function topo {
+    topo=${1:-""}
+    case "$topo" in
+    "")
+        env | egrep "ONOS_TOPO"
+        env | egrep "(OTD|OTL|OTH)="
+        ;;
+
+    *)
+        [ ! -f $ONOS_ROOT/tools/test/topos/$1.recipe ] && echo "No such topo recipe: $1" >&2 && return 1
+        unset ONOS_TOPO OTD OTL OTH ONOS_DEVICES ONOS_HOSTS
+        unset $(env | sed -n 's:\(^OT[DLH][0-9]\{1,\}\)=.*:\1 :g p')
+        export ONOS_TOPO=$1
+        . $ONOS_ROOT/tools/test/topos/$1.recipe
+        let d=1; while [ $d -le $OTD ]; do
+            dev="$(printf 'of:%016x' $d)"
+            export OTD$d=$dev; export ONOS_DEVICES="$ONOS_DEVICES $dev"
+            let d=d+1;
+        done
+        let h=1; while [ $h -le $OTH ]; do
+            host="$(printf '00:00:00:00:00:%02x/-1' $h)"
+            export OTH$h=$host; export ONOS_HOSTS="$ONOS_HOSTS $host"
+            let h=h+1
+        done
+        topo
+    esac
+}
+
+# Lists available topo recipes
+function topos {
+    for topo in $(ls -1 $ONOS_ROOT/tools/test/topos/*.recipe); do
+        name=$(basename $topo .recipe)
+        printf "%-16s  %s\n" \
+            "$([ $name = $ONOS_TOPO ] && echo $name '*' || echo $name)" \
+            "$(grep '^#' $topo | head -n 1)"
+    done
+}
+
 # Sets the primary instance to the specified instance number.
 function setPrimaryInstance {
+    export ONOS_INSTANCES=$(env | grep 'OC[0-9]*=' | sort | cut -d= -f2)
     export OCI=$(env | egrep "OC[0-9]+" | sort | egrep OC${1:-1} | cut -d= -f2)
     echo $OCI
+}
+
+# ON.Lab shared test cell warden address
+export CELL_WARDEN="10.254.1.19"
+
+# Clears cell environment
+function clearCell {
+    unset ONOS_CELL ONOS_NIC ONOS_IP ONOS_APPS ONOS_BOOT_FEATURES
+    unset OCI OCN OCT ONOS_INSTANCES ONOS_FEATURES
+    unset $(env | sed -n 's:\(^OC[0-9]\{1,\}\)=.*:\1 :g p')
 }
 
 # Applies the settings in the specified cell file or lists current cell definition
 # if no cell file is given.
 function cell {
-    if [ -n "$1" ]; then
-        [ ! -f $ONOS_ROOT/tools/test/cells/$1 ] && \
-            echo "No such cell: $1" >&2 && return 1
-        unset ONOS_CELL ONOS_NIC ONOS_IP ONOS_APPS ONOS_BOOT_FEATURES
-        unset OCI OCN OCT ONOS_INSTANCES ONOS_FEATURES ONOS_USER ONOS_GROUP
-        unset $(env | sed -n 's:\(^OC[0-9]\{1,\}\)=.*:\1 :g p')
-        export ONOS_USER=${ONOS_USER:-sdn}
-        export ONOS_GROUP=${ONOS_GROUP:-sdn}
-        export ONOS_WEB_USER=onos
-        export ONOS_WEB_PASS=rocks
-        export ONOS_CELL=$1
-        . $ONOS_ROOT/tools/test/cells/$1
-        export ONOS_INSTANCES=$(env | grep 'OC[0-9]*=' | sort | cut -d= -f2)
+    cell=${1:-""}
+    case "$cell" in
+    "borrow")
+        clearCell
+        aux="/tmp/cell-$$"
+        duration=${2:-0}
+        spec=${3:-3+1}
+        spec=${spec/+/%2B}
+        user=${4:-$(id -un)}
+        query="duration=$duration&spec=$spec&user=$user"
+        curl -sS -X POST "http://$CELL_WARDEN:4321/?$query" -d "$(cat ~/.ssh/id_rsa.pub)" > $aux
+        . $aux
+        rm -f $aux
         setPrimaryInstance 1 >/dev/null
-        cell
-    else
+        onos-verify-cell
+        topo default >/dev/null
+        ;;
+    "return")
+        curl -sS -X DELETE "http://$CELL_WARDEN:4321/?user=${2:-$(id -un)}"
+        clearCell
+        ;;
+
+    "status")
+        curl -sS "http://$CELL_WARDEN:4321/" | sort
+        ;;
+
+    "")
         env | egrep "ONOS_CELL"
         env | egrep "OCI"
         env | egrep "OC[0-9]+" | sort
         env | egrep "OC[NT]"
-        env | egrep "ONOS_" | egrep -v 'ONOS_ROOT|ONOS_CELL|ONOS_INSTANCES' | sort
-    fi
+        env | egrep "ONOS_" | egrep -v 'ONOS_ROOT|ONOS_CELL|ONOS_INSTANCES|ONOS_DEVICES|ONOS_HOSTS' | sort
+        ;;
+
+    *)
+        [ ! -f $ONOS_ROOT/tools/test/cells/$1 ] && echo "No such cell: $1" >&2 && return 1
+        clearCell
+        export ONOS_USER=${ONOS_USER:-sdn}
+        export ONOS_GROUP=${ONOS_GROUP:-sdn}
+        export ONOS_WEB_USER=${ONOS_WEB_USER:-onos}
+        export ONOS_WEB_PASS=${ONOS_WEB_PASS:-rocks}
+        export ONOS_CELL=$1
+        . $ONOS_ROOT/tools/test/cells/$1
+        setPrimaryInstance 1 >/dev/null
+        cell
+        topo default >/dev/null
+    esac
 }
 
-cell $ONOS_CELL > /dev/null
+[ -n "$ONOS_CELL" -a "$ONOS_CELL" != "borrow" ] && cell $ONOS_CELL > /dev/null
 
 # Lists available cells
 function cells {
@@ -198,3 +275,9 @@ alias atttopo='onos-netcfg $OCI $ONOS_ROOT/tools/test/topos/attmpls-cfg.json'
 
 # Load UK topo GEO data
 alias uktopo='onos-netcfg $OCI $ONOS_ROOT/tools/test/topos/uk-cfg.json'
+
+# Git annotated one-line log
+alias gil='git log --oneline --decorate=short'
+
+# Buck (if "buck" is not on the PATH)
+[ -z "$(which buck)" ] && alias buck="onos-buck"

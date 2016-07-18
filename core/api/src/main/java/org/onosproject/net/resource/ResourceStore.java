@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2016 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -109,6 +109,18 @@ public interface ResourceStore extends Store<ResourceEvent, ResourceStoreDelegat
      * @return a set of the child resources of the specified resource
      */
     Set<Resource> getChildResources(DiscreteResourceId parent);
+
+    /**
+     * Returns a set of the child resources of the specified parent and whose type is
+     * the specified class.
+     *
+     * @param parent ID of the parent of the resources to be returned
+     * @param cls class instance of the children
+     * @param <T> type of the resource
+     * @return a set of the child resources of the specified parent and whose type is
+     * the specified class
+     */
+    <T> Set<Resource> getChildResources(DiscreteResourceId parent, Class<T> cls);
 
     /**
      * Returns a collection of the resources which are children of the specified parent and

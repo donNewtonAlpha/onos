@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,13 +36,16 @@
         clusterIndex = -1,      // the instance to which we are connected
         connectRetries = 0,     // limit our attempts at reconnecting
         openListeners = {},     // registered listeners for websocket open()
-        nextListenerId = 1;     // internal ID for open listeners
+        nextListenerId = 1,     // internal ID for open listeners
+        loggedInUser = null;    // name of logged-in user
 
     // =======================
     // === Bootstrap Handler
 
     var builtinHandlers = {
         bootstrap: function (data) {
+            $log.debug('bootstrap data', data);
+            loggedInUser = data.user;
             clusterNodes = data.clusterNodes;
             clusterNodes.forEach(function (d, i) {
                 if (d.uiAttached) {
@@ -53,6 +56,7 @@
             });
         }
     };
+
 
     // ==========================
     // === Web socket callbacks
@@ -252,6 +256,8 @@
         });
     }
 
+    // TODO: simplify listener handling (see theme.js for sample code)
+
     function addOpenListener(callback) {
         var id = nextListenerId++,
             cb = fs.isF(callback),
@@ -332,6 +338,7 @@
                 removeOpenListener: removeOpenListener,
                 sendEvent: sendEvent,
                 isConnected: function () { return wsUp; },
+                loggedInUser: function () { return loggedInUser || '(no-one)'; },
 
                 _setVeilDelegate: setVeilDelegate,
                 _setLoadingDelegate: setLoadingDelegate

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -192,7 +192,7 @@ public final class OpenstackSecurityGroupRule {
         if (this instanceof OpenstackSecurityGroupRule) {
             OpenstackSecurityGroupRule that = (OpenstackSecurityGroupRule) o;
             return this.direction.equals(that.direction) &&
-                    this.ethertype.equals(that.direction) &&
+                    this.ethertype.equals(that.ethertype) &&
                     this.id.equals(that.id) &&
                     this.portRangeMax == that.portRangeMax &&
                     this.portRangeMin == that.portRangeMin &&
@@ -347,7 +347,7 @@ public final class OpenstackSecurityGroupRule {
         public OpenstackSecurityGroupRule build() {
 
             int portRangeMinInt = (portRangeMin == null || portRangeMin.equals("null")) ?
-                    -1 : Integer.parseInt(portRangeMax);
+                    -1 : Integer.parseInt(portRangeMin);
             int portRangeMaxInt = (portRangeMax == null || portRangeMax.equals("null")) ?
                     -1 : Integer.parseInt(portRangeMax);
             IpPrefix ipPrefix = (remoteIpPrefix == null || remoteIpPrefix.equals("null")) ?

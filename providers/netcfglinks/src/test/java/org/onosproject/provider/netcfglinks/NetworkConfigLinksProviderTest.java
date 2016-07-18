@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,15 +15,14 @@
  */
 package org.onosproject.provider.netcfglinks;
 
-import java.nio.ByteBuffer;
-import java.util.List;
-
+import com.google.common.collect.ImmutableList;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.onlab.packet.ChassisId;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.ONOSLLDP;
+import org.onosproject.cluster.ClusterMetadataServiceAdapter;
 import org.onosproject.core.CoreServiceAdapter;
 import org.onosproject.mastership.MastershipServiceAdapter;
 import org.onosproject.net.ConnectPoint;
@@ -52,7 +51,8 @@ import org.onosproject.net.packet.PacketContext;
 import org.onosproject.net.packet.PacketProcessor;
 import org.onosproject.net.packet.PacketServiceAdapter;
 
-import com.google.common.collect.ImmutableList;
+import java.nio.ByteBuffer;
+import java.util.List;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.empty;
@@ -152,7 +152,7 @@ public class NetworkConfigLinksProviderTest {
 
             Ethernet ethPacket = new Ethernet();
             ethPacket.setEtherType(Ethernet.TYPE_LLDP);
-            ethPacket.setDestinationMACAddress(ONOSLLDP.LLDP_NICIRA);
+            ethPacket.setDestinationMACAddress(ONOSLLDP.LLDP_ONLAB);
             ethPacket.setPayload(lldp);
             ethPacket.setPad(true);
 
@@ -232,6 +232,7 @@ public class NetworkConfigLinksProviderTest {
         provider.deviceService = new TestDeviceManager();
         provider.masterService = new TestMastershipService();
         provider.packetService = new TestPacketService();
+        provider.metadataService = new ClusterMetadataServiceAdapter();
         provider.netCfgService = configRegistry;
 
         provider.activate();

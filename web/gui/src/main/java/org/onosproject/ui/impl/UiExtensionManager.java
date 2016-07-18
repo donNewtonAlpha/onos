@@ -1,5 +1,5 @@
 /*
- * Copyright 2015,2016 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,21 +38,24 @@ import org.apache.felix.scr.annotations.Deactivate;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.apache.felix.scr.annotations.Service;
-import org.onlab.util.KryoNamespace;
+import org.onlab.util.Tools;
 import org.onosproject.mastership.MastershipService;
 import org.onosproject.store.serializers.KryoNamespaces;
-import org.onosproject.store.service.EventuallyConsistentMap;
-import org.onosproject.store.service.EventuallyConsistentMapEvent;
-import org.onosproject.store.service.EventuallyConsistentMapListener;
+import org.onosproject.store.service.ConsistentMap;
+import org.onosproject.store.service.MapEvent;
+import org.onosproject.store.service.MapEventListener;
+import org.onosproject.store.service.Serializer;
 import org.onosproject.store.service.StorageService;
-import org.onosproject.store.service.WallClockTimestamp;
 import org.onosproject.ui.UiExtension;
 import org.onosproject.ui.UiExtensionService;
 import org.onosproject.ui.UiMessageHandlerFactory;
 import org.onosproject.ui.UiPreferencesService;
+import org.onosproject.ui.UiTopoMap;
+import org.onosproject.ui.UiTopoMapFactory;
 import org.onosproject.ui.UiTopoOverlayFactory;
 import org.onosproject.ui.UiView;
 import org.onosproject.ui.UiViewHidden;
+import org.onosproject.ui.impl.topo.Topo2ViewMessageHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,6 +63,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static com.google.common.collect.ImmutableList.of;
 import static java.util.stream.Collectors.toSet;
@@ -74,13 +79,20 @@ import static org.onosproject.ui.UiView.Category.PLATFORM;
  */
 @Component(immediate = true)
 @Service
-public class UiExtensionManager implements UiExtensionService, UiPreferencesService, SpriteService {
+public class UiExtensionManager
+        implements UiExtensionService, UiPreferencesService, SpriteService {
 
     private static final ClassLoader CL = UiExtensionManager.class.getClassLoader();
+
+    private static final String ONOS_USER_PREFERENCES = "onos-ui-user-preferences";
     private static final String CORE = "core";
     private static final String GUI_ADDED = "guiAdded";
     private static final String GUI_REMOVED = "guiRemoved";
     private static final String UPDATE_PREFS = "updatePrefs";
+    private static final String SLASH = "/";
+
+    private static final int IDX_USER = 0;
+    private static final int IDX_KEY = 1;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -100,11 +112,16 @@ public class UiExtensionManager implements UiExtensionService, UiPreferencesServ
     protected StorageService storageService;
 
     // User preferences
-    private EventuallyConsistentMap<String, ObjectNode> prefs;
-    private final EventuallyConsistentMapListener<String, ObjectNode> prefsListener =
+    private ConsistentMap<String, ObjectNode> prefsConsistentMap;
+    private Map<String, ObjectNode> prefs;
+    private final MapEventListener<String, ObjectNode> prefsListener =
             new InternalPrefsListener();
 
     private final ObjectMapper mapper = new ObjectMapper();
+
+    private final ExecutorService eventHandlingExecutor =
+            Executors.newSingleThreadExecutor(
+                    Tools.groupedThreads("onos/ui-ext-manager", "event-handler", log));
 
     // Creates core UI extension
     private UiExtension createCoreExtension() {
@@ -114,6 +131,10 @@ public class UiExtensionManager implements UiExtensionService, UiPreferencesServ
                 new UiView(PLATFORM, "cluster", "Cluster Nodes", "nav_cluster"),
                 new UiView(PLATFORM, "processor", "Packet Processors", "nav_processors"),
                 new UiView(NETWORK, "topo", "Topology", "nav_topo"),
+
+                // FIXME: leave commented out for now, while still under development
+//                new UiView(NETWORK, "topo2", "New-Topo"),
+
                 new UiView(NETWORK, "device", "Devices", "nav_devs"),
                 new UiViewHidden("flow"),
                 new UiViewHidden("port"),
@@ -122,14 +143,15 @@ public class UiExtensionManager implements UiExtensionService, UiPreferencesServ
                 new UiView(NETWORK, "link", "Links", "nav_links"),
                 new UiView(NETWORK, "host", "Hosts", "nav_hosts"),
                 new UiView(NETWORK, "intent", "Intents", "nav_intents"),
-                //TODO add a new type of icon for tunnel
-                new UiView(NETWORK, "tunnel", "Tunnels", "nav_links")
+                new UiView(NETWORK, "tunnel", "Tunnels", "nav_tunnels")
         );
 
         UiMessageHandlerFactory messageHandlerFactory =
                 () -> ImmutableList.of(
                         new UserPreferencesMessageHandler(),
                         new TopologyViewMessageHandler(),
+                        new Topo2ViewMessageHandler(),
+                        new MapSelectorMessageHandler(),
                         new DeviceViewMessageHandler(),
                         new LinkViewMessageHandler(),
                         new HostViewMessageHandler(),
@@ -150,37 +172,57 @@ public class UiExtensionManager implements UiExtensionService, UiPreferencesServ
                         new TrafficOverlay()
                 );
 
+        UiTopoMapFactory topoMapFactory =
+                () -> ImmutableList.of(
+                        new UiTopoMap("australia", "Australia", "*australia", 1.0),
+                        new UiTopoMap("americas", "North, Central and South America", "*americas", 0.7),
+                        new UiTopoMap("n_america", "North America", "*n_america", 0.9),
+                        new UiTopoMap("s_america", "South America", "*s_america", 0.9),
+                        new UiTopoMap("usa", "United States", "*continental_us", 1.3),
+                        new UiTopoMap("bayareaGEO", "Bay Area, California", "*bayarea", 1.0),
+                        new UiTopoMap("europe", "Europe", "*europe", 10.0),
+                        new UiTopoMap("italy", "Italy", "*italy", 0.8),
+                        new UiTopoMap("uk", "United Kingdom and Ireland", "*uk", 2.0),
+                        new UiTopoMap("japan", "Japan", "*japan", 0.8),
+                        new UiTopoMap("s_korea", "South Korea", "*s_korea", 0.75),
+                        new UiTopoMap("taiwan", "Taiwan", "*taiwan", 0.7),
+                        new UiTopoMap("africa", "Africa", "*africa", 0.7),
+                        new UiTopoMap("oceania", "Oceania", "*oceania", 0.7),
+                        new UiTopoMap("asia", "Asia", "*asia", 0.7)
+                );
+
         return new UiExtension.Builder(CL, coreViews)
                 .messageHandlerFactory(messageHandlerFactory)
                 .topoOverlayFactory(topoOverlayFactory)
+                .topoMapFactory(topoMapFactory)
                 .resourcePath(CORE)
                 .build();
     }
 
     @Activate
     public void activate() {
-        KryoNamespace.Builder kryoBuilder = new KryoNamespace.Builder()
-                .register(KryoNamespaces.API)
-                .register(ObjectNode.class, ArrayNode.class,
-                          JsonNodeFactory.class, LinkedHashMap.class,
-                          TextNode.class, BooleanNode.class,
-                          LongNode.class, DoubleNode.class, ShortNode.class,
-                          IntNode.class, NullNode.class);
+        Serializer serializer = Serializer.using(KryoNamespaces.API,
+                ObjectNode.class, ArrayNode.class,
+                JsonNodeFactory.class, LinkedHashMap.class,
+                TextNode.class, BooleanNode.class,
+                LongNode.class, DoubleNode.class, ShortNode.class,
+                IntNode.class, NullNode.class);
 
-        prefs = storageService.<String, ObjectNode>eventuallyConsistentMapBuilder()
-                .withName("onos-user-preferences")
-                .withSerializer(kryoBuilder)
-                .withTimestampProvider((k, v) -> new WallClockTimestamp())
-                .withPersistence()
+        prefsConsistentMap = storageService.<String, ObjectNode>consistentMapBuilder()
+                .withName(ONOS_USER_PREFERENCES)
+                .withSerializer(serializer)
+                .withRelaxedReadConsistency()
                 .build();
-        prefs.addListener(prefsListener);
+        prefsConsistentMap.addListener(prefsListener);
+        prefs = prefsConsistentMap.asJavaMap();
         register(core);
         log.info("Started");
     }
 
     @Deactivate
     public void deactivate() {
-        prefs.removeListener(prefsListener);
+        prefsConsistentMap.removeListener(prefsListener);
+        eventHandlingExecutor.shutdown();
         UiWebSocketServlet.closeAll();
         unregister(core);
         log.info("Stopped");
@@ -229,7 +271,7 @@ public class UiExtensionManager implements UiExtensionService, UiPreferencesServ
     public Map<String, ObjectNode> getPreferences(String userName) {
         ImmutableMap.Builder<String, ObjectNode> builder = ImmutableMap.builder();
         prefs.entrySet().stream()
-                .filter(e -> e.getKey().startsWith(userName + "/"))
+                .filter(e -> e.getKey().startsWith(userName + SLASH))
                 .forEach(e -> builder.put(keyName(e.getKey()), e.getValue()));
         return builder.build();
     }
@@ -261,26 +303,29 @@ public class UiExtensionManager implements UiExtensionService, UiPreferencesServ
     }
 
     private String key(String userName, String keyName) {
-        return userName + "/" + keyName;
+        return userName + SLASH + keyName;
     }
 
+
     private String userName(String key) {
-        return key.split("/")[0];
+        return key.split(SLASH)[IDX_USER];
     }
 
     private String keyName(String key) {
-        return key.split("/")[1];
+        return key.split(SLASH)[IDX_KEY];
     }
 
     // Auxiliary listener to preference map events.
     private class InternalPrefsListener
-            implements EventuallyConsistentMapListener<String, ObjectNode> {
+            implements MapEventListener<String, ObjectNode> {
         @Override
-        public void event(EventuallyConsistentMapEvent<String, ObjectNode> event) {
-            String userName = userName(event.key());
-            if (event.type() == EventuallyConsistentMapEvent.Type.PUT) {
-                UiWebSocketServlet.sendToUser(userName, UPDATE_PREFS, jsonPrefs());
-            }
+        public void event(MapEvent<String, ObjectNode> event) {
+            eventHandlingExecutor.execute(() -> {
+                String userName = userName(event.key());
+                if (event.type() == MapEvent.Type.INSERT || event.type() == MapEvent.Type.UPDATE) {
+                    UiWebSocketServlet.sendToUser(userName, UPDATE_PREFS, jsonPrefs());
+                }
+            });
         }
 
         private ObjectNode jsonPrefs() {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@ package org.onosproject.cpman.rest;
 
 import com.google.common.collect.ImmutableSet;
 import org.glassfish.jersey.server.ResourceConfig;
-import org.glassfish.jersey.test.JerseyTest;
 import org.junit.Before;
 import org.junit.Test;
 import org.onlab.osgi.ServiceDirectory;
@@ -30,8 +29,10 @@ import org.onosproject.cluster.NodeId;
 import org.onosproject.codec.CodecService;
 import org.onosproject.codec.impl.CodecManager;
 import org.onosproject.cpman.ControlLoad;
+import org.onosproject.cpman.ControlLoadSnapshot;
 import org.onosproject.cpman.ControlPlaneMonitorService;
-import org.onosproject.cpman.codec.ControlLoadCodec;
+import org.onosproject.cpman.codec.ControlLoadSnapshotCodec;
+import org.onosproject.rest.resources.ResourceTest;
 
 import javax.ws.rs.client.WebTarget;
 import java.util.Set;
@@ -49,7 +50,7 @@ import static org.junit.Assert.assertThat;
 /**
  * Unit test for ControlMetrics REST API.
  */
-public class ControlMetricsResourceTest extends JerseyTest {
+public class ControlMetricsResourceTest extends ResourceTest {
 
     final ControlPlaneMonitorService mockControlPlaneMonitorService =
             createMock(ControlPlaneMonitorService.class);
@@ -58,7 +59,7 @@ public class ControlMetricsResourceTest extends JerseyTest {
     NodeId nodeId;
     ControlLoad mockControlLoad;
 
-    private static final String PREFIX = "metrics";
+    private static final String PREFIX = "controlmetrics";
 
     /**
      * Constructs a control metrics resource test instance.
@@ -143,7 +144,7 @@ public class ControlMetricsResourceTest extends JerseyTest {
     public void setUpTest() {
         final CodecManager codecService = new CodecManager();
         codecService.activate();
-        codecService.registerCodec(ControlLoad.class, new ControlLoadCodec());
+        codecService.registerCodec(ControlLoadSnapshot.class, new ControlLoadSnapshotCodec());
         ServiceDirectory testDirectory =
                 new TestServiceDirectory()
                         .add(ControlPlaneMonitorService.class,
@@ -165,7 +166,7 @@ public class ControlMetricsResourceTest extends JerseyTest {
      */
     @Test
     public void testResourceEmptyArray() {
-        expect(mockControlPlaneMonitorService.availableResources(anyObject()))
+        expect(mockControlPlaneMonitorService.availableResourcesSync(anyObject(), anyObject()))
                 .andReturn(ImmutableSet.of()).once();
         replay(mockControlPlaneMonitorService);
         final WebTarget wt = target();
@@ -180,10 +181,10 @@ public class ControlMetricsResourceTest extends JerseyTest {
      */
     @Test
     public void testResourcePopulatedArray() {
-        expect(mockControlPlaneMonitorService.availableResources(anyObject()))
+        expect(mockControlPlaneMonitorService.availableResourcesSync(anyObject(), anyObject()))
                 .andReturn(resourceSet).once();
-        expect(mockControlPlaneMonitorService.getLoad(anyObject(), anyObject(),
-        anyString())).andReturn(null).times(4);
+        expect(mockControlPlaneMonitorService.getLoadSync(anyObject(), anyObject(),
+                anyString())).andReturn(null).times(4);
         replay(mockControlPlaneMonitorService);
 
         final WebTarget wt = target();

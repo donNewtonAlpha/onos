@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2014-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,13 +15,16 @@
  */
 package org.onosproject.net.flow;
 
+import java.util.List;
 import java.util.Set;
 
+import com.google.common.collect.Lists;
 import org.hamcrest.Description;
 import org.hamcrest.Factory;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeMatcher;
 import org.junit.Test;
+import org.onlab.packet.Ethernet;
 import org.onlab.packet.Ip6Address;
 import org.onlab.packet.IpPrefix;
 import org.onlab.packet.MacAddress;
@@ -29,6 +32,7 @@ import org.onlab.packet.MplsLabel;
 import org.onlab.packet.TpPort;
 import org.onlab.packet.VlanId;
 import org.onosproject.net.ChannelSpacing;
+import org.onosproject.net.DeviceId;
 import org.onosproject.net.GridType;
 import org.onosproject.net.OchSignal;
 import org.onosproject.net.PortNumber;
@@ -36,10 +40,14 @@ import org.onosproject.net.flow.criteria.Criteria;
 import org.onosproject.net.flow.criteria.Criterion;
 
 import com.google.common.testing.EqualsTester;
+import org.onosproject.net.flow.criteria.ExtensionSelector;
+import org.onosproject.net.flow.criteria.ExtensionSelectorType;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.equalTo;
 import static org.onlab.junit.ImmutableClassChecker.assertThatClassIsImmutable;
 import static org.onosproject.net.flow.criteria.Criterion.Type;
 
@@ -75,6 +83,26 @@ public class DefaultTrafficSelectorTest {
                 .addEqualityGroup(selector1, sameAsSelector1)
                 .addEqualityGroup(selector2)
                 .testEquals();
+    }
+
+    /**
+     * Tests criteria order is consistent.
+     */
+    @Test
+    public void testCriteriaOrder() {
+        final TrafficSelector selector1 = DefaultTrafficSelector.builder()
+                .matchInPort(PortNumber.portNumber(11))
+                .matchEthType(Ethernet.TYPE_ARP)
+                .build();
+        final TrafficSelector selector2 = DefaultTrafficSelector.builder()
+                .matchEthType(Ethernet.TYPE_ARP)
+                .matchInPort(PortNumber.portNumber(11))
+                .build();
+
+        List<Criterion> criteria1 = Lists.newArrayList(selector1.criteria());
+        List<Criterion> criteria2 = Lists.newArrayList(selector2.criteria());
+
+        new EqualsTester().addEqualityGroup(criteria1, criteria2).testEquals();
     }
 
     /**
@@ -266,5 +294,36 @@ public class DefaultTrafficSelectorTest {
         selector = DefaultTrafficSelector.builder()
                 .add(Criteria.matchLambda(new OchSignal(GridType.DWDM, ChannelSpacing.CHL_100GHZ, 1, 1))).build();
         assertThat(selector, hasCriterionWithType(Type.OCH_SIGID));
+
+        selector = DefaultTrafficSelector.builder()
+                .matchEthDst(macValue)
+                .extension(new MockExtensionSelector(1), DeviceId.NONE)
+                .extension(new MockExtensionSelector(2), DeviceId.NONE)
+                .build();
+        assertThat(selector.criteria().size(), is(equalTo(3)));
+    }
+
+    private class MockExtensionSelector extends AbstractExtension implements ExtensionSelector {
+
+        ExtensionSelectorType type;
+
+        MockExtensionSelector(int typeInt) {
+            this.type = new ExtensionSelectorType(typeInt);
+        }
+
+        @Override
+        public ExtensionSelectorType type() {
+            return type;
+        }
+
+        @Override
+        public byte[] serialize() {
+            return new byte[0];
+        }
+
+        @Override
+        public void deserialize(byte[] data) {
+
+        }
     }
 }

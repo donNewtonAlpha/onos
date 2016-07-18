@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,6 +50,10 @@ public class MessageEncoder extends MessageToByteEncoder<InternalMessage> {
             ByteBuf out) throws Exception {
 
         out.writeInt(this.preamble);
+
+        // write time
+        out.writeLong(message.time().logicalTime());
+        out.writeLong(message.time().logicalCounter());
 
         // write message id
         out.writeLong(message.id());

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -93,6 +93,9 @@ public class DefaultInfluxDbMetricsReporter implements InfluxDbMetricsReporter {
     public void activate() {
         cfgService.registerProperties(getClass());
         coreService.registerApplication("org.onosproject.influxdbmetrics");
+        metricsService.registerReporter(this);
+
+        startReport();
 
         log.info("Started");
     }
@@ -100,6 +103,9 @@ public class DefaultInfluxDbMetricsReporter implements InfluxDbMetricsReporter {
     @Deactivate
     public void deactivate() {
         cfgService.unregisterProperties(getClass(), false);
+
+        stopReport();
+        metricsService.unregisterReporter(this);
 
         log.info("Stopped");
     }
@@ -112,20 +118,15 @@ public class DefaultInfluxDbMetricsReporter implements InfluxDbMetricsReporter {
 
     @Override
     public void startReport() {
+        configSender();
+        influxDbReporter = buildReporter(influxDbHttpSender);
+
         try {
-            influxDbHttpSender = new InfluxDbHttpSender(DEFAULT_PROTOCOL, address,
-                    port, database, username + SEPARATOR + password, REPORT_TIME_UNIT,
-                    DEFAULT_CONN_TIMEOUT, DEFAULT_READ_TIMEOUT);
-            MetricRegistry mr = metricsService.getMetricRegistry();
-            influxDbReporter = InfluxDbReporter.forRegistry(addHostPrefix(filter(mr)))
-                    .convertRatesTo(TimeUnit.SECONDS)
-                    .convertDurationsTo(TimeUnit.MILLISECONDS)
-                    .build(influxDbHttpSender);
             influxDbReporter.start(REPORT_PERIOD, REPORT_TIME_UNIT);
-            log.info("Start to report metrics to influxDB.");
         } catch (Exception e) {
-            log.error("Fail to connect to given influxDB server!");
+            log.error("Errors during reporting to InfluxDB, msg: {}" + e.getMessage());
         }
+        log.info("Start to report metrics to influxDB.");
     }
 
     @Override
@@ -140,6 +141,20 @@ public class DefaultInfluxDbMetricsReporter implements InfluxDbMetricsReporter {
     public void restartReport() {
         stopReport();
         startReport();
+    }
+
+    @Override
+    public void notifyMetricsChange() {
+        influxDbReporter.stop();
+        influxDbReporter = buildReporter(influxDbHttpSender);
+
+        try {
+            influxDbReporter.start(REPORT_PERIOD, REPORT_TIME_UNIT);
+        } catch (Exception e) {
+            log.error("Errors during reporting to InfluxDB, msg: {}" + e.getMessage());
+        }
+
+        log.info("Metric registry has been changed, apply changes.");
     }
 
     @Override
@@ -225,5 +240,32 @@ public class DefaultInfluxDbMetricsReporter implements InfluxDbMetricsReporter {
             log.info("Configured. Monitor all metrics is {}",
                     monitorAll ? "enabled" : "disabled");
         }
+    }
+
+    /**
+     * Configures parameters for sender.
+     */
+    private void configSender() {
+        try {
+            influxDbHttpSender = new InfluxDbHttpSender(DEFAULT_PROTOCOL, address,
+                    port, database, username + SEPARATOR + password, REPORT_TIME_UNIT,
+                    DEFAULT_CONN_TIMEOUT, DEFAULT_READ_TIMEOUT);
+        } catch (Exception e) {
+            log.error("Fail to connect to given influxDB server!");
+        }
+    }
+
+    /**
+     * Builds reporter with the given sender.
+     *
+     * @param sender sender
+     * @return reporter
+     */
+    private InfluxDbReporter buildReporter(InfluxDbHttpSender sender) {
+        MetricRegistry mr = metricsService.getMetricRegistry();
+        return InfluxDbReporter.forRegistry(addHostPrefix(filter(mr)))
+                .convertRatesTo(TimeUnit.SECONDS)
+                .convertDurationsTo(TimeUnit.MILLISECONDS)
+                .build(sender);
     }
 }

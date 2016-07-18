@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,25 +15,12 @@
  */
 package org.onosproject.influxdbmetrics;
 
+import org.onlab.metrics.MetricsReporter;
+
 /**
  * A Metric reporter interface for reporting all metrics to influxDB server.
  */
-public interface InfluxDbMetricsReporter {
-
-    /**
-     * Starts to report metrics to InfluxDB server.
-     */
-    void startReport();
-
-    /**
-     * Stops reporting metrics.
-     */
-    void stopReport();
-
-    /**
-     * Restarts metrics reporter.
-     */
-    void restartReport();
+public interface InfluxDbMetricsReporter extends MetricsReporter {
 
     /**
      * Configures default parameters for influx database metrics reporter.

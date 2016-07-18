@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,20 +15,27 @@
  */
 package org.onosproject.incubator.net.virtual.impl;
 
+import com.google.common.collect.Maps;
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.apache.felix.scr.annotations.Service;
+import org.onlab.osgi.DefaultServiceDirectory;
+import org.onlab.packet.IpAddress;
+import org.onlab.packet.MacAddress;
+import org.onlab.packet.VlanId;
 import org.onosproject.incubator.net.tunnel.TunnelId;
 import org.onosproject.incubator.net.virtual.NetworkId;
 import org.onosproject.incubator.net.virtual.TenantId;
 import org.onosproject.incubator.net.virtual.VirtualDevice;
+import org.onosproject.incubator.net.virtual.VirtualHost;
 import org.onosproject.incubator.net.virtual.VirtualLink;
 import org.onosproject.incubator.net.virtual.VirtualNetwork;
 import org.onosproject.incubator.net.virtual.VirtualNetworkAdminService;
 import org.onosproject.incubator.net.virtual.VirtualNetworkEvent;
+import org.onosproject.incubator.net.virtual.VirtualNetworkIntent;
 import org.onosproject.incubator.net.virtual.VirtualNetworkListener;
 import org.onosproject.incubator.net.virtual.VirtualNetworkProvider;
 import org.onosproject.incubator.net.virtual.VirtualNetworkProviderRegistry;
@@ -39,13 +46,24 @@ import org.onosproject.incubator.net.virtual.VirtualNetworkStoreDelegate;
 import org.onosproject.incubator.net.virtual.VirtualPort;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.DeviceId;
+import org.onosproject.net.HostId;
+import org.onosproject.net.HostLocation;
+import org.onosproject.net.Link;
 import org.onosproject.net.Port;
 import org.onosproject.net.PortNumber;
+import org.onosproject.net.device.DeviceService;
+import org.onosproject.net.intent.IntentEvent;
+import org.onosproject.net.intent.IntentListener;
+import org.onosproject.net.intent.IntentService;
+import org.onosproject.net.intent.IntentState;
+import org.onosproject.net.link.LinkService;
 import org.onosproject.net.provider.AbstractListenerProviderRegistry;
 import org.onosproject.net.provider.AbstractProviderService;
+import org.onosproject.net.topology.TopologyService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Map;
 import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -57,7 +75,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 @Service
 public class VirtualNetworkManager
         extends AbstractListenerProviderRegistry<VirtualNetworkEvent, VirtualNetworkListener,
-        VirtualNetworkProvider, VirtualNetworkProviderService>
+                                                 VirtualNetworkProvider, VirtualNetworkProviderService>
         implements VirtualNetworkService, VirtualNetworkAdminService, VirtualNetworkProviderRegistry {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
@@ -70,23 +88,47 @@ public class VirtualNetworkManager
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected VirtualNetworkStore store;
 
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected IntentService intentService;
+
+    private final InternalVirtualIntentListener intentListener = new InternalVirtualIntentListener();
+
     private VirtualNetworkStoreDelegate delegate = this::post;
 
     // TODO: figure out how to coordinate "implementation" of a virtual network in a cluster
 
+    /**
+     * Only used for Junit test methods outside of this package.
+     *
+     * @param store virtual network store
+     */
+    public void setStore(VirtualNetworkStore store) {
+        this.store = store;
+    }
+
+    /**
+     * Only used for Junit test methods outside of this package.
+     *
+     * @param intentService intent service
+     */
+
+    public void setIntentService(IntentService intentService) {
+        this.intentService = intentService;
+    }
+
     @Activate
-    protected void activate() {
+    public void activate() {
         store.setDelegate(delegate);
         eventDispatcher.addSink(VirtualNetworkEvent.class, listenerRegistry);
-
+        intentService.addListener(intentListener);
         log.info("Started");
     }
 
     @Deactivate
-    protected void deactivate() {
+    public void deactivate() {
         store.unsetDelegate(delegate);
         eventDispatcher.removeSink(VirtualNetworkEvent.class);
-
+        intentService.removeListener(intentListener);
         log.info("Stopped");
     }
 
@@ -134,14 +176,46 @@ public class VirtualNetworkManager
     }
 
     @Override
+    public VirtualHost createVirtualHost(NetworkId networkId, HostId hostId, MacAddress mac,
+                                         VlanId vlan, HostLocation location, Set<IpAddress> ips) {
+        checkNotNull(networkId, NETWORK_NULL);
+        checkNotNull(hostId, DEVICE_NULL);
+        return store.addHost(networkId, hostId, mac, vlan, location, ips);
+    }
+
+    @Override
+    public void removeVirtualHost(NetworkId networkId, HostId hostId) {
+        checkNotNull(networkId, NETWORK_NULL);
+        checkNotNull(hostId, DEVICE_NULL);
+        store.removeHost(networkId, hostId);
+    }
+
+    @Override
     public VirtualLink createVirtualLink(NetworkId networkId,
-                                         ConnectPoint src, ConnectPoint dst,
-                                         TunnelId realizedBy) {
+                                         ConnectPoint src, ConnectPoint dst) {
         checkNotNull(networkId, NETWORK_NULL);
         checkNotNull(src, LINK_POINT_NULL);
         checkNotNull(dst, LINK_POINT_NULL);
-        checkNotNull(realizedBy, "Tunnel ID cannot be null");
-        return store.addLink(networkId, src, dst, realizedBy);
+        return store.addLink(networkId, src, dst, Link.State.ACTIVE, null);
+    }
+
+    /**
+     * Maps the physical connect point to a virtual connect point.
+     *
+     * @param networkId  network identifier
+     * @param physicalCp physical connect point
+     * @return virtual connect point
+     */
+    private ConnectPoint mapPhysicalToVirtualToPort(NetworkId networkId,
+                                                    ConnectPoint physicalCp) {
+        Set<VirtualPort> ports = store.getPorts(networkId, null);
+        for (VirtualPort port : ports) {
+            if (port.realizedBy().element().id().equals(physicalCp.elementId()) &&
+                    port.realizedBy().number().equals(physicalCp.port())) {
+                return new ConnectPoint(port.element().id(), port.number());
+            }
+        }
+        return null;
     }
 
     @Override
@@ -175,10 +249,27 @@ public class VirtualNetworkManager
         return store.getNetworks(tenantId);
     }
 
+    /**
+     * Returns the virtual network matching the network identifier.
+     *
+     * @param networkId network identifier
+     * @return virtual network
+     */
+    private VirtualNetwork getVirtualNetwork(NetworkId networkId) {
+        checkNotNull(networkId, NETWORK_NULL);
+        return store.getNetwork(networkId);
+    }
+
     @Override
     public Set<VirtualDevice> getVirtualDevices(NetworkId networkId) {
         checkNotNull(networkId, NETWORK_NULL);
         return store.getDevices(networkId);
+    }
+
+    @Override
+    public Set<VirtualHost> getVirtualHosts(NetworkId networkId) {
+        checkNotNull(networkId, NETWORK_NULL);
+        return store.getHosts(networkId);
     }
 
     @Override
@@ -190,15 +281,157 @@ public class VirtualNetworkManager
     @Override
     public Set<VirtualPort> getVirtualPorts(NetworkId networkId, DeviceId deviceId) {
         checkNotNull(networkId, NETWORK_NULL);
-        checkNotNull(deviceId, DEVICE_NULL);
         return store.getPorts(networkId, deviceId);
     }
+
+    private final Map<ServiceKey, VnetService> networkServices = Maps.newConcurrentMap();
 
     @Override
     public <T> T get(NetworkId networkId, Class<T> serviceClass) {
         checkNotNull(networkId, NETWORK_NULL);
-        return null;
+        ServiceKey serviceKey = networkServiceKey(networkId, serviceClass);
+        VnetService service = lookup(serviceKey);
+        if (service == null) {
+            service = create(serviceKey);
+        }
+        return (T) service;
     }
+
+    /**
+     * Returns the Vnet service matching the service key.
+     *
+     * @param serviceKey service key
+     * @return vnet service
+     */
+    private VnetService lookup(ServiceKey serviceKey) {
+        return networkServices.get(serviceKey);
+    }
+
+    /**
+     * Creates a new service key using the specified network identifier and service class.
+     *
+     * @param networkId    network identifier
+     * @param serviceClass service class
+     * @param <T>          type of service
+     * @return service key
+     */
+    private <T> ServiceKey networkServiceKey(NetworkId networkId, Class<T> serviceClass) {
+        return new ServiceKey(networkId, serviceClass);
+    }
+
+
+    /**
+     * Create a new vnet service instance.
+     *
+     * @param serviceKey service key
+     * @return vnet service
+     */
+    private VnetService create(ServiceKey serviceKey) {
+        VirtualNetwork network = getVirtualNetwork(serviceKey.networkId());
+        checkNotNull(network, NETWORK_NULL);
+        VnetService service;
+        if (serviceKey.serviceClass.equals(DeviceService.class)) {
+            service = new VirtualNetworkDeviceService(this, network);
+        } else if (serviceKey.serviceClass.equals(LinkService.class)) {
+            service = new VirtualNetworkLinkService(this, network);
+        } else if (serviceKey.serviceClass.equals(TopologyService.class)) {
+            service = new VirtualNetworkTopologyService(this, network);
+        } else if (serviceKey.serviceClass.equals(IntentService.class)) {
+            service = new VirtualNetworkIntentService(this, network, new DefaultServiceDirectory());
+        } else {
+            return null;
+        }
+        networkServices.put(serviceKey, service);
+        return service;
+    }
+
+    /**
+     * Service key class.
+     */
+    private class ServiceKey {
+        final NetworkId networkId;
+        final Class serviceClass;
+
+        /**
+         * Constructor for service key.
+         *
+         * @param networkId    network identifier
+         * @param serviceClass service class
+         */
+        public ServiceKey(NetworkId networkId, Class serviceClass) {
+            checkNotNull(networkId, NETWORK_NULL);
+            this.networkId = networkId;
+            this.serviceClass = serviceClass;
+        }
+
+        /**
+         * Returns the network identifier.
+         *
+         * @return network identifier
+         */
+        public NetworkId networkId() {
+            return networkId;
+        }
+
+        /**
+         * Returns the service class.
+         *
+         * @return service class
+         */
+        public Class serviceClass() {
+            return serviceClass;
+        }
+    }
+
+    /**
+     * Internal intent event listener.
+     */
+    private class InternalVirtualIntentListener implements IntentListener {
+        @Override
+        public void event(IntentEvent event) {
+
+            // Ignore intent events that are not relevant.
+            if (!isRelevant(event)) {
+                return;
+            }
+
+            VirtualNetworkIntent intent = (VirtualNetworkIntent) event.subject();
+
+            switch (event.type()) {
+                case INSTALL_REQ:
+                    store.addOrUpdateIntent(intent, IntentState.INSTALL_REQ);
+                    break;
+                case INSTALLED:
+                    store.addOrUpdateIntent(intent, IntentState.INSTALLED);
+                    break;
+                case WITHDRAW_REQ:
+                    store.addOrUpdateIntent(intent, IntentState.WITHDRAW_REQ);
+                    break;
+                case WITHDRAWN:
+                    store.addOrUpdateIntent(intent, IntentState.WITHDRAWN);
+                    break;
+                case FAILED:
+                    store.addOrUpdateIntent(intent, IntentState.FAILED);
+                    break;
+                case CORRUPT:
+                    store.addOrUpdateIntent(intent, IntentState.CORRUPT);
+                    break;
+                case PURGED:
+                    store.removeIntent(intent.key());
+                default:
+                    break;
+            }
+        }
+
+        @Override
+        public boolean isRelevant(IntentEvent event) {
+            if (event.subject() instanceof VirtualNetworkIntent) {
+                return true;
+            }
+            return false;
+        }
+    }
+
 
     @Override
     protected VirtualNetworkProviderService createProviderService(VirtualNetworkProvider provider) {
@@ -212,6 +445,35 @@ public class VirtualNetworkManager
             implements VirtualNetworkProviderService {
         InternalVirtualNetworkProviderService(VirtualNetworkProvider provider) {
             super(provider);
+        }
+
+        @Override
+        public void tunnelUp(NetworkId networkId, ConnectPoint src, ConnectPoint dst, TunnelId tunnelId) {
+
+            ConnectPoint srcVirtualCp = mapPhysicalToVirtualToPort(networkId, src);
+            ConnectPoint dstVirtualCp = mapPhysicalToVirtualToPort(networkId, dst);
+            if ((srcVirtualCp == null) || (dstVirtualCp == null)) {
+                log.error("Src or dst virtual connection point was not found.");
+            }
+
+            VirtualLink virtualLink = store.getLink(networkId, srcVirtualCp, dstVirtualCp);
+            if (virtualLink != null) {
+                store.updateLink(virtualLink, tunnelId, Link.State.ACTIVE);
+            }
+        }
+
+        @Override
+        public void tunnelDown(NetworkId networkId, ConnectPoint src, ConnectPoint dst, TunnelId tunnelId) {
+            ConnectPoint srcVirtualCp = mapPhysicalToVirtualToPort(networkId, src);
+            ConnectPoint dstVirtualCp = mapPhysicalToVirtualToPort(networkId, dst);
+            if ((srcVirtualCp == null) || (dstVirtualCp == null)) {
+                log.error("Src or dst virtual connection point was not found.");
+            }
+
+            VirtualLink virtualLink = store.getLink(networkId, srcVirtualCp, dstVirtualCp);
+            if (virtualLink != null) {
+                store.updateLink(virtualLink, tunnelId, Link.State.INACTIVE);
+            }
         }
     }
 

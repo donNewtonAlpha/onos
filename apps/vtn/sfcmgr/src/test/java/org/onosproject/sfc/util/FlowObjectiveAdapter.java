@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,8 @@ import org.onosproject.net.flowobjective.FilteringObjective;
 import org.onosproject.net.flowobjective.FlowObjectiveService;
 import org.onosproject.net.flowobjective.ForwardingObjective;
 import org.onosproject.net.flowobjective.NextObjective;
+
+import com.google.common.collect.ImmutableList;
 
 /**
  * Testing version of implementation on FlowObjectiveService.
@@ -60,6 +62,11 @@ public class FlowObjectiveAdapter implements FlowObjectiveService {
 
     @Override
     public List<String> getNextMappings() {
-        return null;
+        return ImmutableList.of();
+    }
+
+    @Override
+    public List<String> getPendingNexts() {
+        return ImmutableList.of();
     }
 }

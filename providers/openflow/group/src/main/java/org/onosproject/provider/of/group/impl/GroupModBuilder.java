@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,14 +14,6 @@
  * limitations under the License.
  */
 package org.onosproject.provider.of.group.impl;
-
-import static org.slf4j.LoggerFactory.getLogger;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Optional;
 
 import org.onlab.packet.Ip4Address;
 import org.onlab.packet.Ip6Address;
@@ -66,6 +58,14 @@ import org.projectfloodlight.openflow.types.U32;
 import org.projectfloodlight.openflow.types.U64;
 import org.projectfloodlight.openflow.types.VlanPcp;
 import org.slf4j.Logger;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Optional;
+
+import static org.slf4j.LoggerFactory.getLogger;
 
 /*
  * Builder for GroupMod.
@@ -194,8 +194,17 @@ public final class GroupModBuilder {
             if (type == GroupDescription.Type.SELECT) {
                 bucketBuilder.setWeight(1);
             }
-            bucketBuilder.setWatchGroup(OFGroup.ANY);
-            bucketBuilder.setWatchPort(OFPort.ANY);
+            if (type == GroupDescription.Type.FAILOVER && bucket.watchPort() != null) {
+                bucketBuilder.setWatchPort(OFPort.of((int) bucket.watchPort().toLong()));
+            } else {
+                bucketBuilder.setWatchPort(OFPort.ANY);
+            }
+            if (type == GroupDescription.Type.FAILOVER &&  bucket.watchGroup() != null) {
+                bucketBuilder.setWatchGroup(OFGroup.of(bucket.watchGroup().id()));
+            } else {
+                bucketBuilder.setWatchGroup(OFGroup.ANY);
+            }
+
             OFBucket ofBucket = bucketBuilder.build();
             ofBuckets.add(ofBucket);
         }
@@ -310,18 +319,18 @@ public final class GroupModBuilder {
             case VLAN_POP:
                 return factory.actions().popVlan();
             case VLAN_PUSH:
-                L2ModificationInstruction.PushHeaderInstructions pushVlanInstruction
-                        = (L2ModificationInstruction.PushHeaderInstructions) l2m;
+                L2ModificationInstruction.ModVlanHeaderInstruction pushVlanInstruction
+                        = (L2ModificationInstruction.ModVlanHeaderInstruction) l2m;
                 return factory.actions().pushVlan(
                         EthType.of(pushVlanInstruction.ethernetType().toShort()));
             case MPLS_PUSH:
-                L2ModificationInstruction.PushHeaderInstructions pushHeaderInstructions =
-                        (L2ModificationInstruction.PushHeaderInstructions) l2m;
+                L2ModificationInstruction.ModMplsHeaderInstruction pushHeaderInstructions =
+                        (L2ModificationInstruction.ModMplsHeaderInstruction) l2m;
                 return factory.actions().pushMpls(EthType.of(pushHeaderInstructions
                                                              .ethernetType().toShort()));
             case MPLS_POP:
-                L2ModificationInstruction.PushHeaderInstructions popHeaderInstructions =
-                        (L2ModificationInstruction.PushHeaderInstructions) l2m;
+                L2ModificationInstruction.ModMplsHeaderInstruction popHeaderInstructions =
+                        (L2ModificationInstruction.ModMplsHeaderInstruction) l2m;
                 return factory.actions().popMpls(EthType.of(popHeaderInstructions
                                                             .ethernetType().toShort()));
             case MPLS_LABEL:

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2016 Open Networking Laboratory
+ * Copyright 2014-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,6 +63,7 @@ import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.flow.FlowRuleBatchEntry;
 import org.onosproject.net.intent.IntentId;
 import org.onosproject.net.resource.ResourceAllocation;
+import org.onosproject.net.resource.ResourceConsumerId;
 import org.onosproject.net.resource.Resources;
 import org.onosproject.net.provider.ProviderId;
 import org.onosproject.net.intent.constraint.AnnotationConstraint;
@@ -79,7 +80,6 @@ import org.onlab.packet.IpPrefix;
 import org.onlab.packet.Ip4Prefix;
 import org.onlab.packet.Ip6Prefix;
 import org.onlab.packet.MacAddress;
-import org.onlab.util.KryoNamespace;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -121,7 +121,7 @@ public class KryoSerializerTest {
             GridType.DWDM, ChannelSpacing.CHL_100GHZ, -8, 4);
     private static final VlanId VLAN1 = VlanId.vlanId((short) 100);
 
-    private KryoSerializer serializer;
+    private StoreSerializer serializer;
 
     @BeforeClass
     public static void setUpBeforeClass() throws Exception {
@@ -129,16 +129,7 @@ public class KryoSerializerTest {
 
     @Before
     public void setUp() throws Exception {
-        serializer = new KryoSerializer() {
-
-            @Override
-            protected void setupKryoPool() {
-                serializerPool = KryoNamespace.newBuilder()
-                        .register(KryoNamespaces.API)
-                        .nextId(KryoNamespaces.BEGIN_USER_CUSTOM_ID)
-                        .build();
-            }
-        };
+        serializer = StoreSerializer.using(KryoNamespaces.API);
     }
 
     @After
@@ -364,7 +355,7 @@ public class KryoSerializerTest {
     public void testResourceAllocation() {
         testSerializedEquals(new ResourceAllocation(
                 Resources.discrete(DID1, P1, VLAN1).resource(),
-                IntentId.valueOf(30)));
+                ResourceConsumerId.of(30L, IntentId.class)));
     }
 
     @Test
@@ -436,7 +427,7 @@ public class KryoSerializerTest {
     }
 
     // code clone
-    protected static void assertAnnotationsEquals(Annotations actual, SparseAnnotations... annotations) {
+    private static void assertAnnotationsEquals(Annotations actual, SparseAnnotations... annotations) {
         SparseAnnotations expected = DefaultAnnotations.builder().build();
         for (SparseAnnotations a : annotations) {
             expected = DefaultAnnotations.union(expected, a);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2014-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,6 @@ import org.apache.felix.scr.annotations.Property;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.apache.felix.scr.annotations.Service;
-import org.onlab.util.KryoNamespace;
 import org.onosproject.cluster.ClusterService;
 import org.onosproject.cluster.NodeId;
 import org.onosproject.mastership.MastershipService;
@@ -41,9 +40,8 @@ import org.onosproject.store.AbstractStore;
 import org.onosproject.store.cluster.messaging.ClusterCommunicationService;
 import org.onosproject.store.cluster.messaging.MessageSubject;
 import org.onosproject.store.serializers.KryoNamespaces;
-import org.onosproject.store.serializers.KryoSerializer;
+import org.onosproject.store.serializers.StoreSerializer;
 import org.onosproject.store.service.ConsistentMap;
-import org.onosproject.store.service.ConsistentMapException;
 import org.onosproject.store.service.Serializer;
 import org.onosproject.store.service.StorageService;
 import org.osgi.service.component.ComponentContext;
@@ -61,7 +59,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static org.onlab.util.Tools.get;
 import static org.onlab.util.Tools.groupedThreads;
-import static org.onlab.util.Tools.retryable;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**
@@ -95,15 +92,7 @@ public class DistributedPacketStore
     private static final MessageSubject PACKET_OUT_SUBJECT =
             new MessageSubject("packet-out");
 
-    private static final KryoSerializer SERIALIZER = new KryoSerializer() {
-        @Override
-        protected void setupKryoPool() {
-            serializerPool = KryoNamespace.newBuilder()
-                    .register(KryoNamespaces.API)
-                    .nextId(KryoNamespaces.BEGIN_USER_CUSTOM_ID)
-                    .build();
-        }
-    };
+    private static final StoreSerializer SERIALIZER = StoreSerializer.using(KryoNamespaces.API);
 
     private ExecutorService messageHandlingExecutor;
 
@@ -118,7 +107,7 @@ public class DistributedPacketStore
     public void activate() {
         messageHandlingExecutor = Executors.newFixedThreadPool(
                 messageHandlerThreadPoolSize,
-                groupedThreads("onos/store/packet", "message-handlers"));
+                groupedThreads("onos/store/packet", "message-handlers", log));
 
         communicationService.<OutboundPacket>addSubscriber(PACKET_OUT_SUBJECT,
                 SERIALIZER::decode,
@@ -209,15 +198,12 @@ public class DistributedPacketStore
         private PacketRequestTracker() {
             requests = storageService.<TrafficSelector, Set<PacketRequest>>consistentMapBuilder()
                     .withName("onos-packet-requests")
-                    .withPartitionsDisabled()
                     .withSerializer(Serializer.using(KryoNamespaces.API))
                     .build();
         }
 
         private void add(PacketRequest request) {
-            AtomicBoolean firstRequest =
-                    retryable(this::addInternal, ConsistentMapException.ConcurrentModification.class,
-                              Integer.MAX_VALUE, MAX_BACKOFF).apply(request);
+            AtomicBoolean firstRequest = addInternal(request);
             if (firstRequest.get() && delegate != null) {
                 // The instance that makes the first request will push to all devices
                 delegate.requestPackets(request);
@@ -227,6 +213,9 @@ public class DistributedPacketStore
         private AtomicBoolean addInternal(PacketRequest request) {
             AtomicBoolean firstRequest = new AtomicBoolean(false);
             requests.compute(request.selector(), (s, existingRequests) -> {
+                // Reset to false just in case this is a retry due to
+                // ConcurrentModificationException
+                firstRequest.set(false);
                 if (existingRequests == null) {
                     firstRequest.set(true);
                     return ImmutableSet.of(request);
@@ -243,9 +232,7 @@ public class DistributedPacketStore
         }
 
         private void remove(PacketRequest request) {
-            AtomicBoolean removedLast =
-                    retryable(this::removeInternal, ConsistentMapException.ConcurrentModification.class,
-                              Integer.MAX_VALUE, MAX_BACKOFF).apply(request);
+            AtomicBoolean removedLast = removeInternal(request);
             if (removedLast.get() && delegate != null) {
                 // The instance that removes the last request will remove from all devices
                 delegate.cancelPackets(request);
@@ -255,6 +242,9 @@ public class DistributedPacketStore
         private AtomicBoolean removeInternal(PacketRequest request) {
             AtomicBoolean removedLast = new AtomicBoolean(false);
             requests.computeIfPresent(request.selector(), (s, existingRequests) -> {
+                // Reset to false just in case this is a retry due to
+                // ConcurrentModificationException
+                removedLast.set(false);
                 if (existingRequests.contains(request)) {
                     Set<PacketRequest> newRequests = Sets.newHashSet(existingRequests);
                     newRequests.remove(request);

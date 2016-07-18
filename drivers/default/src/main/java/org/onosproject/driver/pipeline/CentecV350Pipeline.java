@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -134,13 +134,13 @@ public class CentecV350Pipeline extends AbstractHandlerBehaviour implements Pipe
             .register(DefaultGroupKey.class)
             .register(CentecV350Group.class)
             .register(byte[].class)
-            .build();
+            .build("CentecV350Pipeline");
 
     private Cache<GroupKey, NextObjective> pendingGroups;
 
     private ScheduledExecutorService groupChecker =
             Executors.newScheduledThreadPool(2, groupedThreads("onos/pipeliner",
-                    "centec-V350-%d"));
+                    "centec-V350-%d", log));
 
     @Override
     public void init(DeviceId deviceId, PipelinerContext context) {

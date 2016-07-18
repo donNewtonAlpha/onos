@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2014-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,15 +18,19 @@ package org.onosproject.store.cluster.impl;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
+import org.apache.felix.scr.annotations.Modified;
+import org.apache.felix.scr.annotations.Property;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.apache.felix.scr.annotations.Service;
 import org.joda.time.DateTime;
 import org.onlab.packet.IpAddress;
 import org.onlab.util.KryoNamespace;
+import org.onlab.util.Tools;
 import org.onosproject.cluster.ClusterEvent;
 import org.onosproject.cluster.ClusterMetadataService;
 import org.onosproject.cluster.ClusterStore;
@@ -39,9 +43,11 @@ import org.onosproject.store.AbstractStore;
 import org.onosproject.store.cluster.messaging.Endpoint;
 import org.onosproject.store.cluster.messaging.MessagingService;
 import org.onosproject.store.serializers.KryoNamespaces;
-import org.onosproject.store.serializers.KryoSerializer;
+import org.onosproject.store.serializers.StoreSerializer;
+import org.osgi.service.component.ComponentContext;
 import org.slf4j.Logger;
 
+import java.util.Dictionary;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -52,6 +58,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.cluster.ClusterEvent.Type.INSTANCE_ACTIVATED;
@@ -73,20 +80,22 @@ public class DistributedClusterStore
 
     public static final String HEARTBEAT_MESSAGE = "onos-cluster-heartbeat";
 
-    // TODO: make these configurable.
-    private static final int HEARTBEAT_INTERVAL_MS = 100;
-    private static final int PHI_FAILURE_THRESHOLD = 10;
+    private static final int DEFAULT_HEARTBEAT_INTERVAL = 100;
+    @Property(name = "heartbeatInterval", intValue = DEFAULT_HEARTBEAT_INTERVAL,
+            label = "Interval time to send heartbeat to other controller nodes (millisecond)")
+    private int heartbeatInterval = DEFAULT_HEARTBEAT_INTERVAL;
 
-    private static final KryoSerializer SERIALIZER = new KryoSerializer() {
-        @Override
-        protected void setupKryoPool() {
-            serializerPool = KryoNamespace.newBuilder()
+    private static final int DEFAULT_PHI_FAILURE_THRESHOLD = 10;
+    @Property(name = "phiFailureThreshold", intValue = DEFAULT_PHI_FAILURE_THRESHOLD,
+            label = "the value of Phi threshold to detect accrual failure")
+    private int phiFailureThreshold = DEFAULT_PHI_FAILURE_THRESHOLD;
+
+    private static final StoreSerializer SERIALIZER = StoreSerializer.using(
+                  KryoNamespace.newBuilder()
                     .register(KryoNamespaces.API)
+                    .nextId(KryoNamespaces.BEGIN_USER_CUSTOM_ID)
                     .register(HeartbeatMessage.class)
-                    .build()
-                    .populate(1);
-        }
-    };
+                    .build("ClusterStore"));
 
     private static final String INSTANCE_ID_NULL = "Instance ID cannot be null";
 
@@ -95,9 +104,9 @@ public class DistributedClusterStore
     private final Map<NodeId, DateTime> nodeStateLastUpdatedTimes = Maps.newConcurrentMap();
 
     private ScheduledExecutorService heartBeatSender = Executors.newSingleThreadScheduledExecutor(
-            groupedThreads("onos/cluster/membership", "heartbeat-sender"));
+            groupedThreads("onos/cluster/membership", "heartbeat-sender", log));
     private ExecutorService heartBeatMessageHandler = Executors.newSingleThreadExecutor(
-            groupedThreads("onos/cluster/membership", "heartbeat-receiver"));
+            groupedThreads("onos/cluster/membership", "heartbeat-receiver", log));
 
     private PhiAccrualFailureDetector failureDetector;
 
@@ -119,7 +128,7 @@ public class DistributedClusterStore
         failureDetector = new PhiAccrualFailureDetector();
 
         heartBeatSender.scheduleWithFixedDelay(this::heartbeat, 0,
-                                               HEARTBEAT_INTERVAL_MS, TimeUnit.MILLISECONDS);
+                                               heartbeatInterval, TimeUnit.MILLISECONDS);
 
         log.info("Started");
     }
@@ -131,6 +140,12 @@ public class DistributedClusterStore
         heartBeatMessageHandler.shutdownNow();
 
         log.info("Stopped");
+    }
+
+    @Modified
+    public void modified(ComponentContext context) {
+        readComponentConfiguration(context);
+        restartHeartbeatSender();
     }
 
     @Override
@@ -178,6 +193,7 @@ public class DistributedClusterStore
 
     @Override
     public ControllerNode addNode(NodeId nodeId, IpAddress ip, int tcpPort) {
+        checkNotNull(nodeId, INSTANCE_ID_NULL);
         ControllerNode node = new DefaultControllerNode(nodeId, ip, tcpPort);
         addNode(node);
         return node;
@@ -215,12 +231,12 @@ public class DistributedClusterStore
                     .filter(node -> !(node.id().equals(localNode.id())))
                     .collect(Collectors.toSet());
             State state = nodeStates.get(localNode.id());
-            byte[] hbMessagePayload = SERIALIZER.encode(new HeartbeatMessage(localNode, state, peers));
+            byte[] hbMessagePayload = SERIALIZER.encode(new HeartbeatMessage(localNode, state));
             peers.forEach((node) -> {
                 heartbeatToPeer(hbMessagePayload, node);
                 State currentState = nodeStates.get(node.id());
                 double phi = failureDetector.phi(node.id());
-                if (phi >= PHI_FAILURE_THRESHOLD) {
+                if (phi >= phiFailureThreshold) {
                     if (currentState.isActive()) {
                         updateState(node.id(), State.INACTIVE);
                     }
@@ -238,6 +254,11 @@ public class DistributedClusterStore
     private void notifyStateChange(NodeId nodeId, State oldState, State newState) {
         if (oldState != newState) {
             ControllerNode node = allNodes.get(nodeId);
+            // Either this node or that node is no longer part of the same cluster
+            if (node == null) {
+                log.debug("Could not find node {} in the cluster, ignoring state change", nodeId);
+                return;
+            }
             ClusterEvent.Type type = newState == State.READY ? INSTANCE_READY :
                     newState == State.ACTIVE ? INSTANCE_ACTIVATED :
                             INSTANCE_DEACTIVATED;
@@ -258,31 +279,24 @@ public class DistributedClusterStore
         @Override
         public void accept(Endpoint sender, byte[] message) {
             HeartbeatMessage hb = SERIALIZER.decode(message);
-            failureDetector.report(hb.source().id());
-            updateState(hb.source().id(), hb.state);
-            hb.knownPeers().forEach(node -> {
-                allNodes.put(node.id(), node);
-            });
+            if (clusterMetadataService.getClusterMetadata().getNodes().contains(hb.source())) {
+                failureDetector.report(hb.source().id());
+                updateState(hb.source().id(), hb.state);
+            }
         }
     }
 
     private static class HeartbeatMessage {
         private ControllerNode source;
         private State state;
-        private Set<ControllerNode> knownPeers;
 
-        public HeartbeatMessage(ControllerNode source, State state, Set<ControllerNode> members) {
+        public HeartbeatMessage(ControllerNode source, State state) {
             this.source = source;
             this.state = state != null ? state : State.ACTIVE;
-            this.knownPeers = ImmutableSet.copyOf(members);
         }
 
         public ControllerNode source() {
             return source;
-        }
-
-        public Set<ControllerNode> knownPeers() {
-            return knownPeers;
         }
     }
 
@@ -291,4 +305,78 @@ public class DistributedClusterStore
         return nodeStateLastUpdatedTimes.get(nodeId);
     }
 
+    /**
+     * Extracts properties from the component configuration context.
+     *
+     * @param context the component context
+     */
+    private void readComponentConfiguration(ComponentContext context) {
+        Dictionary<?, ?> properties = context.getProperties();
+
+        Integer newHeartbeatInterval = Tools.getIntegerProperty(properties,
+                                                                "heartbeatInterval");
+        if (newHeartbeatInterval == null) {
+            setHeartbeatInterval(DEFAULT_HEARTBEAT_INTERVAL);
+            log.info("Heartbeat interval time is not configured, default value is {}",
+                     DEFAULT_HEARTBEAT_INTERVAL);
+        } else {
+            setHeartbeatInterval(newHeartbeatInterval);
+            log.info("Configured. Heartbeat interval time is configured to {}",
+                     heartbeatInterval);
+        }
+
+        Integer newPhiFailureThreshold = Tools.getIntegerProperty(properties,
+                                                                  "phiFailureThreshold");
+        if (newPhiFailureThreshold == null) {
+            setPhiFailureThreshold(DEFAULT_PHI_FAILURE_THRESHOLD);
+            log.info("Phi failure threshold is not configured, default value is {}",
+                     DEFAULT_PHI_FAILURE_THRESHOLD);
+        } else {
+            setPhiFailureThreshold(newPhiFailureThreshold);
+            log.info("Configured. Phi failure threshold is configured to {}",
+                     phiFailureThreshold);
+        }
+    }
+
+    /**
+     * Sets heartbeat interval between the termination of one execution of heartbeat
+     * and the commencement of the next.
+     *
+     * @param interval term between each heartbeat
+     */
+    private void setHeartbeatInterval(int interval) {
+        try {
+            checkArgument(interval > 0, "Interval must be greater than zero");
+            heartbeatInterval = interval;
+        } catch (IllegalArgumentException e) {
+            log.warn(e.getMessage());
+            heartbeatInterval = DEFAULT_HEARTBEAT_INTERVAL;
+        }
+    }
+
+    /**
+     * Sets Phi failure threshold.
+     * Phi is based on a paper titled: "The φ Accrual Failure Detector" by Hayashibara, et al.
+     *
+     * @param threshold
+     */
+    private void setPhiFailureThreshold(int threshold) {
+        phiFailureThreshold = threshold;
+    }
+
+    /**
+     * Restarts heartbeatSender executor.
+     */
+    private void restartHeartbeatSender() {
+        try {
+            ScheduledExecutorService prevSender = heartBeatSender;
+            heartBeatSender = Executors.newSingleThreadScheduledExecutor(
+                    groupedThreads("onos/cluster/membership", "heartbeat-sender-%d", log));
+            heartBeatSender.scheduleWithFixedDelay(this::heartbeat, 0,
+                                                   heartbeatInterval, TimeUnit.MILLISECONDS);
+            prevSender.shutdown();
+        } catch (Exception e) {
+            log.warn(e.getMessage());
+        }
+    }
 }

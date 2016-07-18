@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,17 +36,16 @@ import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.apache.felix.scr.annotations.Service;
 import org.onlab.util.KryoNamespace;
-import org.onlab.util.Tools;
 import org.onosproject.net.config.Config;
 import org.onosproject.net.config.ConfigApplyDelegate;
 import org.onosproject.net.config.ConfigFactory;
+import org.onosproject.net.config.InvalidConfigException;
 import org.onosproject.net.config.NetworkConfigEvent;
 import org.onosproject.net.config.NetworkConfigStore;
 import org.onosproject.net.config.NetworkConfigStoreDelegate;
 import org.onosproject.store.AbstractStore;
 import org.onosproject.store.serializers.KryoNamespaces;
 import org.onosproject.store.service.ConsistentMap;
-import org.onosproject.store.service.ConsistentMapException;
 import org.onosproject.store.service.MapEvent;
 import org.onosproject.store.service.MapEventListener;
 import org.onosproject.store.service.Serializer;
@@ -78,7 +77,6 @@ public class DistributedNetworkConfigStore
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private static final int MAX_BACKOFF = 10;
     private static final String INVALID_CONFIG_JSON =
             "JSON node does not contain valid configuration";
     private static final String INVALID_JSON_LIST =
@@ -134,8 +132,12 @@ public class DistributedNetworkConfigStore
         ImmutableSet.copyOf(configs.keySet()).forEach(k -> {
             if (Objects.equals(k.configKey, configFactory.configKey()) &&
                     isAssignableFrom(configFactory, k)) {
-                validateConfig(k, configFactory, configs.get(k).value());
-                configs.remove(k); // Prune whether valid or not
+                // Prune whether valid or not
+                Versioned<JsonNode> versioned = configs.remove(k);
+                // Allow for the value to be processed by another node already
+                if (versioned != null) {
+                    validateConfig(k, configFactory, versioned.value());
+                }
             }
         });
     }
@@ -166,8 +168,23 @@ public class DistributedNetworkConfigStore
     @Override
     public void removeConfigFactory(ConfigFactory configFactory) {
         factoriesByConfig.remove(configFactory.configClass().getName());
+        processExistingConfigs(configFactory);
         notifyDelegate(new NetworkConfigEvent(CONFIG_UNREGISTERED, configFactory.configKey(),
                                               configFactory.configClass()));
+    }
+
+    // Sweep through any configurations for the config factory, set back to pending state.
+    private void processExistingConfigs(ConfigFactory configFactory) {
+        ImmutableSet.copyOf(configs.keySet()).forEach(k -> {
+            if (Objects.equals(configFactory.configClass().getName(), k.configClass)) {
+                Versioned<JsonNode> remove = configs.remove(k);
+                if (remove != null) {
+                    JsonNode json = remove.value();
+                    configs.put(key(k.subject, configFactory.configKey()), json);
+                    log.debug("Set config pending: {}, {}", k.subject, k.configClass);
+                }
+            }
+        });
     }
 
     @Override
@@ -207,6 +224,11 @@ public class DistributedNetworkConfigStore
         ImmutableSet.Builder<Class<? extends Config<S>>> builder = ImmutableSet.builder();
         configs.keySet().forEach(k -> {
             if (Objects.equals(subject, k.subject) && k.configClass != null && delegate != null) {
+                ConfigFactory<S, ? extends Config<S>> configFactory = factoriesByConfig.get(k.configClass);
+                if (configFactory == null) {
+                    log.error("Found config but no config factory: subject={}, configClass={}",
+                            subject, k.configClass);
+                }
                 builder.add(factoriesByConfig.get(k.configClass).configClass());
             }
         });
@@ -215,9 +237,7 @@ public class DistributedNetworkConfigStore
 
     @Override
     public <S, T extends Config<S>> T getConfig(S subject, Class<T> configClass) {
-        // TODO: need to identify and address the root cause for timeouts.
-        Versioned<JsonNode> json = Tools.retryable(configs::get, ConsistentMapException.class, 1, MAX_BACKOFF)
-                .apply(key(subject, configClass));
+        Versioned<JsonNode> json = configs.get(key(subject, configClass));
         return json != null ? createConfig(subject, configClass, json.value()) : null;
     }
 
@@ -236,7 +256,17 @@ public class DistributedNetworkConfigStore
     public <S, C extends Config<S>> C applyConfig(S subject, Class<C> configClass, JsonNode json) {
         // Create the configuration and validate it.
         C config = createConfig(subject, configClass, json);
-        checkArgument(config.isValid(), INVALID_CONFIG_JSON);
+
+        try {
+            checkArgument(config.isValid(), INVALID_CONFIG_JSON);
+        } catch (RuntimeException e) {
+            ConfigFactory<S, C> configFactory = getConfigFactory(configClass);
+            String subjectKey = configFactory.subjectFactory().subjectClassKey();
+            String subjectString = configFactory.subjectFactory().subjectKey(config.subject());
+            String configKey = config.key();
+
+            throw new InvalidConfigException(subjectKey, subjectString, configKey, e);
+        }
 
         // Insert the validated configuration and get it back.
         Versioned<JsonNode> versioned = configs.putAndGet(key(subject, configClass), json);
@@ -259,6 +289,24 @@ public class DistributedNetworkConfigStore
     @Override
     public <S> void clearQueuedConfig(S subject, String configKey) {
         configs.remove(key(subject, configKey));
+    }
+
+    @Override
+    public <S> void clearConfig(S subject) {
+        ImmutableSet.copyOf(configs.keySet()).forEach(k -> {
+            if (Objects.equals(subject, k.subject) && delegate != null) {
+                configs.remove(k);
+            }
+        });
+    }
+
+    @Override
+    public <S> void clearConfig() {
+        ImmutableSet.copyOf(configs.keySet()).forEach(k -> {
+            if (delegate != null) {
+                configs.remove(k);
+            }
+        });
     }
 
     /**

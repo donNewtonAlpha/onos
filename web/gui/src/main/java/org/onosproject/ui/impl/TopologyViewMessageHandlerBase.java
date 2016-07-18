@@ -1,5 +1,5 @@
 /*
- * Copyright 2015,2016 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,7 +63,7 @@ import org.onosproject.net.topology.TopologyService;
 import org.onosproject.ui.JsonUtils;
 import org.onosproject.ui.UiConnection;
 import org.onosproject.ui.UiMessageHandler;
-import org.onosproject.ui.impl.topo.ServicesBundle;
+import org.onosproject.ui.impl.topo.util.ServicesBundle;
 import org.onosproject.ui.topo.PropertyPanel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

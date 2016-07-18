@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2014-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 package org.onosproject.net;
+
+import com.google.common.annotations.Beta;
 
 /**
  * Collection of keys for annotation.
@@ -108,6 +110,18 @@ public final class AnnotationKeys {
      * Annotation key for the static lambda.
      */
     public static final String STATIC_LAMBDA = "staticLambda";
+
+    /**
+     * Annotation key for optical port's target power.
+     */
+    @Beta
+    public static final String TARGET_POWER = "targetPower";
+
+    /**
+     * Annotation key for optical port's current power.
+     */
+    @Beta
+    public static final String CURRENT_POWER = "currentPower";
 
     /**
      * Annotation key for the static port.

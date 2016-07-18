@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2016 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -165,9 +165,9 @@ public final class ResourceManager extends AbstractListenerManager<ResourceEvent
         checkNotNull(parent);
         checkNotNull(cls);
 
-        // naive implementation
-        return getAvailableResources(parent).stream()
-                .filter(resource -> resource.isTypeOf(cls))
+        return store.getChildResources(parent, cls).stream()
+                // We access store twice in this method, then the store may be updated by others
+                .filter(store::isAvailable)
                 .collect(Collectors.toSet());
     }
 
@@ -177,9 +177,11 @@ public final class ResourceManager extends AbstractListenerManager<ResourceEvent
         checkNotNull(parent);
         checkNotNull(cls);
 
-        // naive implementation
-        return getAvailableResources(parent).stream()
-                .flatMap(resource -> Tools.stream(resource.valueAs(cls)))
+        return store.getChildResources(parent, cls).stream()
+                // We access store twice in this method, then the store may be updated by others
+                .filter(store::isAvailable)
+                .map(x -> x.valueAs(cls))
+                .flatMap(Tools::stream)
                 .collect(Collectors.toSet());
     }
 

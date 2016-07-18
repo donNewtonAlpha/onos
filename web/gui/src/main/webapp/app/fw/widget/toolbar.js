@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -110,7 +110,8 @@
         }
 
         function adjustWidth(btnWidth) {
-            if (fs.noPxStyle(currentRow, 'width') >= maxWidth) {
+            // 0.1 fudge for rounding error
+            if (fs.noPxStyle(currentRow, 'width') + 0.1 >= maxWidth) {
                 tbWidth += btnWidth;
                 maxWidth = tbWidth;
             }

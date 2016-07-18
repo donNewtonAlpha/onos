@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2014-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,10 @@
  */
 package org.onosproject.sdnip;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
 import org.junit.Before;
 import org.junit.Test;
-import org.onlab.junit.TestUtils.TestUtilsException;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.IPv4;
 import org.onlab.packet.IpAddress;
@@ -47,7 +47,6 @@ import org.onosproject.net.intent.Key;
 import org.onosproject.net.intent.PointToPointIntent;
 import org.onosproject.routing.IntentSynchronizationService;
 import org.onosproject.routing.config.BgpConfig;
-import org.onosproject.routing.config.BgpPeer;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -82,7 +81,6 @@ public class PeerConnectivityManagerTest extends AbstractIntentTest {
 
     private Set<BgpConfig.BgpSpeakerConfig> bgpSpeakers;
     private Map<String, Interface> interfaces;
-    private Map<IpAddress, BgpPeer> peers;
 
     private BgpConfig bgpConfig;
 
@@ -90,24 +88,35 @@ public class PeerConnectivityManagerTest extends AbstractIntentTest {
 
     private final String dpid1 = "00:00:00:00:00:00:00:01";
     private final String dpid2 = "00:00:00:00:00:00:00:02";
+    private final String dpid3 = "00:00:00:00:00:00:00:03";
 
     private final DeviceId deviceId1 =
             DeviceId.deviceId(SdnIp.dpidToUri(dpid1));
     private final DeviceId deviceId2 =
             DeviceId.deviceId(SdnIp.dpidToUri(dpid2));
+    private final DeviceId deviceId3 =
+            DeviceId.deviceId(SdnIp.dpidToUri(dpid3));
 
     // Interfaces connected to BGP speakers
     private final ConnectPoint s1Eth100 =
             new ConnectPoint(deviceId1, PortNumber.portNumber(100));
+    private final ConnectPoint s2Eth100 =
+            new ConnectPoint(deviceId2, PortNumber.portNumber(100));
+    private final ConnectPoint s3Eth100 =
+            new ConnectPoint(deviceId3, PortNumber.portNumber(100));
 
     // Interfaces connected to BGP peers
     private final ConnectPoint s1Eth1 =
             new ConnectPoint(deviceId1, PortNumber.portNumber(1));
     private final ConnectPoint s2Eth1 =
             new ConnectPoint(deviceId2, PortNumber.portNumber(1));
+    private final ConnectPoint s3Eth1 =
+            new ConnectPoint(deviceId3, PortNumber.portNumber(1));
 
-    private final TrafficTreatment noTreatment =
-            DefaultTrafficTreatment.emptyTreatment();
+    private static final VlanId NO_VLAN = VlanId.NONE;
+    private static final VlanId VLAN10 = VlanId.vlanId(Short.valueOf("10"));
+    private static final VlanId VLAN20 = VlanId.vlanId(Short.valueOf("20"));
+    private static final VlanId VLAN30 = VlanId.vlanId(Short.valueOf("30"));
 
     @Before
     public void setUp() throws Exception {
@@ -124,7 +133,6 @@ public class PeerConnectivityManagerTest extends AbstractIntentTest {
         // These will set expectations on routingConfig and interfaceService
         bgpSpeakers = setUpBgpSpeakers();
         interfaces = Collections.unmodifiableMap(setUpInterfaces());
-        peers = setUpPeers();
 
         initPeerConnectivity();
         intentList = setUpIntentList();
@@ -139,16 +147,25 @@ public class PeerConnectivityManagerTest extends AbstractIntentTest {
 
         BgpConfig.BgpSpeakerConfig speaker1 = new BgpConfig.BgpSpeakerConfig(
                 Optional.empty(),
-                s1Eth100, Collections.singleton(IpAddress.valueOf("192.168.10.1")));
+                NO_VLAN, s1Eth100,
+                Collections.singleton(IpAddress.valueOf("192.168.10.1")));
 
         BgpConfig.BgpSpeakerConfig speaker2 = new BgpConfig.BgpSpeakerConfig(
                 Optional.empty(),
-                s1Eth100, Sets.newHashSet(IpAddress.valueOf("192.168.20.1"),
+                NO_VLAN, s1Eth100,
+                Sets.newHashSet(IpAddress.valueOf("192.168.20.1"),
                 IpAddress.valueOf("192.168.30.1")));
+
+        BgpConfig.BgpSpeakerConfig speaker3 = new BgpConfig.BgpSpeakerConfig(
+                Optional.empty(),
+                VLAN30, s3Eth100,
+                Sets.newHashSet(IpAddress.valueOf("192.168.40.1"),
+                                IpAddress.valueOf("192.168.50.1")));
 
         Set<BgpConfig.BgpSpeakerConfig> bgpSpeakers = Sets.newHashSet();
         bgpSpeakers.add(speaker1);
         bgpSpeakers.add(speaker2);
+        bgpSpeakers.add(speaker3);
 
         return bgpSpeakers;
     }
@@ -173,6 +190,7 @@ public class PeerConnectivityManagerTest extends AbstractIntentTest {
                 VlanId.NONE);
 
         configuredInterfaces.put(interfaceSw1Eth1, intfsw1eth1);
+
         String interfaceSw2Eth1 = "s2-eth1";
         InterfaceIpAddress ia2 =
             new InterfaceIpAddress(IpAddress.valueOf("192.168.20.101"),
@@ -181,6 +199,7 @@ public class PeerConnectivityManagerTest extends AbstractIntentTest {
                 Collections.singletonList(ia2),
                 MacAddress.valueOf("00:00:00:00:00:02"),
                 VlanId.NONE);
+
         configuredInterfaces.put(interfaceSw2Eth1, intfsw2eth1);
 
         String interfaceSw2Eth1intf2 = "s2-eth1_2";
@@ -191,7 +210,32 @@ public class PeerConnectivityManagerTest extends AbstractIntentTest {
                 Collections.singletonList(ia3),
                 MacAddress.valueOf("00:00:00:00:00:03"),
                 VlanId.NONE);
+
         configuredInterfaces.put(interfaceSw2Eth1intf2, intfsw2eth1intf2);
+
+        String interfaceSw3Eth1 = "s3-eth1";
+        InterfaceIpAddress ia4 =
+                new InterfaceIpAddress(IpAddress.valueOf("192.168.40.101"),
+                                       IpPrefix.valueOf("192.168.40.0/24"));
+        Interface intfsw3eth1 = new Interface(Interface.NO_INTERFACE_NAME,
+                s3Eth1,
+                ImmutableList.of(ia4),
+                MacAddress.valueOf("00:00:00:00:00:04"),
+                VLAN10);
+
+        configuredInterfaces.put(interfaceSw3Eth1, intfsw3eth1);
+
+        String interfaceSw3Eth1intf2 = "s3-eth1_2";
+        InterfaceIpAddress ia5 =
+                new InterfaceIpAddress(IpAddress.valueOf("192.168.50.101"),
+                                       IpPrefix.valueOf("192.168.50.0/24"));
+        Interface intfsw3eth1intf2 = new Interface(Interface.NO_INTERFACE_NAME,
+                s3Eth1,
+                ImmutableList.of(ia5),
+                MacAddress.valueOf("00:00:00:00:00:05"),
+                VLAN20);
+
+        configuredInterfaces.put(interfaceSw3Eth1intf2, intfsw3eth1intf2);
 
         expect(interfaceService.getInterfacesByPort(s1Eth1))
                 .andReturn(Collections.singleton(intfsw1eth1)).anyTimes();
@@ -199,6 +243,7 @@ public class PeerConnectivityManagerTest extends AbstractIntentTest {
                 .andReturn(Collections.singleton(intfsw1eth1)).anyTimes();
         expect(interfaceService.getMatchingInterface(IpAddress.valueOf("192.168.10.1")))
                 .andReturn(intfsw1eth1).anyTimes();
+
         expect(interfaceService.getInterfacesByPort(s2Eth1))
                 .andReturn(Collections.singleton(intfsw2eth1)).anyTimes();
         expect(interfaceService.getInterfacesByIp(IpAddress.valueOf("192.168.20.101")))
@@ -211,6 +256,16 @@ public class PeerConnectivityManagerTest extends AbstractIntentTest {
         expect(interfaceService.getMatchingInterface(IpAddress.valueOf("192.168.30.1")))
                 .andReturn(intfsw2eth1intf2).anyTimes();
 
+        expect(interfaceService.getInterfacesByIp(IpAddress.valueOf("192.168.40.101")))
+                .andReturn(Collections.singleton(intfsw3eth1)).anyTimes();
+        expect(interfaceService.getMatchingInterface(IpAddress.valueOf("192.168.40.1")))
+                .andReturn(intfsw3eth1).anyTimes();
+
+        expect(interfaceService.getInterfacesByIp(IpAddress.valueOf("192.168.50.101")))
+                .andReturn(Collections.singleton(intfsw3eth1intf2)).anyTimes();
+        expect(interfaceService.getMatchingInterface(IpAddress.valueOf("192.168.50.1")))
+                .andReturn(intfsw3eth1intf2).anyTimes();
+
         // Non-existent interface used during one of the tests
         expect(interfaceService.getInterfacesByPort(new ConnectPoint(
                 DeviceId.deviceId(SdnIp.dpidToUri("00:00:00:00:00:00:01:00")),
@@ -221,31 +276,6 @@ public class PeerConnectivityManagerTest extends AbstractIntentTest {
                 Sets.newHashSet(configuredInterfaces.values())).anyTimes();
 
         return configuredInterfaces;
-    }
-
-    /**
-     * Sets up BGP daemon peers.
-     *
-     * @return configured BGP peers as a MAP from peer IP address to BgpPeer
-     */
-    private Map<IpAddress, BgpPeer> setUpPeers() {
-
-        Map<IpAddress, BgpPeer> configuredPeers = new HashMap<>();
-
-        String peerSw1Eth1 = "192.168.10.1";
-        configuredPeers.put(IpAddress.valueOf(peerSw1Eth1),
-                new BgpPeer(dpid1, 1, peerSw1Eth1));
-
-        // Two BGP peers are connected to switch 2 port 1.
-        String peer1Sw2Eth1 = "192.168.20.1";
-        configuredPeers.put(IpAddress.valueOf(peer1Sw2Eth1),
-                new BgpPeer(dpid2, 1, peer1Sw2Eth1));
-
-        String peer2Sw2Eth1 = "192.168.30.1";
-        configuredPeers.put(IpAddress.valueOf(peer2Sw2Eth1),
-                new BgpPeer(dpid2, 1, peer2Sw2Eth1));
-
-        return configuredPeers;
     }
 
     /**
@@ -268,6 +298,8 @@ public class PeerConnectivityManagerTest extends AbstractIntentTest {
      * The purpose of this method is too simplify the setUpBgpIntents() method,
      * and to make the setUpBgpIntents() easy to read.
      *
+     * @param srcVlanId ingress VlanId
+     * @param dstVlanId egress VlanId
      * @param srcPrefix source IP prefix to match
      * @param dstPrefix destination IP prefix to match
      * @param srcTcpPort source TCP port to match
@@ -275,15 +307,27 @@ public class PeerConnectivityManagerTest extends AbstractIntentTest {
      * @param srcConnectPoint source connect point for PointToPointIntent
      * @param dstConnectPoint destination connect point for PointToPointIntent
      */
-    private void bgpPathintentConstructor(String srcPrefix, String dstPrefix,
-            Short srcTcpPort, Short dstTcpPort,
-            ConnectPoint srcConnectPoint, ConnectPoint dstConnectPoint) {
+    private void bgpPathintentConstructor(VlanId srcVlanId, VlanId dstVlanId,
+                                          String srcPrefix, String dstPrefix,
+                                          Short srcTcpPort, Short dstTcpPort,
+                                          ConnectPoint srcConnectPoint,
+                                          ConnectPoint dstConnectPoint) {
 
         TrafficSelector.Builder builder = DefaultTrafficSelector.builder()
                 .matchEthType(Ethernet.TYPE_IPV4)
                 .matchIPProtocol(IPv4.PROTOCOL_TCP)
                 .matchIPSrc(IpPrefix.valueOf(srcPrefix))
                 .matchIPDst(IpPrefix.valueOf(dstPrefix));
+
+        if (!srcVlanId.equals(VlanId.NONE)) {
+            builder.matchVlanId(VlanId.ANY);
+        }
+
+        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+
+        if (!dstVlanId.equals(VlanId.NONE)) {
+            treatment.setVlanId(dstVlanId);
+        }
 
         if (srcTcpPort != null) {
             builder.matchTcpSrc(TpPort.tpPort(srcTcpPort));
@@ -299,7 +343,7 @@ public class PeerConnectivityManagerTest extends AbstractIntentTest {
                 .appId(APPID)
                 .key(key)
                 .selector(builder.build())
-                .treatment(noTreatment)
+                .treatment(treatment.build())
                 .ingressPoint(srcConnectPoint)
                 .egressPoint(dstConnectPoint)
                 .build();
@@ -316,49 +360,118 @@ public class PeerConnectivityManagerTest extends AbstractIntentTest {
 
         // Start to build intents between BGP speaker1 and BGP peer1
         bgpPathintentConstructor(
-                "192.168.10.101/32", "192.168.10.1/32", null, bgpPort,
+                NO_VLAN, NO_VLAN,
+                "192.168.10.101/32", "192.168.10.1/32",
+                null, bgpPort,
                 s1Eth100, s1Eth1);
         bgpPathintentConstructor(
-                "192.168.10.101/32", "192.168.10.1/32", bgpPort, null,
+                NO_VLAN, NO_VLAN,
+                "192.168.10.101/32", "192.168.10.1/32",
+                bgpPort, null,
                 s1Eth100, s1Eth1);
 
         bgpPathintentConstructor(
-                "192.168.10.1/32", "192.168.10.101/32", null, bgpPort,
+                NO_VLAN, NO_VLAN,
+                "192.168.10.1/32", "192.168.10.101/32",
+                null, bgpPort,
                 s1Eth1, s1Eth100);
         bgpPathintentConstructor(
-                "192.168.10.1/32", "192.168.10.101/32", bgpPort, null,
+                NO_VLAN, NO_VLAN,
+                "192.168.10.1/32", "192.168.10.101/32",
+                bgpPort, null,
                 s1Eth1, s1Eth100);
 
         // Start to build intents between BGP speaker1 and BGP peer2
         bgpPathintentConstructor(
-                "192.168.20.101/32", "192.168.20.1/32", null, bgpPort,
+                NO_VLAN, NO_VLAN,
+                "192.168.20.101/32", "192.168.20.1/32",
+                null, bgpPort,
                 s1Eth100, s2Eth1);
         bgpPathintentConstructor(
-                "192.168.20.101/32", "192.168.20.1/32", bgpPort, null,
-                s1Eth100, s2Eth1);
-
-        bgpPathintentConstructor(
-                "192.168.20.1/32", "192.168.20.101/32", null, bgpPort,
-                s2Eth1, s1Eth100);
-        bgpPathintentConstructor(
-                "192.168.20.1/32", "192.168.20.101/32", bgpPort, null,
-                s2Eth1, s1Eth100);
-
-        //
-        // Start to build intents between BGP speaker3 and BGP peer1
-        bgpPathintentConstructor(
-                "192.168.30.101/32", "192.168.30.1/32", null, bgpPort,
-                s1Eth100, s2Eth1);
-        bgpPathintentConstructor(
-                "192.168.30.101/32", "192.168.30.1/32", bgpPort, null,
+                NO_VLAN, NO_VLAN,
+                "192.168.20.101/32", "192.168.20.1/32",
+                bgpPort, null,
                 s1Eth100, s2Eth1);
 
         bgpPathintentConstructor(
-                "192.168.30.1/32", "192.168.30.101/32", null, bgpPort,
+                NO_VLAN, NO_VLAN,
+                "192.168.20.1/32", "192.168.20.101/32",
+                null, bgpPort,
                 s2Eth1, s1Eth100);
         bgpPathintentConstructor(
-                "192.168.30.1/32", "192.168.30.101/32", bgpPort, null,
+                NO_VLAN, NO_VLAN,
+                "192.168.20.1/32", "192.168.20.101/32",
+                bgpPort, null,
                 s2Eth1, s1Eth100);
+
+        // Start to build intents between BGP speaker2 and BGP peer1
+        bgpPathintentConstructor(
+                NO_VLAN, NO_VLAN,
+                "192.168.30.101/32", "192.168.30.1/32",
+                null, bgpPort,
+                s1Eth100, s2Eth1);
+        bgpPathintentConstructor(
+                NO_VLAN, NO_VLAN,
+                "192.168.30.101/32", "192.168.30.1/32",
+                bgpPort, null,
+                s1Eth100, s2Eth1);
+
+        bgpPathintentConstructor(
+                NO_VLAN, NO_VLAN,
+                "192.168.30.1/32", "192.168.30.101/32",
+                null, bgpPort,
+                s2Eth1, s1Eth100);
+        bgpPathintentConstructor(
+                NO_VLAN, NO_VLAN,
+                "192.168.30.1/32", "192.168.30.101/32",
+                bgpPort, null,
+                s2Eth1, s1Eth100);
+
+        // Start to build intents between BGP speaker3 and BGP peer4
+        bgpPathintentConstructor(
+                VLAN30, VLAN10,
+                "192.168.40.101/32", "192.168.40.1/32",
+                null, bgpPort,
+                s3Eth100, s3Eth1);
+        bgpPathintentConstructor(
+                VLAN30, VLAN10,
+                "192.168.40.101/32", "192.168.40.1/32",
+                bgpPort, null,
+                s3Eth100, s3Eth1);
+
+        bgpPathintentConstructor(
+                VLAN10, VLAN30,
+                "192.168.40.1/32", "192.168.40.101/32",
+                null, bgpPort,
+                s3Eth1, s3Eth100);
+        bgpPathintentConstructor(
+                VLAN10, VLAN30,
+                "192.168.40.1/32", "192.168.40.101/32",
+                bgpPort, null,
+                s3Eth1, s3Eth100);
+
+        // Start to build intents between BGP speaker3 and BGP peer5
+        bgpPathintentConstructor(
+                VLAN30, VLAN20,
+                "192.168.50.101/32", "192.168.50.1/32",
+                null, bgpPort,
+                s3Eth100, s3Eth1);
+        bgpPathintentConstructor(
+                VLAN30, VLAN20,
+                "192.168.50.101/32", "192.168.50.1/32",
+                bgpPort, null,
+                s3Eth100, s3Eth1);
+
+        bgpPathintentConstructor(
+                VLAN20, VLAN30,
+                "192.168.50.1/32", "192.168.50.101/32",
+                null, bgpPort,
+                s3Eth1, s3Eth100);
+        bgpPathintentConstructor(
+                VLAN20, VLAN30,
+                "192.168.50.1/32", "192.168.50.101/32",
+                bgpPort, null,
+                s3Eth1, s3Eth100);
     }
 
     /**
@@ -367,20 +480,33 @@ public class PeerConnectivityManagerTest extends AbstractIntentTest {
      * The purpose of this method is too simplify the setUpBgpIntents() method,
      * and to make the setUpBgpIntents() easy to read.
      *
+     * @param srcVlanId ingress VlanId
+     * @param dstVlanId egress VlanId
      * @param srcPrefix source IP prefix to match
      * @param dstPrefix destination IP prefix to match
      * @param srcConnectPoint source connect point for PointToPointIntent
      * @param dstConnectPoint destination connect point for PointToPointIntent
      */
-    private void icmpPathintentConstructor(String srcPrefix, String dstPrefix,
-            ConnectPoint srcConnectPoint, ConnectPoint dstConnectPoint) {
+    private void icmpPathintentConstructor(VlanId srcVlanId, VlanId dstVlanId,
+                                           String srcPrefix, String dstPrefix,
+                                           ConnectPoint srcConnectPoint,
+                                           ConnectPoint dstConnectPoint) {
 
-        TrafficSelector selector = DefaultTrafficSelector.builder()
+        TrafficSelector.Builder builder = DefaultTrafficSelector.builder()
                 .matchEthType(Ethernet.TYPE_IPV4)
                 .matchIPProtocol(IPv4.PROTOCOL_ICMP)
                 .matchIPSrc(IpPrefix.valueOf(srcPrefix))
-                .matchIPDst(IpPrefix.valueOf(dstPrefix))
-                .build();
+                .matchIPDst(IpPrefix.valueOf(dstPrefix));
+
+        if (!srcVlanId.equals(VlanId.NONE)) {
+            builder.matchVlanId(VlanId.ANY);
+        }
+
+        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+
+        if (!dstVlanId.equals(VlanId.NONE)) {
+            treatment.setVlanId(dstVlanId);
+        }
 
         Key key = Key.of(srcPrefix.split("/")[0] + "-" + dstPrefix.split("/")[0]
                 + "-" + "icmp", APPID);
@@ -388,8 +514,8 @@ public class PeerConnectivityManagerTest extends AbstractIntentTest {
         PointToPointIntent intent = PointToPointIntent.builder()
                 .appId(APPID)
                 .key(key)
-                .selector(selector)
-                .treatment(noTreatment)
+                .selector(builder.build())
+                .treatment(treatment.build())
                 .ingressPoint(srcConnectPoint)
                 .egressPoint(dstConnectPoint)
                 .build();
@@ -403,28 +529,58 @@ public class PeerConnectivityManagerTest extends AbstractIntentTest {
     private void setUpIcmpIntents() {
         // Start to build intents between BGP speaker1 and BGP peer1
         icmpPathintentConstructor(
-                "192.168.10.101/32", "192.168.10.1/32", s1Eth100, s1Eth1);
+                NO_VLAN, NO_VLAN,
+                "192.168.10.101/32", "192.168.10.1/32",
+                s1Eth100, s1Eth1);
         icmpPathintentConstructor(
-                "192.168.10.1/32", "192.168.10.101/32", s1Eth1, s1Eth100);
+                NO_VLAN, NO_VLAN,
+                "192.168.10.1/32", "192.168.10.101/32",
+                s1Eth1, s1Eth100);
 
         // Start to build intents between BGP speaker1 and BGP peer2
         icmpPathintentConstructor(
-                "192.168.20.101/32", "192.168.20.1/32", s1Eth100, s2Eth1);
+                NO_VLAN, NO_VLAN,
+                "192.168.20.101/32", "192.168.20.1/32",
+                s1Eth100, s2Eth1);
         icmpPathintentConstructor(
-                "192.168.20.1/32", "192.168.20.101/32", s2Eth1, s1Eth100);
+                NO_VLAN, NO_VLAN,
+                "192.168.20.1/32", "192.168.20.101/32",
+                s2Eth1, s1Eth100);
 
         icmpPathintentConstructor(
-                "192.168.30.101/32", "192.168.30.1/32", s1Eth100, s2Eth1);
+                NO_VLAN, NO_VLAN,
+                "192.168.30.101/32", "192.168.30.1/32",
+                s1Eth100, s2Eth1);
         icmpPathintentConstructor(
-                "192.168.30.1/32", "192.168.30.101/32", s2Eth1, s1Eth100);
+                NO_VLAN, NO_VLAN,
+                "192.168.30.1/32", "192.168.30.101/32",
+                s2Eth1, s1Eth100);
+
+        // Start to build intents between BGP speaker3 and BGP peer 4
+        icmpPathintentConstructor(
+                VLAN10, VLAN30,
+                "192.168.40.1/32", "192.168.40.101/32",
+                s3Eth1, s3Eth100);
+        icmpPathintentConstructor(
+                VLAN30, VLAN10,
+                "192.168.40.101/32", "192.168.40.1/32",
+                s3Eth100, s3Eth1);
+
+        // Start to build intents between BGP speaker3 and BGP peer 5
+        icmpPathintentConstructor(
+                VLAN20, VLAN30,
+                "192.168.50.1/32", "192.168.50.101/32",
+                s3Eth1, s3Eth100);
+        icmpPathintentConstructor(
+                VLAN30, VLAN20,
+                "192.168.50.101/32", "192.168.50.1/32",
+                s3Eth100, s3Eth1);
     }
 
     /**
      * Initializes peer connectivity testing environment.
-     *
-     * @throws TestUtilsException if exceptions when using TestUtils
      */
-    private void initPeerConnectivity() throws TestUtilsException {
+    private void initPeerConnectivity() {
         expect(bgpConfig.bgpSpeakers()).andReturn(bgpSpeakers).anyTimes();
         replay(bgpConfig);
         expect(networkConfigService.getConfig(APPID, BgpConfig.class))
@@ -492,6 +648,14 @@ public class PeerConnectivityManagerTest extends AbstractIntentTest {
                 .andReturn(Collections.emptySet()).anyTimes();
         expect(interfaceService.getMatchingInterface(IpAddress.valueOf("192.168.30.1")))
                 .andReturn(null).anyTimes();
+        expect(interfaceService.getInterfacesByIp(IpAddress.valueOf("192.168.40.101")))
+                .andReturn(Collections.emptySet()).anyTimes();
+        expect(interfaceService.getMatchingInterface(IpAddress.valueOf("192.168.40.1")))
+                .andReturn(null).anyTimes();
+        expect(interfaceService.getInterfacesByIp(IpAddress.valueOf("192.168.50.101")))
+                .andReturn(Collections.emptySet()).anyTimes();
+        expect(interfaceService.getMatchingInterface(IpAddress.valueOf("192.168.50.1")))
+                .andReturn(null).anyTimes();
 
         replay(interfaceService);
 
@@ -510,6 +674,7 @@ public class PeerConnectivityManagerTest extends AbstractIntentTest {
         expect(bgpConfig.bgpSpeakers()).andReturn(Collections.emptySet()).anyTimes();
         replay(bgpConfig);
 
+        // We don't expect any intents in this case
         reset(intentSynchronizer);
         replay(intentSynchronizer);
         peerConnectivityManager.start();
@@ -522,10 +687,20 @@ public class PeerConnectivityManagerTest extends AbstractIntentTest {
      */
     @Test
     public void testNoPeerInterface() {
-        String peerSw100Eth1 = "192.168.200.1";
-        peers.put(IpAddress.valueOf(peerSw100Eth1),
-                new BgpPeer("00:00:00:00:00:00:01:00", 1, peerSw100Eth1));
-        testConnectionSetup();
+        IpAddress ip = IpAddress.valueOf("1.1.1.1");
+        bgpSpeakers.clear();
+        bgpSpeakers.add(new BgpConfig.BgpSpeakerConfig(Optional.of("foo"),
+                VlanId.NONE, s1Eth100, Collections.singleton(ip)));
+        reset(interfaceService);
+        interfaceService.addListener(anyObject(InterfaceListener.class));
+        expect(interfaceService.getMatchingInterface(ip)).andReturn(null).anyTimes();
+        replay(interfaceService);
+
+        // We don't expect any intents in this case
+        reset(intentSynchronizer);
+        replay(intentSynchronizer);
+        peerConnectivityManager.start();
+        verify(intentSynchronizer);
     }
 
 }

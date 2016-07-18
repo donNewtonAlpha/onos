@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ import java.util.List;
 public class VirtualLinkListCommand extends AbstractShellCommand {
 
     private static final String FMT_VIRTUAL_LINK =
-            "src=%s, dst=%s";
+            "src=%s, dst=%s, state=%s, tunnelId=%s";
 
     @Argument(index = 0, name = "networkId", description = "Network ID",
             required = true, multiValued = false)
@@ -65,6 +65,8 @@ public class VirtualLinkListCommand extends AbstractShellCommand {
      * @param virtualLink virtual link
      */
     private void printVirtualLink(VirtualLink virtualLink) {
-        print(FMT_VIRTUAL_LINK, virtualLink.src().toString(), virtualLink.dst().toString());
+        print(FMT_VIRTUAL_LINK, virtualLink.src().toString(), virtualLink.dst().toString(),
+              virtualLink.state(),
+              virtualLink.tunnelId() == null ? null : virtualLink.tunnelId().toString());
     }
 }

@@ -32,7 +32,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <onos.version>1.6.0-SNAPSHOT</onos.version>
+        <onos.version>1.7.0-SNAPSHOT</onos.version>
 
         <web.context>/onos/${artifactId}</web.context>
         <api.version>1.0.0</api.version>
@@ -108,20 +108,20 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.7.0</version>
+            <version>2.7.3</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>
-            <version>2.7.0</version>
+            <version>2.7.3</version>
             <scope>provided</scope>
         </dependency>
 
         <dependency>
             <groupId>org.osgi</groupId>
             <artifactId>org.osgi.core</artifactId>
-            <version>4.3.1</version>
+            <version>5.0.0</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -156,24 +156,7 @@
                             ${project.groupId}.${project.artifactId}
                         </Bundle-SymbolicName>
                         <Import-Package>
-                            org.slf4j,
-                            org.osgi.framework,
-                            javax.ws.rs,
-                            javax.ws.rs.core,
-                            org.glassfish.jersey,
-                            org.glassfish.jersey.servlet,
-                            com.fasterxml.jackson.databind,
-                            com.fasterxml.jackson.databind.node,
-                            com.fasterxml.jackson.core,
-                            org.apache.karaf.shell.commands,
-                            org.apache.karaf.shell.console,
-                            com.google.common.*,
-                            org.onlab.packet.*,
-                            org.onlab.rest.*,
-                            org.onlab.osgi.*,
-                            org.onlab.util.*,
-                            org.onosproject.*,
-                            org.jboss.netty.util.*
+                            *,org.glassfish.jersey.servlet
                         </Import-Package>
                         <Web-ContextPath>${web.context}</Web-ContextPath>
                     </instructions>

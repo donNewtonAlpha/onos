@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -169,7 +169,6 @@ public final class DefaultForwardingObjective implements ForwardingObjective {
                 .add("appId", appId())
                 .add("permanent", permanent())
                 .add("timeout", timeout())
-                .add("context", context())
                 .toString();
     }
 
@@ -283,6 +282,8 @@ public final class DefaultForwardingObjective implements ForwardingObjective {
             checkArgument(nextId != null || treatment != null, "Must supply at " +
                     "least a treatment and/or a nextId");
             checkNotNull(appId, "Must supply an application id");
+            checkArgument(priority <= MAX_PRIORITY && priority >= MIN_PRIORITY, "Priority " +
+                    "out of range");
             op = Operation.ADD;
             return new DefaultForwardingObjective(this);
         }

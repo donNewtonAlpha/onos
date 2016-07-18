@@ -1,5 +1,5 @@
 /*
- * Copyright 2014,2015 Open Networking Laboratory
+ * Copyright 2014-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -98,11 +98,27 @@
         }
     }
 
+    var textFieldDoesNotBlock = {
+        enter: 1,
+        esc: 1
+    };
+
+    function textFieldInput() {
+        var t = d3.event.target.tagName.toLowerCase();
+        return t === 'input' || t === 'textarea';
+    }
+
     function keyIn() {
         var event = d3.event,
             keyCode = event.keyCode,
             key = whatKey(keyCode),
-            kh = keyHandler,
+            textBlockable = !textFieldDoesNotBlock[key];
+
+        if (textBlockable && textFieldInput()) {
+            return;
+        }
+
+        var kh = keyHandler,
             gk = kh.globalKeys[key],
             gcb = fs.isF(gk) || (fs.isA(gk) && fs.isF(gk[0])),
             dk = kh.dialogKeys[key],
@@ -112,7 +128,7 @@
             vcb = fs.isF(vk) || (fs.isA(vk) && fs.isF(vk[0])) || fs.isF(kh.viewFn),
             token = 'keyev';    // indicate this was a key-pressed event
 
-        d3.event.stopPropagation();
+        event.stopPropagation();
 
         if (enabled) {
             if (matchSeq(key)) return;
@@ -151,9 +167,9 @@
             // Masked keys are global key handlers that always return true.
             // That is, the view will never see the event for that key.
             maskedKeys: {
-                slash: true,
-                backSlash: true,
-                T: true
+                slash: 1,
+                backSlash: 1,
+                T: 1
             }
         });
     }

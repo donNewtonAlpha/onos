@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,18 +15,15 @@
  */
 package org.onosproject.net.device.impl;
 
+import static org.onosproject.net.optical.device.OchPortHelper.ochPortDescription;
+import static org.onosproject.net.optical.device.OduCltPortHelper.oduCltPortDescription;
+import static org.onosproject.net.optical.device.OmsPortHelper.omsPortDescription;
+import static org.onosproject.net.optical.device.OtuPortHelper.otuPortDescription;
 import static org.slf4j.LoggerFactory.getLogger;
-import static com.google.common.base.Preconditions.checkNotNull;
-
 import org.onosproject.net.config.ConfigOperator;
 import org.onosproject.net.config.basics.OpticalPortConfig;
 import org.onosproject.net.AnnotationKeys;
 import org.onosproject.net.DefaultAnnotations;
-import org.onosproject.net.OchPort;
-import org.onosproject.net.OtuPort;
-import org.onosproject.net.OduCltPort;
-import org.onosproject.net.OmsPort;
-import org.onosproject.net.Port;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.SparseAnnotations;
 import org.onosproject.net.device.DefaultPortDescription;
@@ -97,33 +94,64 @@ public final class OpticalPortOperator implements ConfigOperator {
     }
 
     // updates a port description whose port type has not changed.
-    private static PortDescription updateDescription(
-            PortNumber port, SparseAnnotations sa, PortDescription descr) {
+    /**
+     * Updates {@link PortDescription} using specified number and annotations.
+     *
+     * @param port {@link PortNumber} to use in updated description
+     * @param sa   annotations to use in updated description
+     * @param descr base {@link PortDescription}
+     * @return updated {@link PortDescription}
+     */
+    private static PortDescription updateDescription(PortNumber port,
+                                                     SparseAnnotations sa,
+                                                     PortDescription descr) {
+
+        // TODO This switch can go away once deprecation is complete.
         switch (descr.type()) {
             case OMS:
-                OmsPortDescription oms = (OmsPortDescription) descr;
-                return new OmsPortDescription(port, oms.isEnabled(), oms.minFrequency(),
-                        oms.maxFrequency(), oms.grid(), sa);
+                if (descr instanceof OmsPortDescription) {
+                    OmsPortDescription oms = (OmsPortDescription) descr;
+                    return omsPortDescription(port, oms.isEnabled(), oms.minFrequency(),
+                                                  oms.maxFrequency(), oms.grid(), sa);
+                }
+                break;
             case OCH:
-            // We might need to update lambda below with STATIC_LAMBDA.
-                OchPortDescription och = (OchPortDescription) descr;
-                return new OchPortDescription(port, och.isEnabled(), och.signalType(),
-                        och.isTunable(), och.lambda(), sa);
+                // We might need to update lambda below with STATIC_LAMBDA.
+                if (descr instanceof OchPortDescription) {
+                    OchPortDescription och = (OchPortDescription) descr;
+                    return ochPortDescription(port, och.isEnabled(), och.signalType(),
+                            och.isTunable(), och.lambda(), sa);
+                }
+                break;
             case ODUCLT:
-                OduCltPortDescription odu = (OduCltPortDescription) descr;
-                return new OduCltPortDescription(port, odu.isEnabled(), odu.signalType(), sa);
+                if (descr instanceof OduCltPortDescription) {
+                    OduCltPortDescription odu = (OduCltPortDescription) descr;
+                    return oduCltPortDescription(port, odu.isEnabled(), odu.signalType(), sa);
+                }
+                break;
             case PACKET:
             case FIBER:
             case COPPER:
-                return new DefaultPortDescription(port, descr.isEnabled(), descr.type(),
-                        descr.portSpeed(), sa);
+                break;
             case OTU:
-                OtuPortDescription otu = (OtuPortDescription) descr;
-                return new OtuPortDescription(port, otu.isEnabled(), otu.signalType(), sa);
+                if (descr instanceof OtuPortDescription) {
+                    OtuPortDescription otu = (OtuPortDescription) descr;
+                    return otuPortDescription(port, otu.isEnabled(), otu.signalType(), sa);
+                }
+                break;
             default:
                 log.warn("Unsupported optical port type {} - can't update", descr.type());
                 return descr;
         }
+        if (port.exactlyEquals(descr.portNumber()) && sa.equals(descr.annotations())) {
+            // result is no-op
+            return descr;
+        }
+        return new DefaultPortDescription(port,
+                                          descr.isEnabled(),
+                                          descr.type(),
+                                          descr.portSpeed(),
+                                          sa);
     }
 
     /**
@@ -148,51 +176,4 @@ public final class OpticalPortOperator implements ConfigOperator {
         return DefaultAnnotations.union(an, b.build());
     }
 
-    /**
-     * Returns a description built from an existing port.
-     *
-     * @param port the device port
-     * @return a PortDescription based on the port
-     */
-    public static PortDescription descriptionOf(Port port) {
-        checkNotNull(port, "Must supply non-null Port");
-        final boolean isUp = port.isEnabled();
-        return descriptionOfPort(port, isUp);
-    }
-
-    /**
-     * Returns a description built from an existing port and reported status.
-     *
-     * @param port port
-     * @param isEnabled true if enabled
-     * @return a PortDescription based on the port
-     */
-    static PortDescription descriptionOf(Port port, boolean isEnabled) {
-        checkNotNull(port, "Must supply non-null Port");
-        final boolean isup = isEnabled;
-        return descriptionOfPort(port, isup);
-    }
-
-    private static PortDescription descriptionOfPort(Port port, final boolean isup) {
-        final PortNumber ptn = port.number();
-        final SparseAnnotations an = (SparseAnnotations) port.annotations();
-        switch (port.type()) {
-            case OMS:
-                OmsPort oms = (OmsPort) port;
-                return new OmsPortDescription(ptn, isup, oms.minFrequency(),
-                        oms.maxFrequency(), oms.grid(), an);
-            case OCH:
-                OchPort och = (OchPort) port;
-                return new OchPortDescription(ptn, isup, och.signalType(),
-                        och.isTunable(), och.lambda(), an);
-            case ODUCLT:
-                OduCltPort odu = (OduCltPort) port;
-                return new OduCltPortDescription(ptn, isup, odu.signalType(), an);
-            case OTU:
-                OtuPort otu = (OtuPort) port;
-                return new OtuPortDescription(ptn, isup, otu.signalType(), an);
-            default:
-                return new DefaultPortDescription(ptn, isup, port.type(), port.portSpeed(), an);
-        }
-    }
 }

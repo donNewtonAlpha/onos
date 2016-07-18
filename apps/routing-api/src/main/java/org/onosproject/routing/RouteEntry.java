@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,10 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Represents a route entry for an IP prefix.
+ *
+ * @deprecated use RouteService instead
  */
+@Deprecated
 public class RouteEntry {
     private final IpPrefix prefix;              // The IP prefix
     private final IpAddress nextHop;            // Next-hop IP address

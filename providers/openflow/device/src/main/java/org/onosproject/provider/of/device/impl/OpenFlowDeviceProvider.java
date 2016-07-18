@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2014-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,30 @@
  */
 package org.onosproject.provider.of.device.impl;
 
-import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Strings.isNullOrEmpty;
+import static org.onlab.util.Tools.get;
+import static org.onosproject.net.DeviceId.deviceId;
+import static org.onosproject.net.Port.Type.COPPER;
+import static org.onosproject.net.Port.Type.FIBER;
+import static org.onosproject.net.optical.device.OchPortHelper.ochPortDescription;
+import static org.onosproject.net.optical.device.OduCltPortHelper.oduCltPortDescription;
+import static org.onosproject.net.optical.device.OmsPortHelper.omsPortDescription;
+import static org.onosproject.net.optical.device.OtuPortHelper.otuPortDescription;
+import static org.onosproject.openflow.controller.Dpid.dpid;
+import static org.onosproject.openflow.controller.Dpid.uri;
+import static org.slf4j.LoggerFactory.getLogger;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Dictionary;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
@@ -44,6 +64,7 @@ import org.onosproject.net.OtuSignalType;
 import org.onosproject.net.Port;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.SparseAnnotations;
+import org.onosproject.net.behaviour.LambdaQuery;
 import org.onosproject.net.device.DefaultDeviceDescription;
 import org.onosproject.net.device.DefaultPortDescription;
 import org.onosproject.net.device.DefaultPortStatistics;
@@ -51,12 +72,10 @@ import org.onosproject.net.device.DeviceDescription;
 import org.onosproject.net.device.DeviceProvider;
 import org.onosproject.net.device.DeviceProviderRegistry;
 import org.onosproject.net.device.DeviceProviderService;
-import org.onosproject.net.device.OchPortDescription;
-import org.onosproject.net.device.OduCltPortDescription;
-import org.onosproject.net.device.OmsPortDescription;
-import org.onosproject.net.device.OtuPortDescription;
 import org.onosproject.net.device.PortDescription;
 import org.onosproject.net.device.PortStatistics;
+import org.onosproject.net.driver.DriverHandler;
+import org.onosproject.net.driver.HandlerBehaviour;
 import org.onosproject.net.provider.AbstractProvider;
 import org.onosproject.net.provider.ProviderId;
 import org.onosproject.openflow.controller.Dpid;
@@ -71,6 +90,8 @@ import org.osgi.service.component.ComponentContext;
 import org.projectfloodlight.openflow.protocol.OFCalientPortDescProp;
 import org.projectfloodlight.openflow.protocol.OFCalientPortDescPropOptical;
 import org.projectfloodlight.openflow.protocol.OFCalientPortDescStatsEntry;
+import org.projectfloodlight.openflow.protocol.OFErrorMsg;
+import org.projectfloodlight.openflow.protocol.OFErrorType;
 import org.projectfloodlight.openflow.protocol.OFExpPort;
 import org.projectfloodlight.openflow.protocol.OFExpPortDescPropOpticalTransport;
 import org.projectfloodlight.openflow.protocol.OFExpPortOpticalTransportLayerEntry;
@@ -81,6 +102,7 @@ import org.projectfloodlight.openflow.protocol.OFPortConfig;
 import org.projectfloodlight.openflow.protocol.OFPortDesc;
 import org.projectfloodlight.openflow.protocol.OFPortDescPropOpticalTransport;
 import org.projectfloodlight.openflow.protocol.OFPortFeatures;
+import org.projectfloodlight.openflow.protocol.OFPortMod;
 import org.projectfloodlight.openflow.protocol.OFPortOptical;
 import org.projectfloodlight.openflow.protocol.OFPortOpticalTransportLayerClass;
 import org.projectfloodlight.openflow.protocol.OFPortOpticalTransportSignalType;
@@ -93,26 +115,14 @@ import org.projectfloodlight.openflow.protocol.OFStatsReply;
 import org.projectfloodlight.openflow.protocol.OFStatsReplyFlags;
 import org.projectfloodlight.openflow.protocol.OFStatsType;
 import org.projectfloodlight.openflow.protocol.OFVersion;
+import org.projectfloodlight.openflow.types.OFPort;
 import org.projectfloodlight.openflow.types.PortSpeed;
 import org.slf4j.Logger;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Dictionary;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-
-import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Strings.isNullOrEmpty;
-import static org.onlab.util.Tools.get;
-import static org.onosproject.net.DeviceId.deviceId;
-import static org.onosproject.net.Port.Type.COPPER;
-import static org.onosproject.net.Port.Type.FIBER;
-import static org.onosproject.openflow.controller.Dpid.dpid;
-import static org.onosproject.openflow.controller.Dpid.uri;
-import static org.slf4j.LoggerFactory.getLogger;
+import com.google.common.base.Strings;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 /**
  * Provider which uses an OpenFlow controller to detect network
@@ -143,9 +153,9 @@ public class OpenFlowDeviceProvider extends AbstractProvider implements DevicePr
 
     private final InternalDeviceProvider listener = new InternalDeviceProvider();
 
-    // TODO: We need to make the poll interval configurable.
-    static final int POLL_INTERVAL = 5;
-    @Property(name = "PortStatsPollFrequency", intValue = POLL_INTERVAL,
+    private static final String POLL_PROP_NAME = "portStatsPollFrequency";
+    private static final int POLL_INTERVAL = 5;
+    @Property(name = POLL_PROP_NAME, intValue = POLL_INTERVAL,
     label = "Frequency (in seconds) for polling switch Port statistics")
     private int portStatsPollFrequency = POLL_INTERVAL;
 
@@ -172,9 +182,11 @@ public class OpenFlowDeviceProvider extends AbstractProvider implements DevicePr
     @Deactivate
     public void deactivate(ComponentContext context) {
         cfgService.unregisterProperties(getClass(), false);
+        listener.disable();
         controller.removeListener(listener);
         providerRegistry.unregister(this);
         collectors.values().forEach(PortStatsCollector::stop);
+        collectors.clear();
         providerService = null;
         LOG.info("Stopped");
     }
@@ -184,7 +196,7 @@ public class OpenFlowDeviceProvider extends AbstractProvider implements DevicePr
         Dictionary<?, ?> properties = context.getProperties();
         int newPortStatsPollFrequency;
         try {
-            String s = get(properties, "PortStatsPollFrequency");
+            String s = get(properties, POLL_PROP_NAME);
             newPortStatsPollFrequency = isNullOrEmpty(s) ? portStatsPollFrequency : Integer.parseInt(s.trim());
 
         } catch (NumberFormatException | ClassCastException e) {
@@ -268,6 +280,34 @@ public class OpenFlowDeviceProvider extends AbstractProvider implements DevicePr
         LOG.debug("Accepting mastership role change to {} for device {}", newRole, deviceId);
     }
 
+    @Override
+    public void changePortState(DeviceId deviceId, PortNumber portNumber,
+                                boolean enable) {
+        final Dpid dpid = dpid(deviceId.uri());
+        OpenFlowSwitch sw = controller.getSwitch(dpid);
+        if (sw == null || !sw.isConnected()) {
+            LOG.error("Failed to change portState on device {}", deviceId);
+            return;
+        }
+        OFPortMod.Builder pmb = sw.factory().buildPortMod();
+        OFPort port = OFPort.of((int) portNumber.toLong());
+        pmb.setPortNo(port);
+        if (enable) {
+            pmb.setConfig(0x0); // port_down bit 0
+        } else {
+            pmb.setConfig(0x1); // port_down bit 1
+        }
+        pmb.setMask(0x1);
+        pmb.setAdvertise(0x0);
+        for (OFPortDesc pd : sw.getPorts()) {
+            if (pd.getPortNo().equals(port)) {
+                pmb.setHwAddr(pd.getHwAddr());
+                break;
+            }
+        }
+        sw.sendMsg(Collections.singletonList(pmb.build()));
+    }
+
     private void pushPortMetrics(Dpid dpid, List<OFPortStatsEntry> portStatsEntries) {
         DeviceId deviceId = DeviceId.deviceId(Dpid.uri(dpid));
         Collection<PortStatistics> stats = buildPortStatistics(deviceId, portStatsEntries);
@@ -305,12 +345,12 @@ public class OpenFlowDeviceProvider extends AbstractProvider implements DevicePr
         }
 
         return Collections.unmodifiableSet(stats);
-
     }
 
     private class InternalDeviceProvider implements OpenFlowSwitchListener, OpenFlowEventListener {
 
         private HashMap<Dpid, List<OFPortStatsEntry>> portStatsReplies = new HashMap<>();
+        private boolean isDisabled = false;
 
         @Override
         public void switchAdded(Dpid dpid) {
@@ -341,14 +381,19 @@ public class OpenFlowDeviceProvider extends AbstractProvider implements DevicePr
             providerService.deviceConnected(did, description);
             providerService.updatePorts(did, buildPortDescriptions(sw));
 
-            PortStatsCollector psc =
-                    new PortStatsCollector(sw, portStatsPollFrequency);
+            PortStatsCollector psc = new PortStatsCollector(sw, portStatsPollFrequency);
+            stopCollectorIfNeeded(collectors.put(dpid, psc));
             psc.start();
-            collectors.put(dpid, psc);
 
             //figure out race condition for collectors.remove() and collectors.put()
             if (controller.getSwitch(dpid) == null) {
                 switchRemoved(dpid);
+            }
+        }
+
+        private void stopCollectorIfNeeded(PortStatsCollector collector) {
+            if (collector != null) {
+                collector.stop();
             }
         }
 
@@ -358,11 +403,7 @@ public class OpenFlowDeviceProvider extends AbstractProvider implements DevicePr
                 return;
             }
             providerService.deviceDisconnected(deviceId(uri(dpid)));
-
-            PortStatsCollector collector = collectors.remove(dpid);
-            if (collector != null) {
-                collector.stop();
-            }
+            stopCollectorIfNeeded(collectors.remove(dpid));
         }
 
         @Override
@@ -443,7 +484,7 @@ public class OpenFlowDeviceProvider extends AbstractProvider implements DevicePr
                     LOG.debug("Ports Of{}", portsOf);
                     portsOf.forEach(
                         op -> {
-                            portDescs.add(buildPortDescription(type, op));
+                            portDescs.add(buildPortDescription(type, op, opsw));
                         }
                      );
                     });
@@ -490,7 +531,7 @@ public class OpenFlowDeviceProvider extends AbstractProvider implements DevicePr
             }
 
             SparseAnnotations annotations = buildOduCltAnnotation(port);
-            return new OduCltPortDescription(portNo, enabled, sigType, annotations);
+            return oduCltPortDescription(portNo, enabled, sigType, annotations);
         }
 
         private SparseAnnotations buildOduCltAnnotation(OFPortDesc port) {
@@ -504,9 +545,10 @@ public class OpenFlowDeviceProvider extends AbstractProvider implements DevicePr
             return annotations;
         }
 
-        private PortDescription buildPortDescription(PortDescPropertyType ptype, OFObject port) {
-            if (port instanceof  OFPortOptical) {
-               return buildPortDescription(ptype, (OFPortOptical) port);
+        private PortDescription buildPortDescription(PortDescPropertyType ptype, OFObject port,
+                OpenFlowOpticalSwitch opsw) {
+            if (port instanceof OFPortOptical) {
+                return buildPortDescription(ptype, (OFPortOptical) port, opsw);
             }
             return buildPortDescription(ptype, (OFExpPort) port);
         }
@@ -546,10 +588,10 @@ public class OpenFlowDeviceProvider extends AbstractProvider implements DevicePr
             OFExpPortDescPropOpticalTransport firstProp = port.getProperties().get(0);
             OFPortOpticalTransportSignalType sigType = firstProp.getPortSignalType();
 
-            DefaultPortDescription portDes = null;
+            PortDescription portDes = null;
             switch (sigType) {
             case OMSN:
-                portDes =  new OmsPortDescription(portNo, enabled,
+                portDes = omsPortDescription(portNo, enabled,
                         FREQ191_7, FREQ191_7.add(FREQ4_4), FREQ50, annotations);
                 break;
             case OCH:
@@ -567,8 +609,9 @@ public class OpenFlowDeviceProvider extends AbstractProvider implements DevicePr
                 //yet not relevant for tunable OCH port, creating with default parameters
                 OchSignal signalId = new OchSignal(GridType.DWDM, ChannelSpacing.CHL_50GHZ, 1, 1);
 
-                portDes = new OchPortDescription(portNo, enabled,
-                        oduSignalType, true, signalId, annotations);
+                portDes = ochPortDescription(portNo, enabled,
+                                             oduSignalType, true,
+                                             signalId, annotations);
 
                 break;
             case OTU2:
@@ -590,7 +633,7 @@ public class OpenFlowDeviceProvider extends AbstractProvider implements DevicePr
                 OtuSignalType otuSignalType =
                         ((sigType == OFPortOpticalTransportSignalType.OTU2) ? OtuSignalType.OTU2 :
                             OtuSignalType.OTU4);
-                portDes = new OtuPortDescription(portNo, enabled, otuSignalType, annotations);
+                portDes = otuPortDescription(portNo, enabled, otuSignalType, annotations);
                 break;
             default:
                 break;
@@ -644,7 +687,8 @@ public class OpenFlowDeviceProvider extends AbstractProvider implements DevicePr
          * @param port the port to build from.
          * @return portDescription for the port.
          */
-        private PortDescription buildPortDescription(PortDescPropertyType ptype, OFPortOptical port) {
+        private PortDescription buildPortDescription(PortDescPropertyType ptype, OFPortOptical port,
+                OpenFlowOpticalSwitch opsw) {
             checkArgument(port.getDesc().size() >= 1);
 
             // Minimally functional fixture. This needs to be fixed as we add better support.
@@ -669,11 +713,38 @@ public class OpenFlowDeviceProvider extends AbstractProvider implements DevicePr
                 case 2:     // OMS port
                     // Assume complete optical spectrum and 50 GHz grid
                     // LINC-OE is only supported optical OF device for now
-                    return new OmsPortDescription(portNo, enabled,
-                            Spectrum.U_BAND_MIN, Spectrum.O_BAND_MAX, Frequency.ofGHz(50), annotations);
+                    Set<OchSignal> signals = null;
+                    if (opsw instanceof HandlerBehaviour) {
+                        DriverHandler driverHandler = ((HandlerBehaviour) opsw).handler();
+                        if (driverHandler != null && driverHandler.hasBehaviour(LambdaQuery.class)) {
+                            try {
+                                signals = driverHandler.behaviour(LambdaQuery.class).queryLambdas(portNo);
+                            } catch (NullPointerException e) {
+                                signals = null;
+                            }
+                        }
+                    }
+                    Frequency minFreq;
+                    Frequency maxFreq;
+                    Frequency channelSpacing;
+                    if (signals == null || signals.isEmpty()) {
+                        minFreq = Spectrum.U_BAND_MIN;
+                        maxFreq = Spectrum.O_BAND_MAX;
+                        channelSpacing = Frequency.ofGHz(50);
+                    } else {
+                        Comparator<OchSignal> compare =
+                                (OchSignal a, OchSignal b) -> a.spacingMultiplier() - b.spacingMultiplier();
+                        OchSignal minOch = Collections.min(signals, compare);
+                        OchSignal maxOch = Collections.max(signals, compare);
+                        minFreq = minOch.centralFrequency();
+                        maxFreq = maxOch.centralFrequency();
+                        channelSpacing = minOch.channelSpacing().frequency();
+                    }
+                    return omsPortDescription(portNo, enabled, minFreq,
+                            maxFreq, channelSpacing, annotations);
                 case 5:     // OCH port
                     OchSignal signal = new OchSignal(GridType.DWDM, ChannelSpacing.CHL_50GHZ, 0, 4);
-                    return new OchPortDescription(portNo, enabled, OduSignalType.ODU4,
+                    return ochPortDescription(portNo, enabled, OduSignalType.ODU4,
                             true, signal, annotations);
                 default:
                     break;
@@ -708,7 +779,7 @@ public class OpenFlowDeviceProvider extends AbstractProvider implements DevicePr
 
             // S160 data sheet
             // Wavelength range: 1260 - 1630 nm, grid is irrelevant for this type of switch
-            return new OmsPortDescription(portNo, enabled,
+            return omsPortDescription(portNo, enabled,
                     Spectrum.U_BAND_MIN, Spectrum.O_BAND_MAX, Frequency.ofGHz(100), annotations);
         }
 
@@ -740,25 +811,57 @@ public class OpenFlowDeviceProvider extends AbstractProvider implements DevicePr
 
         @Override
         public void handleMessage(Dpid dpid, OFMessage msg) {
-            switch (msg.getType()) {
-                case STATS_REPLY:
-                    if (((OFStatsReply) msg).getStatsType() == OFStatsType.PORT) {
-                        OFPortStatsReply portStatsReply = (OFPortStatsReply) msg;
-                        List<OFPortStatsEntry> portStatsReplyList = portStatsReplies.get(dpid);
-                        if (portStatsReplyList == null) {
-                            portStatsReplyList = Lists.newArrayList();
+            if (isDisabled) {
+                return;
+            }
+
+            try {
+                switch (msg.getType()) {
+                    case STATS_REPLY:
+                        if (((OFStatsReply) msg).getStatsType() == OFStatsType.PORT) {
+                            OFPortStatsReply portStatsReply = (OFPortStatsReply) msg;
+                            List<OFPortStatsEntry> portStatsReplyList = portStatsReplies.get(dpid);
+                            if (portStatsReplyList == null) {
+                                portStatsReplyList = Lists.newCopyOnWriteArrayList();
+                            }
+                            portStatsReplyList.addAll(portStatsReply.getEntries());
+                            portStatsReplies.put(dpid, portStatsReplyList);
+                            if (!portStatsReply.getFlags().contains(OFStatsReplyFlags.REPLY_MORE)) {
+                                List<OFPortStatsEntry> statsEntries = portStatsReplies.get(dpid);
+                                if (statsEntries != null) {
+                                    pushPortMetrics(dpid, statsEntries);
+                                    statsEntries.clear();
+                                }
+                            }
+                        } else if (((OFStatsReply) msg).getStatsType() == OFStatsType.EXPERIMENTER) {
+                            OpenFlowSwitch sw = controller.getSwitch(dpid);
+                            if (sw instanceof OpenFlowOpticalSwitch) {
+                                // Optical switch uses experimenter stats message to update power
+                                List<PortDescription> portDescs =
+                                        ((OpenFlowOpticalSwitch) sw).processExpPortStats(msg);
+                                if (!portDescs.isEmpty()) {
+                                    providerService.updatePorts(DeviceId.deviceId(Dpid.uri(dpid)), portDescs);
+                                }
+                            }
                         }
-                        portStatsReplyList.addAll(portStatsReply.getEntries());
-                        portStatsReplies.put(dpid, portStatsReplyList);
-                        if (!portStatsReply.getFlags().contains(OFStatsReplyFlags.REPLY_MORE)) {
-                            pushPortMetrics(dpid, portStatsReplies.get(dpid));
-                            portStatsReplies.get(dpid).clear();
+                        break;
+                    case ERROR:
+                        if (((OFErrorMsg) msg).getErrType() == OFErrorType.PORT_MOD_FAILED) {
+                            LOG.error("port mod failed");
                         }
-                    }
-                    break;
-                default:
-                    break;
+                    default:
+                        break;
+                }
+            } catch (IllegalStateException e) {
+                // system is shutting down and the providerService is no longer
+                // valid. Messages cannot be processed.
             }
         }
+
+        private void disable() {
+            isDisabled = true;
+        }
     }
+
+
 }

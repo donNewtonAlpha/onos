@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,10 +32,9 @@ import org.onosproject.core.CoreService;
 import org.onosproject.net.AnnotationKeys;
 import org.onosproject.net.CltSignalType;
 import org.onosproject.net.ConnectPoint;
-import org.onosproject.net.OchPort;
-import org.onosproject.net.OduCltPort;
 import org.onosproject.net.OduSignalId;
 import org.onosproject.net.OduSignalType;
+import org.onosproject.net.OduSignalUtils;
 import org.onosproject.net.Port;
 import org.onosproject.net.TributarySlot;
 import org.onosproject.net.behaviour.TributarySlotQuery;
@@ -59,7 +58,10 @@ import org.onosproject.net.intent.IntentService;
 import org.onosproject.net.intent.OpticalCircuitIntent;
 import org.onosproject.net.intent.OpticalConnectivityIntent;
 import org.onosproject.net.intent.impl.IntentCompilationException;
+import org.onosproject.net.optical.OchPort;
+import org.onosproject.net.optical.OduCltPort;
 import org.onosproject.net.intent.IntentSetMultimap;
+import org.onosproject.net.intent.impl.ResourceHelper;
 import org.onosproject.net.resource.ResourceAllocation;
 import org.onosproject.net.resource.Resource;
 import org.onosproject.net.resource.ResourceService;
@@ -81,6 +83,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static org.onosproject.net.optical.device.OpticalDeviceServiceView.opticalView;
 
 /**
  * An intent compiler for {@link org.onosproject.net.intent.OpticalCircuitIntent}.
@@ -155,6 +158,7 @@ public class OpticalCircuitIntentCompiler implements IntentCompiler<OpticalCircu
 
     @Activate
     public void activate(ComponentContext context) {
+        deviceService = opticalView(deviceService);
         appId = coreService.registerApplication("org.onosproject.net.intent");
         intentManager.registerCompiler(OpticalCircuitIntent.class, this);
         cfgService.registerProperties(getClass());
@@ -276,7 +280,7 @@ public class OpticalCircuitIntentCompiler implements IntentCompiler<OpticalCircu
     }
 
     private List<Resource> availableSlotResources(ConnectPoint src, ConnectPoint dst, CltSignalType signalType) {
-        OduSignalType oduSignalType = mappingCltSignalTypeToOduSignalType(signalType);
+        OduSignalType oduSignalType = OduSignalUtils.mappingCltSignalTypeToOduSignalType(signalType);
         int requestedTsNum = oduSignalType.tributarySlots();
         Set<TributarySlot> commonTributarySlots = findCommonTributarySlotsOnCps(src, dst);
         if (commonTributarySlots.isEmpty()) {
@@ -339,7 +343,7 @@ public class OpticalCircuitIntentCompiler implements IntentCompiler<OpticalCircu
                                                                     CltSignalType signalType,
                                                                     boolean multiplexingSupported) {
 
-        OduSignalType oduSignalType = mappingCltSignalTypeToOduSignalType(signalType);
+        OduSignalType oduSignalType = OduSignalUtils.mappingCltSignalTypeToOduSignalType(signalType);
 
         return Tools.stream(intentService.getIntents())
                 .filter(x -> x instanceof OpticalConnectivityIntent)
@@ -443,9 +447,9 @@ public class OpticalCircuitIntentCompiler implements IntentCompiler<OpticalCircu
             Optional<IntentId> intentId =
                     resourceService.getResourceAllocations(Resources.discrete(ochCP.deviceId(), ochCP.port()).id())
                             .stream()
-                            .map(ResourceAllocation::consumer)
-                            .filter(x -> x instanceof IntentId)
-                            .map(x -> (IntentId) x)
+                            .map(ResourceAllocation::consumerId)
+                            .map(ResourceHelper::getIntentId)
+                            .flatMap(Tools::stream)
                             .findAny();
 
             if (isAvailable(intentId.orElse(null))) {
@@ -473,9 +477,9 @@ public class OpticalCircuitIntentCompiler implements IntentCompiler<OpticalCircu
             Optional<IntentId> intentId =
                     resourceService.getResourceAllocations(Resources.discrete(oduPort.deviceId(), port.number()).id())
                             .stream()
-                            .map(ResourceAllocation::consumer)
-                            .filter(x -> x instanceof IntentId)
-                            .map(x -> (IntentId) x)
+                            .map(ResourceAllocation::consumerId)
+                            .map(ResourceHelper::getIntentId)
+                            .flatMap(Tools::stream)
                             .findAny();
 
             if (isAvailable(intentId.orElse(null))) {
@@ -509,23 +513,25 @@ public class OpticalCircuitIntentCompiler implements IntentCompiler<OpticalCircu
             OduSignalType ochPortOduSignalType;
 
             if (srcPort instanceof OduCltPort) {
-                oduCltPortOduSignalType = mappingCltSignalTypeToOduSignalType(((OduCltPort) srcPort).signalType());
+                oduCltPortOduSignalType =
+                        OduSignalUtils.mappingCltSignalTypeToOduSignalType(((OduCltPort) srcPort).signalType());
                 ochPortOduSignalType = ((OchPort) dstPort).signalType();
 
                 selectorBuilder.add(Criteria.matchOduSignalType(oduCltPortOduSignalType));
                 // use Instruction of OduSignalId only in case of ODU Multiplexing
                 if (oduCltPortOduSignalType != ochPortOduSignalType) {
-                    OduSignalId oduSignalId = buildOduSignalId(ochPortOduSignalType, slots);
+                    OduSignalId oduSignalId = OduSignalUtils.buildOduSignalId(ochPortOduSignalType, slots);
                     treatmentBuilder.add(Instructions.modL1OduSignalId(oduSignalId));
                 }
             } else { // srcPort is OchPort
-                oduCltPortOduSignalType = mappingCltSignalTypeToOduSignalType(((OduCltPort) dstPort).signalType());
+                oduCltPortOduSignalType =
+                        OduSignalUtils.mappingCltSignalTypeToOduSignalType(((OduCltPort) dstPort).signalType());
                 ochPortOduSignalType = ((OchPort) srcPort).signalType();
 
                 selectorBuilder.add(Criteria.matchOduSignalType(oduCltPortOduSignalType));
                 // use Criteria of OduSignalId only in case of ODU Multiplexing
                 if (oduCltPortOduSignalType != ochPortOduSignalType) {
-                    OduSignalId oduSignalId = buildOduSignalId(ochPortOduSignalType, slots);
+                    OduSignalId oduSignalId = OduSignalUtils.buildOduSignalId(ochPortOduSignalType, slots);
                     selectorBuilder.add(Criteria.matchOduSignalId(oduSignalId));
                 }
             }
@@ -544,46 +550,11 @@ public class OpticalCircuitIntentCompiler implements IntentCompiler<OpticalCircu
         return flowRule;
     }
 
-    OduSignalId buildOduSignalId(OduSignalType ochPortSignalType, Set<TributarySlot> slots) {
-        int tributaryPortNumber = findFirstTributarySlotIndex(slots);
-        int tributarySlotLen = ochPortSignalType.tributarySlots();
-        byte[] tributarySlotBitmap = new byte[OduSignalId.TRIBUTARY_SLOT_BITMAP_SIZE];
-
-        slots.forEach(ts -> tributarySlotBitmap[(byte) (ts.index() - 1) / 8] |= 0x1 << ((ts.index() - 1) % 8));
-        return OduSignalId.oduSignalId(tributaryPortNumber, tributarySlotLen, tributarySlotBitmap);
-    }
-
-    private int findFirstTributarySlotIndex(Set<TributarySlot> tributarySlots) {
-        return (int) tributarySlots.stream().findFirst().get().index();
-    }
-
     private boolean isMultiplexingSupported(ConnectPoint cp) {
         Driver driver = driverService.getDriver(cp.deviceId());
         return driver != null
                 && driver.hasBehaviour(TributarySlotQuery.class)
                 && staticPort(cp) == null;
-    }
-
-    /**
-     * Maps from Intent's OduClt SignalType to OduSignalType.
-     *
-     * @param cltSignalType OduClt port signal type
-     * @return OduSignalType the result of mapping CltSignalType to OduSignalType
-     */
-    OduSignalType mappingCltSignalTypeToOduSignalType(CltSignalType cltSignalType) {
-        switch (cltSignalType) {
-            case CLT_1GBE:
-                return OduSignalType.ODU0;
-            case CLT_10GBE:
-                return OduSignalType.ODU2;
-            case CLT_40GBE:
-                return OduSignalType.ODU3;
-            case CLT_100GBE:
-                return OduSignalType.ODU4;
-            default:
-                log.error("Unsupported CltSignalType {}", cltSignalType);
-                return OduSignalType.ODU0;
-        }
     }
 
     /**

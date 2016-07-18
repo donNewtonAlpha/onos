@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,9 +19,8 @@ import java.util.Arrays;
 
 import io.atomix.catalyst.serializer.Serializer;
 import io.atomix.catalyst.serializer.TypeSerializerFactory;
-import io.atomix.copycat.Query;
 import io.atomix.manager.util.ResourceManagerTypeResolver;
-import io.atomix.variables.state.LongCommands;
+import io.atomix.variables.internal.LongCommands;
 
 import org.onlab.util.Match;
 import org.onosproject.cluster.Leader;
@@ -34,6 +33,8 @@ import org.onosproject.store.primitives.resources.impl.AtomixConsistentMapComman
 import org.onosproject.store.primitives.resources.impl.AtomixConsistentMapFactory;
 import org.onosproject.store.primitives.resources.impl.AtomixLeaderElectorCommands;
 import org.onosproject.store.primitives.resources.impl.AtomixLeaderElectorFactory;
+import org.onosproject.store.primitives.resources.impl.AtomixWorkQueueCommands;
+import org.onosproject.store.primitives.resources.impl.AtomixWorkQueueFactory;
 import org.onosproject.store.primitives.resources.impl.CommitResult;
 import org.onosproject.store.primitives.resources.impl.MapEntryUpdateResult;
 import org.onosproject.store.primitives.resources.impl.PrepareResult;
@@ -41,8 +42,11 @@ import org.onosproject.store.primitives.resources.impl.RollbackResult;
 import org.onosproject.store.serializers.KryoNamespaces;
 import org.onosproject.store.service.MapEvent;
 import org.onosproject.store.service.MapTransaction;
+import org.onosproject.store.service.Task;
 import org.onosproject.store.service.Versioned;
+import org.onosproject.store.service.WorkQueueStats;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 
 /**
@@ -63,8 +67,7 @@ public final class CatalystSerializers {
                                 Transaction.State.class,
                                 PrepareResult.class,
                                 CommitResult.class,
-                                RollbackResult.class,
-                                Query.ConsistencyLevel.class));
+                                RollbackResult.class));
         // ONOS classes
         serializer.register(Change.class, factory);
         serializer.register(Leader.class, factory);
@@ -83,15 +86,20 @@ public final class CatalystSerializers {
         serializer.register(MapTransaction.class, factory);
         serializer.register(Versioned.class, factory);
         serializer.register(MapEvent.class, factory);
+        serializer.register(Task.class, factory);
+        serializer.register(WorkQueueStats.class, factory);
         serializer.register(Maps.immutableEntry("a", "b").getClass(), factory);
+        serializer.register(ImmutableList.of().getClass(), factory);
 
         serializer.resolve(new LongCommands.TypeResolver());
         serializer.resolve(new AtomixConsistentMapCommands.TypeResolver());
         serializer.resolve(new AtomixLeaderElectorCommands.TypeResolver());
+        serializer.resolve(new AtomixWorkQueueCommands.TypeResolver());
         serializer.resolve(new ResourceManagerTypeResolver());
 
         serializer.registerClassLoader(AtomixConsistentMapFactory.class)
-                  .registerClassLoader(AtomixLeaderElectorFactory.class);
+                  .registerClassLoader(AtomixLeaderElectorFactory.class)
+                  .registerClassLoader(AtomixWorkQueueFactory.class);
 
         return serializer;
     }

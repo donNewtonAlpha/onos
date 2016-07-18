@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2016 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,7 +38,6 @@ import org.onosproject.net.driver.AbstractHandlerBehaviour;
 import org.onosproject.net.flow.DefaultFlowRule;
 import org.onosproject.net.flow.DefaultTrafficSelector;
 import org.onosproject.net.flow.DefaultTrafficTreatment;
-import org.onosproject.net.flow.FlowEntry;
 import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.flow.FlowRuleOperations;
 import org.onosproject.net.flow.FlowRuleOperationsContext;
@@ -115,8 +114,7 @@ public class OltPipeline extends AbstractHandlerBehaviour implements Pipeliner {
             .register(GroupKey.class)
             .register(DefaultGroupKey.class)
             .register(OLTPipelineGroup.class)
-            .register(byte[].class)
-            .build();
+            .build("OltPipeline");
 
     @Override
     public void init(DeviceId deviceId, PipelinerContext context) {
@@ -579,12 +577,7 @@ public class OltPipeline extends AbstractHandlerBehaviour implements Pipeliner {
                 builder.add(inner.build()).add(outer.build());
                 break;
             case REMOVE:
-                Iterable<FlowEntry> flows = flowRuleService.getFlowEntries(deviceId);
-                for (FlowEntry fe : flows) {
-                    if (fe.equals(inner.build()) || fe.equals(outer.build())) {
-                        builder.remove(fe);
-                    }
-                }
+                builder.remove(inner.build()).remove(outer.build());
                 break;
             case ADD_TO_EXISTING:
                 break;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,6 +50,7 @@ import org.slf4j.Logger;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.slf4j.LoggerFactory.getLogger;
@@ -182,10 +183,7 @@ public class MeterManager extends AbstractListenerProviderRegistry<MeterEvent, M
     }
 
     private AtomicCounter allocateCounter(DeviceId deviceId) {
-        return storageService.atomicCounterBuilder()
-                .withName(String.format(METERCOUNTERIDENTIFIER, deviceId))
-                .build()
-                .asAtomicCounter();
+        return storageService.getAtomicCounter(String.format(METERCOUNTERIDENTIFIER, deviceId));
     }
 
     private class InternalMeterProviderService
@@ -212,7 +210,7 @@ public class MeterManager extends AbstractListenerProviderRegistry<MeterEvent, M
             //FIXME: FOLLOWING CODE CANNOT BE TESTED UNTIL SOMETHING THAT
             //FIXME: IMPLEMENTS METERS EXISTS
             Map<Pair<DeviceId, MeterId>, Meter> storedMeterMap = store.getAllMeters().stream()
-                    .collect(Collectors.toMap(m -> Pair.of(m.deviceId(), m.id()), m -> m));
+                    .collect(Collectors.toMap(m -> Pair.of(m.deviceId(), m.id()), Function.identity()));
 
             meterEntries.stream()
                     .filter(m -> storedMeterMap.remove(Pair.of(m.deviceId(), m.id())) != null)

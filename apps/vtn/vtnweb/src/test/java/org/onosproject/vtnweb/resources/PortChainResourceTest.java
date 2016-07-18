@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,29 @@
  */
 package org.onosproject.vtnweb.resources;
 
-import com.eclipsesource.json.Json;
-import com.eclipsesource.json.JsonObject;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
+import static org.easymock.EasyMock.anyObject;
+import static org.easymock.EasyMock.createMock;
+import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.replay;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
+
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+import javax.ws.rs.NotFoundException;
+import javax.ws.rs.client.Entity;
+import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -26,6 +45,7 @@ import org.onlab.osgi.ServiceDirectory;
 import org.onlab.osgi.TestServiceDirectory;
 import org.onlab.rest.BaseResource;
 import org.onosproject.codec.CodecService;
+import org.onosproject.net.DeviceId;
 import org.onosproject.vtnrsc.FiveTuple;
 import org.onosproject.vtnrsc.FlowClassifierId;
 import org.onosproject.vtnrsc.LoadBalanceId;
@@ -37,28 +57,10 @@ import org.onosproject.vtnrsc.TenantId;
 import org.onosproject.vtnrsc.portchain.PortChainService;
 import org.onosproject.vtnweb.web.SfcCodecContext;
 
-import javax.ws.rs.NotFoundException;
-import javax.ws.rs.client.Entity;
-import javax.ws.rs.client.WebTarget;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-
-import static org.easymock.EasyMock.anyObject;
-import static org.easymock.EasyMock.createMock;
-import static org.easymock.EasyMock.expect;
-import static org.easymock.EasyMock.replay;
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
+import com.eclipsesource.json.Json;
+import com.eclipsesource.json.JsonObject;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 
 /**
  * Unit tests for port chain REST APIs.
@@ -164,13 +166,49 @@ public class PortChainResourceTest extends VtnResourceTest {
         }
 
         @Override
-        public Optional<LoadBalanceId> matchPath(List<PortPairId> path) {
+        public LoadBalanceId matchPath(List<PortPairId> path) {
             return null;
         }
 
         @Override
         public int getLoadBalancePathSize() {
             return 0;
+        }
+
+        @Override
+        public void addSfcClassifiers(LoadBalanceId id, List<DeviceId> classifierList) {
+        }
+
+        @Override
+        public void addSfcForwarders(LoadBalanceId id, List<DeviceId> forwarderList) {
+        }
+
+        @Override
+        public void removeSfcClassifiers(LoadBalanceId id, List<DeviceId> classifierList) {
+        }
+
+        @Override
+        public void removeSfcForwarders(LoadBalanceId id, List<DeviceId> forwarderList) {
+        }
+
+        @Override
+        public List<DeviceId> getSfcClassifiers(LoadBalanceId id) {
+            return null;
+        }
+
+        @Override
+        public List<DeviceId> getSfcForwarders(LoadBalanceId id) {
+            return null;
+        }
+
+        @Override
+        public Set<LoadBalanceId> getLoadBalancePathMapKeys() {
+            return null;
+        }
+
+        @Override
+        public PortChain oldPortChain() {
+            return null;
         }
     }
 
@@ -279,7 +317,7 @@ public class PortChainResourceTest extends VtnResourceTest {
         String location = "port_chains/1278dcd4-459f-62ed-754b-87fc5e4a6751";
 
         Response deleteResponse = wt.path(location)
-                .request(MediaType.APPLICATION_JSON_TYPE)
+                .request(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_PLAIN_TYPE)
                 .delete();
         assertThat(deleteResponse.getStatus(),
                    is(HttpURLConnection.HTTP_NO_CONTENT));

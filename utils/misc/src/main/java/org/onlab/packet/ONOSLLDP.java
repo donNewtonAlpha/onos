@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 Open Networking Laboratory
+ * Copyright 2014-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,15 +15,13 @@
  */
 package org.onlab.packet;
 
-import java.util.HashMap;
-
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-
 import org.apache.commons.lang.ArrayUtils;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 
 import static org.onlab.packet.LLDPOrganizationalTLV.OUI_LENGTH;
 import static org.onlab.packet.LLDPOrganizationalTLV.SUBTYPE_LENGTH;
@@ -37,10 +35,8 @@ public class ONOSLLDP extends LLDP {
     public static final String DEFAULT_DEVICE = "INVALID";
     public static final String DEFAULT_NAME = "ONOS Discovery";
 
-    public static final byte[] LLDP_NICIRA = {0x01, 0x23, 0x20, 0x00, 0x00,
-            0x01};
-    public static final byte[] LLDP_MULTICAST = {0x01, (byte) 0x80,
-            (byte) 0xc2, 0x00, 0x00, 0x0e};
+    // ON.Lab OUI (a42305) with multicast bit set
+    public static final byte[] LLDP_ONLAB = {(byte) 0xa5, 0x23, 0x05, 0x00, 0x00, 0x01};
     public static final byte[] BDDP_MULTICAST = {(byte) 0xff, (byte) 0xff,
             (byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff};
 
@@ -52,8 +48,7 @@ public class ONOSLLDP extends LLDP {
     private static final short DEVICE_LENGTH = OUI_LENGTH + SUBTYPE_LENGTH;
     private static final short DOMAIN_LENGTH = OUI_LENGTH + SUBTYPE_LENGTH;
 
-    private final HashMap<Byte, LLDPOrganizationalTLV> opttlvs =
-            Maps.<Byte, LLDPOrganizationalTLV>newHashMap();
+    private final HashMap<Byte, LLDPOrganizationalTLV> opttlvs = Maps.newHashMap();
 
     // TLV constants: type, size and subtype
     // Organizationally specific TLV also have packet offset and contents of TLV
@@ -82,7 +77,7 @@ public class ONOSLLDP extends LLDP {
         setName(DEFAULT_NAME);
         setDevice(DEFAULT_DEVICE);
 
-        setOptionalTLVList(Lists.<LLDPTLV>newArrayList(opttlvs.values()));
+        setOptionalTLVList(Lists.newArrayList(opttlvs.values()));
         setTtl(new LLDPTLV().setType(TTL_TLV_TYPE)
                        .setLength((short) ttlValue.length)
                        .setValue(ttlValue));
@@ -227,7 +222,7 @@ public class ONOSLLDP extends LLDP {
     public static ONOSLLDP parseONOSLLDP(Ethernet eth) {
         if (eth.getEtherType() == Ethernet.TYPE_LLDP ||
                 eth.getEtherType() == Ethernet.TYPE_BSN) {
-           ONOSLLDP onosLldp = new ONOSLLDP((LLDP) eth.getPayload()); //(ONOSLLDP) eth.getPayload();
+           ONOSLLDP onosLldp = new ONOSLLDP((LLDP) eth.getPayload());
            if (ONOSLLDP.DEFAULT_NAME.equals(onosLldp.getNameString())) {
                return onosLldp;
            }
@@ -248,26 +243,6 @@ public class ONOSLLDP extends LLDP {
         probe.setPortId(portNum);
         probe.setDevice(deviceId);
         probe.setChassisId(chassisId);
-        return probe;
-    }
-
-    /**
-     * Creates a link probe carrying a fingerprint unique to the ONOS cluster managing
-     * link discovery/verification.
-     *
-     * @param deviceId The device ID as a String
-     * @param chassisId The chassis ID of the device
-     * @param portNum Port number of port to send probe out of
-     * @param domainId The cluster's fingerprint
-     * @return ONOSLLDP probe message
-     */
-    public static ONOSLLDP fingerprintedLLDP(
-            String deviceId, ChassisId chassisId, int portNum, String domainId) {
-        ONOSLLDP probe = new ONOSLLDP(NAME_SUBTYPE, DEVICE_SUBTYPE, DOMAIN_SUBTYPE);
-        probe.setPortId(portNum);
-        probe.setDevice(deviceId);
-        probe.setChassisId(chassisId);
-        probe.setDomainInfo(domainId);
         return probe;
     }
 }

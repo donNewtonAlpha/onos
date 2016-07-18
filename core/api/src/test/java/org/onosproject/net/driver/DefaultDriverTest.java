@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package org.onosproject.net.driver;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import org.junit.Test;
 
@@ -35,7 +36,7 @@ public class DefaultDriverTest {
                                                               TestBehaviourTwoImpl.class),
                                               ImmutableMap.of("foo", "bar"));
 
-        DefaultDriver ddc = new DefaultDriver("foo.bar", ddp, "Circus", "lux", "1.2a",
+        DefaultDriver ddc = new DefaultDriver("foo.bar", ImmutableList.of(ddp), "Circus", "lux", "1.2a",
                                               ImmutableMap.of(),
                                               ImmutableMap.of("foo", "bar"));
         assertEquals("incorrect name", "foo.bar", ddc.name());

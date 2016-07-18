@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2014-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,7 +64,7 @@ public class CoreManager implements CoreService {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private static final File VERSION_FILE = new File("../VERSION");
-    private static Version version = Version.version("1.6.0-SNAPSHOT");
+    private static Version version = Version.version("1.7.0-SNAPSHOT");
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected ApplicationIdStore applicationIdStore;
@@ -183,11 +183,11 @@ public class CoreManager implements CoreService {
         }
 
         Integer timeLimit = Tools.getIntegerProperty(properties, "maxEventTimeLimit");
-        if (timeLimit != null && timeLimit > 1) {
+        if (timeLimit != null && timeLimit >= 0) {
             maxEventTimeLimit = timeLimit;
             eventDeliveryService.setDispatchTimeLimit(maxEventTimeLimit);
         } else if (timeLimit != null) {
-            log.warn("maxEventTimeLimit must be greater than 1");
+            log.warn("maxEventTimeLimit must be greater than or equal to 0");
         }
 
         Boolean performanceCheck = Tools.isPropertyEnabled(properties, "sharedThreadPerformanceCheck");

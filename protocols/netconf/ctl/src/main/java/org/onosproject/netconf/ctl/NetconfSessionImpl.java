@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,13 +55,31 @@ public class NetconfSessionImpl implements NetconfSession {
     private static final String MESSAGE_ID_STRING = "message-id";
     private static final String HELLO = "<hello";
     private static final String NEW_LINE = "\n";
-    private static final int FUTURE_REPLY_TIMEOUT = 5000;
-    private static final String ERROR = "ERROR ";
     private static final String END_OF_RPC_OPEN_TAG = "\">";
     private static final String EQUAL = "=";
     private static final String NUMBER_BETWEEN_QUOTES_MATCHER = "\"+([0-9]+)+\"";
+    private static final String RPC_OPEN = "<rpc ";
+    private static final String RPC_CLOSE = "</rpc>";
+    private static final String GET_OPEN = "<get>";
+    private static final String GET_CLOSE = "</get>";
+    private static final String WITH_DEFAULT_OPEN = "<with-defaults ";
+    private static final String WITH_DEFAULT_CLOSE = "</with-defaults>";
+    private static final String DEFAULT_OPERATION_OPEN = "<default-operation>";
+    private static final String DEFAULT_OPERATION_CLOSE = "</default-operation>";
+    private static final String FILTER_OPEN = "<filter type=\"subtree\">";
+    private static final String FILTER_CLOSE = "</filter>";
+    private static final String EDIT_CONFIG_OPEN = "<edit-config>";
+    private static final String EDIT_CONFIG_CLOSE = "</edit-config>";
+    private static final String TARGET_OPEN = "<target>";
+    private static final String TARGET_CLOSE = "</target>";
+    private static final String CONFIG_OPEN = "<config>";
+    private static final String CONFIG_CLOSE = "</config>";
     private static final String XML_HEADER =
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
+    private static final String NETCONF_BASE_NAMESPACE =
+            "xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"";
+    private static final String NETCONF_WITH_DEFAULTS_NAMESPACE =
+            "xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-with-defaults\"";
 
     private final AtomicInteger messageIdInteger = new AtomicInteger(0);
     private Connection netconfConnection;
@@ -71,19 +89,21 @@ public class NetconfSessionImpl implements NetconfSession {
     private List<String> deviceCapabilities =
             Collections.singletonList("urn:ietf:params:netconf:base:1.0");
     private String serverCapabilities;
-    private NetconfStreamHandler t;
+    private NetconfStreamHandler streamHandler;
     private Map<Integer, CompletableFuture<String>> replies;
     private List<String> errorReplies;
+    private boolean subscriptionConnected = false;
 
 
     public NetconfSessionImpl(NetconfDeviceInfo deviceInfo) throws NetconfException {
         this.deviceInfo = deviceInfo;
+        this.netconfConnection = null;
+        this.sshSession = null;
         connectionActive = false;
         replies = new HashMap<>();
         errorReplies = new ArrayList<>();
         startConnection();
     }
-
 
     private void startConnection() throws NetconfException {
         if (!connectionActive) {
@@ -107,7 +127,7 @@ public class NetconfSessionImpl implements NetconfSession {
                 }
             } catch (IOException e) {
                 log.error("Authentication connection to device {} failed: {} ",
-                                  deviceInfo.getDeviceId(), e.getMessage());
+                          deviceInfo.getDeviceId(), e.getMessage());
                 throw new NetconfException("Authentication connection to device " +
                                                    deviceInfo.getDeviceId() + " failed", e);
             }
@@ -125,15 +145,54 @@ public class NetconfSessionImpl implements NetconfSession {
         try {
             sshSession = netconfConnection.openSession();
             sshSession.startSubSystem("netconf");
-            t = new NetconfStreamThread(sshSession.getStdout(), sshSession.getStdin(),
-                                        sshSession.getStderr(), deviceInfo,
-                                        new NetconfSessionDelegateImpl());
+            streamHandler = new NetconfStreamThread(sshSession.getStdout(), sshSession.getStdin(),
+                                                    sshSession.getStderr(), deviceInfo,
+                                                    new NetconfSessionDelegateImpl());
             this.addDeviceOutputListener(new NetconfDeviceOutputEventListenerImpl(deviceInfo));
             sendHello();
         } catch (IOException e) {
             log.error("Failed to create ch.ethz.ssh2.Session session." + e.getMessage());
             throw new NetconfException("Failed to create ch.ethz.ssh2.Session session with device" +
                                                deviceInfo, e);
+        }
+    }
+
+    private void startSubscriptionConnection() throws NetconfException {
+        if (!serverCapabilities.contains("interleave")) {
+            throw new NetconfException("Device" + deviceInfo + "does not support interleave");
+        }
+        String reply = sendRequest(createSubscriptionString());
+        if (!checkReply(reply)) {
+            throw new NetconfException("Subscription not successful with device "
+                                               + deviceInfo + " with reply " + reply);
+        }
+        subscriptionConnected = true;
+    }
+
+    public void startSubscription() throws NetconfException {
+        if (!subscriptionConnected) {
+            startSubscriptionConnection();
+        }
+        streamHandler.setEnableNotifications(true);
+    }
+
+    private String createSubscriptionString() {
+        StringBuilder subscriptionbuffer = new StringBuilder();
+        subscriptionbuffer.append("<rpc xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">\n");
+        subscriptionbuffer.append("  <create-subscription\n");
+        subscriptionbuffer.append("xmlns=\"urn:ietf:params:xml:ns:netconf:notification:1.0\">\n");
+        subscriptionbuffer.append("  </create-subscription>\n");
+        subscriptionbuffer.append("</rpc>\n");
+        subscriptionbuffer.append(ENDPATTERN);
+        return subscriptionbuffer.toString();
+    }
+
+    @Override
+    public void endSubscription() throws NetconfException {
+        if (subscriptionConnected) {
+            streamHandler.setEnableNotifications(false);
+        } else {
+            throw new NetconfException("Subscription does not exist.");
         }
     }
 
@@ -180,12 +239,13 @@ public class NetconfSessionImpl implements NetconfSession {
             request = request + NEW_LINE + ENDPATTERN;
         }
         String reply = sendRequest(request);
-        return checkReply(reply) ? reply : ERROR + reply;
+        checkReply(reply);
+        return reply;
     }
 
     @Override
     public CompletableFuture<String> request(String request) {
-        CompletableFuture<String> ftrep = t.sendMessage(request);
+        CompletableFuture<String> ftrep = streamHandler.sendMessage(request);
         replies.put(messageIdInteger.get(), ftrep);
         return ftrep;
     }
@@ -196,9 +256,10 @@ public class NetconfSessionImpl implements NetconfSession {
         request = formatXmlHeader(request);
         CompletableFuture<String> futureReply = request(request);
         messageIdInteger.incrementAndGet();
+        int replyTimeout = NetconfControllerImpl.netconfReplyTimeout;
         String rp;
         try {
-            rp = futureReply.get(FUTURE_REPLY_TIMEOUT, TimeUnit.MILLISECONDS);
+            rp = futureReply.get(replyTimeout, TimeUnit.SECONDS);
         } catch (InterruptedException | ExecutionException | TimeoutException e) {
             throw new NetconfException("No matching reply for request " + request, e);
         }
@@ -228,8 +289,54 @@ public class NetconfSessionImpl implements NetconfSession {
     }
 
     @Override
+    public String doWrappedRpc(String request) throws NetconfException {
+        StringBuilder rpc = new StringBuilder(XML_HEADER);
+        rpc.append(RPC_OPEN);
+        rpc.append(MESSAGE_ID_STRING);
+        rpc.append(EQUAL);
+        rpc.append("\"");
+        rpc.append(messageIdInteger.get());
+        rpc.append("\"  ");
+        rpc.append(NETCONF_BASE_NAMESPACE).append(">\n");
+        rpc.append(request);
+        rpc.append(RPC_CLOSE).append(NEW_LINE);
+        rpc.append(ENDPATTERN);
+        String reply = sendRequest(rpc.toString());
+        checkReply(reply);
+        return reply;
+    }
+
+    @Override
     public String get(String request) throws NetconfException {
         return requestSync(request);
+    }
+
+    @Override
+    public String get(String filterSchema, String withDefaultsMode) throws NetconfException {
+        StringBuilder rpc = new StringBuilder(XML_HEADER);
+        rpc.append(RPC_OPEN);
+        rpc.append(MESSAGE_ID_STRING);
+        rpc.append(EQUAL);
+        rpc.append("\"");
+        rpc.append(messageIdInteger.get());
+        rpc.append("\"  ");
+        rpc.append(NETCONF_BASE_NAMESPACE).append(">\n");
+        rpc.append(GET_OPEN).append(NEW_LINE);
+        if (filterSchema != null) {
+            rpc.append(FILTER_OPEN).append(NEW_LINE);
+            rpc.append(filterSchema).append(NEW_LINE);
+            rpc.append(FILTER_CLOSE).append(NEW_LINE);
+        }
+        if (withDefaultsMode != null) {
+            rpc.append(WITH_DEFAULT_OPEN).append(NETCONF_WITH_DEFAULTS_NAMESPACE).append(">");
+            rpc.append(withDefaultsMode).append(WITH_DEFAULT_CLOSE).append(NEW_LINE);
+        }
+        rpc.append(GET_CLOSE).append(NEW_LINE);
+        rpc.append(RPC_CLOSE).append(NEW_LINE);
+        rpc.append(ENDPATTERN);
+        String reply = sendRequest(rpc.toString());
+        checkReply(reply);
+        return reply;
     }
 
     @Override
@@ -274,28 +381,31 @@ public class NetconfSessionImpl implements NetconfSession {
             throws NetconfException {
         newConfiguration = newConfiguration.trim();
         StringBuilder rpc = new StringBuilder(XML_HEADER);
-        rpc.append("<rpc ");
+        rpc.append(RPC_OPEN);
         rpc.append(MESSAGE_ID_STRING);
         rpc.append(EQUAL);
         rpc.append("\"");
         rpc.append(messageIdInteger.get());
         rpc.append("\"  ");
-        rpc.append("xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">\n");
-        rpc.append("<edit-config>\n");
-        rpc.append("<target>");
+        rpc.append(NETCONF_BASE_NAMESPACE).append(">\n");
+        rpc.append(EDIT_CONFIG_OPEN).append("\n");
+        rpc.append(TARGET_OPEN);
         rpc.append("<").append(targetConfiguration).append("/>");
-        rpc.append("</target>\n");
-        rpc.append("<default-operation>");
-        rpc.append(mode);
-        rpc.append("</default-operation>\n");
-        rpc.append("<config>\n");
+        rpc.append(TARGET_CLOSE).append("\n");
+        if (mode != null) {
+            rpc.append(DEFAULT_OPERATION_OPEN);
+            rpc.append(mode);
+            rpc.append(DEFAULT_OPERATION_CLOSE).append("\n");
+        }
+        rpc.append(CONFIG_OPEN).append("\n");
         rpc.append(newConfiguration);
-        rpc.append("</config>\n");
-        rpc.append("</edit-config>\n");
-        rpc.append("</rpc>");
+        rpc.append(CONFIG_CLOSE).append("\n");
+        rpc.append(EDIT_CONFIG_CLOSE).append("\n");
+        rpc.append(RPC_CLOSE);
         rpc.append(ENDPATTERN);
         log.info(rpc.toString());
-        return checkReply(sendRequest(rpc.toString()));
+        String reply = sendRequest(rpc.toString());
+        return checkReply(reply);
     }
 
     @Override
@@ -341,31 +451,47 @@ public class NetconfSessionImpl implements NetconfSession {
     }
 
     @Override
-    public boolean lock() throws NetconfException {
+    public boolean lock(String configType) throws NetconfException {
         StringBuilder rpc = new StringBuilder(XML_HEADER);
-        rpc.append("<rpc>");
+        rpc.append("<rpc xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">\n");
         rpc.append("<lock>");
         rpc.append("<target>");
-        rpc.append("<candidate/>");
+        rpc.append("<");
+        rpc.append(configType);
+        rpc.append("/>");
         rpc.append("</target>");
         rpc.append("</lock>");
         rpc.append("</rpc>");
         rpc.append(ENDPATTERN);
-        return checkReply(sendRequest(rpc.toString()));
+        String lockReply = sendRequest(rpc.toString());
+        return checkReply(lockReply);
     }
 
     @Override
-    public boolean unlock() throws NetconfException {
+    public boolean unlock(String configType) throws NetconfException {
         StringBuilder rpc = new StringBuilder(XML_HEADER);
-        rpc.append("<rpc>");
+        rpc.append("<rpc xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">\n");
         rpc.append("<unlock>");
         rpc.append("<target>");
-        rpc.append("<candidate/>");
+        rpc.append("<");
+        rpc.append(configType);
+        rpc.append("/>");
         rpc.append("</target>");
         rpc.append("</unlock>");
         rpc.append("</rpc>");
         rpc.append(ENDPATTERN);
-        return checkReply(sendRequest(rpc.toString()));
+        String unlockReply = sendRequest(rpc.toString());
+        return checkReply(unlockReply);
+    }
+
+    @Override
+    public boolean lock() throws NetconfException {
+        return lock("running");
+    }
+
+    @Override
+    public boolean unlock() throws NetconfException {
+        return unlock("running");
     }
 
     @Override
@@ -375,13 +501,12 @@ public class NetconfSessionImpl implements NetconfSession {
 
     private boolean close(boolean force) throws NetconfException {
         StringBuilder rpc = new StringBuilder();
-        rpc.append("<rpc>");
+        rpc.append("<rpc xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\">");
         if (force) {
-            rpc.append("<kill-configuration/>");
+            rpc.append("<kill-session/>");
         } else {
-            rpc.append("<close-configuration/>");
+            rpc.append("<close-session/>");
         }
-        rpc.append("<close-configuration/>");
         rpc.append("</rpc>");
         rpc.append(ENDPATTERN);
         return checkReply(sendRequest(rpc.toString())) || close(true);
@@ -414,21 +539,23 @@ public class NetconfSessionImpl implements NetconfSession {
 
     @Override
     public void addDeviceOutputListener(NetconfDeviceOutputEventListener listener) {
-        t.addDeviceEventListener(listener);
+        streamHandler.addDeviceEventListener(listener);
     }
 
     @Override
     public void removeDeviceOutputListener(NetconfDeviceOutputEventListener listener) {
-        t.removeDeviceEventListener(listener);
+        streamHandler.removeDeviceEventListener(listener);
     }
 
     private boolean checkReply(String reply) throws NetconfException {
         if (reply != null) {
             if (!reply.contains("<rpc-error>")) {
+                log.debug("Device {} sent reply {}", deviceInfo, reply);
                 return true;
             } else if (reply.contains("<ok/>")
                     || (reply.contains("<rpc-error>")
                     && reply.contains("warning"))) {
+                log.debug("Device {} sent reply {}", deviceInfo, reply);
                 return true;
             }
         }
@@ -441,6 +568,7 @@ public class NetconfSessionImpl implements NetconfSession {
         @Override
         public void notify(NetconfDeviceOutputEvent event)  {
             Optional<Integer> messageId = event.getMessageID();
+
             if (!messageId.isPresent()) {
                 errorReplies.add(event.getMessagePayload());
                 log.error("Device {} sent error reply {}",

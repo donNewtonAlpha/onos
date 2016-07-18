@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -90,7 +90,7 @@ public class IntentCleanup implements Runnable, IntentListener {
     @Activate
     public void activate() {
         cfgService.registerProperties(getClass());
-        executor = newSingleThreadExecutor(groupedThreads("onos/intent", "cleanup"));
+        executor = newSingleThreadExecutor(groupedThreads("onos/intent", "cleanup", log));
         timer = new Timer("onos-intent-cleanup-timer");
         service.addListener(this);
         adjustRate();
@@ -149,7 +149,7 @@ public class IntentCleanup implements Runnable, IntentListener {
             timerTask = new TimerTask() {
                 @Override
                 public void run() {
-                    executor.submit(IntentCleanup.this);
+                    executor.execute(IntentCleanup.this);
                 }
             };
 
@@ -194,6 +194,9 @@ public class IntentCleanup implements Runnable, IntentListener {
                 break;
             case WITHDRAW_REQ:
                 service.withdraw(intentData.intent());
+                break;
+            case PURGE_REQ:
+                service.purge(intentData.intent());
                 break;
             default:
                 log.warn("Failed to resubmit pending intent {} in state {} with request {}",

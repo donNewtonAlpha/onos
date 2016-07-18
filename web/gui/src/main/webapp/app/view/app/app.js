@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2016 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the 'License');
  * you may not use this file except in compliance with the License.
@@ -38,8 +38,8 @@
     var INSTALLED = 'INSTALLED',
         ACTIVE = 'ACTIVE',
         appMgmtReq = 'appManagementRequest',
-        topPdg = 50,
-        panelWidth = 500,
+        topPdg = 60,
+        panelWidth = 540,
         pName = 'application-details-panel',
         detailsReq = 'appDetailsRequest',
         detailsResp = 'appDetailsResponse',
@@ -49,13 +49,14 @@
         iconUrlSuffix = '/icon',
         dialogId = 'app-dialog',
         dialogOpts = {
-            edge: 'right'
+            edge: 'right',
+            width: 400
         },
         strongWarning = {
             'org.onosproject.drivers': true
         },
         discouragement = 'Deactivating or uninstalling this component can' +
-        ' have serious negative consequences! Do so at your own risk!!',
+        ' have serious negative consequences! <br> = DO SO AT YOUR OWN RISK =',
         propOrder = ['id', 'state', 'category', 'version', 'origin', 'role'],
         friendlyProps = ['App ID', 'State', 'Category', 'Version', 'Origin', 'Role'];
         // note: url is handled separately
@@ -84,8 +85,7 @@
     }
 
     function addCloseBtn(div) {
-        is.loadEmbeddedIcon(div, 'plus', 30);
-        div.select('g').attr('transform', 'translate(25, 0) rotate(45)');
+        is.loadEmbeddedIcon(div, 'close', 26);
         div.on('click', closePanel);
     }
 
@@ -136,19 +136,18 @@
     }
 
     function addProp(tbody, index, value) {
-        var tr = tbody.append('tr'),
-            vcls = index ? 'value' : 'value-bold';
+        var tr = tbody.append('tr');
 
         function addCell(cls, txt) {
             tr.append('td').attr('class', cls).html(txt);
         }
 
         addCell('label', friendlyProps[index] + ':');
-        addCell(vcls, value);
+        addCell('value', value);
     }
 
     function urlize(u) {
-        return '<i>URL:</i> <a href="' + u + '" target="_blank">' + u + '</a>';
+        return 'Url:<br/> <a href="' + u + '" target="_blank">' + u + '</a>';
     }
 
     function addIcon(elem, value) {
@@ -213,7 +212,8 @@
          'WebSocketService', 'FnService', 'KeyService', 'PanelService',
          'IconService', 'UrlFnService', 'DialogService', 'TableBuilderService',
 
-    function (_$log_, _$scope_, $http, $timeout, _wss_, _fs_, _ks_, _ps_, _is_, ufs, ds, tbs) {
+    function (_$log_, _$scope_, $http, $timeout, _wss_, _fs_, _ks_, _ps_, _is_,
+              ufs, ds, tbs) {
         $log = _$log_;
         $scope = _$scope_;
         wss = _wss_;
@@ -289,7 +289,7 @@
             var content = ds.createDiv();
             content.append('p').text(fs.cap(action) + ' ' + itemId);
             if (strongWarning[itemId]) {
-                content.append('p').text(discouragement).classed('strong', true);
+                content.append('p').html(discouragement).classed('strong', true);
             }
             return content;
         }
@@ -334,21 +334,23 @@
         $scope.$on('FileChanged', function () {
             var formData = new FormData(),
                 url;
+
             if ($scope.appFile) {
                 formData.append('file', $scope.appFile);
-                url = fileUploadUrl + (activateImmediately || '');
+                url = fileUploadUrl + activateImmediately;
+
                 $http.post(ufs.rsUrl(url), formData, {
                     transformRequest: angular.identity,
                     headers: {
                         'Content-Type': undefined
                     }
                 })
-                    .finally(function () {
-                        activateImmediately = null;
-                        $scope.sortCallback($scope.sortParams);
-                        document.getElementById('inputFileForm').reset();
-                        $timeout(function () { wss.sendEvent(detailsReq); }, 250);
-                    });
+                .finally(function () {
+                    activateImmediately = '';
+                    $scope.sortCallback($scope.sortParams);
+                    document.getElementById('inputFileForm').reset();
+                    $timeout(function () { wss.sendEvent(detailsReq); }, 250);
+                });
             }
         });
 
@@ -361,6 +363,7 @@
         $scope.$on('$destroy', function () {
             ks.unbindKeys();
             wss.unbindHandlers(handlers);
+            ds.closeDialog();
         });
 
         $log.log('OvAppCtrl has been created');
@@ -382,22 +385,22 @@
     // binds the model file to the scope in scope.appFile
     // sends upload request to the server
     .directive('fileModel', ['$parse',
-            function ($parse) {
-        return {
-            restrict: 'A',
-            link: function (scope, elem, attrs) {
-                var model = $parse(attrs.fileModel),
-                    modelSetter = model.assign;
+        function ($parse) {
+            return {
+                restrict: 'A',
+                link: function (scope, elem, attrs) {
+                    var model = $parse(attrs.fileModel),
+                        modelSetter = model.assign;
 
-                elem.bind('change', function () {
-                    scope.$apply(function () {
-                        modelSetter(scope, elem[0].files[0]);
+                    elem.bind('change', function () {
+                        scope.$apply(function () {
+                            modelSetter(scope, elem[0].files[0]);
+                        });
+                        scope.$emit('FileChanged');
                     });
-                    scope.$emit('FileChanged');
-                });
-            }
-        };
-    }])
+                }
+            };
+        }])
 
     .directive("filedrop", function ($parse, $document) {
         return {
@@ -407,11 +410,13 @@
 
                 // When an item is dragged over the document
                 var onDragOver = function (e) {
+                    d3.select('#frame').classed('dropping', true);
                     e.preventDefault();
                 };
 
                 // When the user leaves the window, cancels the drag or drops the item
                 var onDragEnd = function (e) {
+                    d3.select('#frame').classed('dropping', false);
                     e.preventDefault();
                 };
 
@@ -468,7 +473,7 @@
                 });
                 ks.gestureNotes([
                     ['click', 'Select a row to show application details'],
-                    ['scroll down', 'See more application']
+                    ['scroll down', 'See more applications']
                 ]);
 
                 // if the panelData changes

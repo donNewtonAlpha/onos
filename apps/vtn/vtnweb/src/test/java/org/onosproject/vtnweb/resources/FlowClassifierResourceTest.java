@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,8 +65,9 @@ public class FlowClassifierResourceTest extends VtnResourceTest {
     VirtualPortId dstPortId1 = VirtualPortId.portId("aef3478a-4a56-2a6e-cd3a-9dee4e2ec345");
 
     final MockFlowClassifier flowClassifier1 = new MockFlowClassifier(flowClassifierId1, tenantId1, "flowClassifier1",
-                                                                      "Mock flow classifier", "IPv4", "IP", 1001, 1500,
-                                                                      5001, 6000, IpPrefix.valueOf("1.1.1.1/16"),
+                                                                      "Mock flow classifier", "IPv4", "IP", 10000,
+                                                                      1001, 1500, 5001, 6000,
+                                                                      IpPrefix.valueOf("1.1.1.1/16"),
                                                                       IpPrefix.valueOf("22.12.34.45/16"),
                                                                       srcPortId1, dstPortId1);
 
@@ -81,6 +82,7 @@ public class FlowClassifierResourceTest extends VtnResourceTest {
         private final String description;
         private final String etherType;
         private final String protocol;
+        private final int priority;
         private final int minSrcPortRange;
         private final int maxSrcPortRange;
         private final int minDstPortRange;
@@ -91,15 +93,17 @@ public class FlowClassifierResourceTest extends VtnResourceTest {
         private final VirtualPortId dstPort;
 
         public MockFlowClassifier(FlowClassifierId flowClassifierId, TenantId tenantId, String name,
-                                  String description, String etherType, String protocol, int minSrcPortRange,
-                                  int maxSrcPortRange, int minDstPortRange, int maxDstPortRange, IpPrefix srcIpPrefix,
-                                  IpPrefix dstIpPrefix, VirtualPortId srcPort, VirtualPortId dstPort) {
+                                  String description, String etherType, String protocol, int priority,
+                                  int minSrcPortRange, int maxSrcPortRange, int minDstPortRange, int maxDstPortRange,
+                                  IpPrefix srcIpPrefix, IpPrefix dstIpPrefix, VirtualPortId srcPort,
+                                  VirtualPortId dstPort) {
             this.flowClassifierId = flowClassifierId;
             this.tenantId = tenantId;
             this.name = name;
             this.description = description;
             this.etherType = etherType;
             this.protocol = protocol;
+            this.priority = priority;
             this.minSrcPortRange = minSrcPortRange;
             this.maxSrcPortRange = maxSrcPortRange;
             this.minDstPortRange = minDstPortRange;
@@ -139,6 +143,11 @@ public class FlowClassifierResourceTest extends VtnResourceTest {
         @Override
         public String protocol() {
             return protocol;
+        }
+
+        @Override
+        public int priority() {
+            return priority;
         }
 
         @Override
@@ -295,7 +304,7 @@ public class FlowClassifierResourceTest extends VtnResourceTest {
         String location = "flow_classifiers/4a334cd4-fe9c-4fae-af4b-321c5e2eb051";
 
         Response deleteResponse = wt.path(location)
-                .request(MediaType.APPLICATION_JSON_TYPE)
+                .request(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_PLAIN_TYPE)
                 .delete();
         assertThat(deleteResponse.getStatus(),
                    is(HttpURLConnection.HTTP_NO_CONTENT));

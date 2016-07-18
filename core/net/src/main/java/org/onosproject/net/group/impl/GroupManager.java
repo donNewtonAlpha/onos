@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -102,6 +102,7 @@ public class GroupManager
 
     @Deactivate
     public void deactivate() {
+        deviceService.removeListener(deviceListener);
         cfgService.unregisterProperties(getClass(), false);
         store.unsetDelegate(delegate);
         eventDispatcher.removeSink(GroupEvent.class);

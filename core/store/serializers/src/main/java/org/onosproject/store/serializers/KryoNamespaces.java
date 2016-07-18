@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2016 Open Networking Laboratory
+ * Copyright 2014-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+
 import org.onlab.packet.ChassisId;
 import org.onlab.packet.EthType;
 import org.onlab.packet.Ip4Address;
@@ -31,7 +32,9 @@ import org.onlab.packet.MacAddress;
 import org.onlab.packet.TpPort;
 import org.onlab.packet.VlanId;
 import org.onlab.util.Bandwidth;
+import org.onlab.util.ClosedOpenRange;
 import org.onlab.util.Frequency;
+import org.onlab.util.ImmutableByteSequence;
 import org.onlab.util.KryoNamespace;
 import org.onlab.util.Match;
 import org.onosproject.app.ApplicationState;
@@ -64,6 +67,7 @@ import org.onosproject.net.DefaultPort;
 import org.onosproject.net.Device;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.Element;
+import org.onosproject.net.EncapsulationType;
 import org.onosproject.net.GridType;
 import org.onosproject.net.HostId;
 import org.onosproject.net.HostLocation;
@@ -147,9 +151,17 @@ import org.onosproject.net.flow.instructions.L1ModificationInstruction;
 import org.onosproject.net.flow.instructions.L2ModificationInstruction;
 import org.onosproject.net.flow.instructions.L3ModificationInstruction;
 import org.onosproject.net.flow.instructions.L4ModificationInstruction;
+import org.onosproject.net.flowobjective.DefaultFilteringObjective;
+import org.onosproject.net.flowobjective.DefaultForwardingObjective;
+import org.onosproject.net.flowobjective.DefaultNextObjective;
+import org.onosproject.net.flowobjective.FilteringObjective;
+import org.onosproject.net.flowobjective.ForwardingObjective;
+import org.onosproject.net.flowobjective.NextObjective;
+import org.onosproject.net.flowobjective.Objective;
 import org.onosproject.net.host.DefaultHostDescription;
 import org.onosproject.net.host.HostDescription;
 import org.onosproject.net.intent.ConnectivityIntent;
+import org.onosproject.net.intent.FlowObjectiveIntent;
 import org.onosproject.net.intent.FlowRuleIntent;
 import org.onosproject.net.intent.HostToHostIntent;
 import org.onosproject.net.intent.Intent;
@@ -163,6 +175,7 @@ import org.onosproject.net.intent.MplsPathIntent;
 import org.onosproject.net.intent.MultiPointToSinglePointIntent;
 import org.onosproject.net.intent.OpticalCircuitIntent;
 import org.onosproject.net.intent.OpticalConnectivityIntent;
+import org.onosproject.net.intent.OpticalOduIntent;
 import org.onosproject.net.intent.OpticalPathIntent;
 import org.onosproject.net.intent.PathIntent;
 import org.onosproject.net.intent.PointToPointIntent;
@@ -170,6 +183,7 @@ import org.onosproject.net.intent.SinglePointToMultiPointIntent;
 import org.onosproject.net.intent.constraint.AnnotationConstraint;
 import org.onosproject.net.intent.constraint.BandwidthConstraint;
 import org.onosproject.net.intent.constraint.BooleanConstraint;
+import org.onosproject.net.intent.constraint.EncapsulationConstraint;
 import org.onosproject.net.intent.constraint.LatencyConstraint;
 import org.onosproject.net.intent.constraint.LinkTypeConstraint;
 import org.onosproject.net.intent.constraint.ObstacleConstraint;
@@ -177,15 +191,17 @@ import org.onosproject.net.intent.constraint.PartialFailureConstraint;
 import org.onosproject.net.intent.constraint.WaypointConstraint;
 import org.onosproject.net.link.DefaultLinkDescription;
 import org.onosproject.net.meter.MeterId;
-import org.onosproject.net.resource.ContinuousResource;
-import org.onosproject.net.resource.ContinuousResourceId;
-import org.onosproject.net.resource.DiscreteResource;
-import org.onosproject.net.resource.DiscreteResourceId;
-import org.onosproject.net.resource.ResourceAllocation;
 import org.onosproject.net.packet.DefaultOutboundPacket;
 import org.onosproject.net.packet.DefaultPacketRequest;
 import org.onosproject.net.packet.PacketPriority;
 import org.onosproject.net.provider.ProviderId;
+import org.onosproject.net.resource.ContinuousResource;
+import org.onosproject.net.resource.ContinuousResourceId;
+import org.onosproject.net.resource.DiscreteResource;
+import org.onosproject.net.resource.DiscreteResourceCodec;
+import org.onosproject.net.resource.DiscreteResourceId;
+import org.onosproject.net.resource.ResourceAllocation;
+import org.onosproject.net.resource.ResourceConsumerId;
 import org.onosproject.security.Permission;
 import org.onosproject.store.Timestamp;
 import org.onosproject.store.primitives.MapUpdate;
@@ -193,7 +209,9 @@ import org.onosproject.store.primitives.TransactionId;
 import org.onosproject.store.service.MapEvent;
 import org.onosproject.store.service.MapTransaction;
 import org.onosproject.store.service.SetEvent;
+import org.onosproject.store.service.Task;
 import org.onosproject.store.service.Versioned;
+import org.onosproject.store.service.WorkQueueStats;
 
 import java.net.URI;
 import java.time.Duration;
@@ -250,7 +268,15 @@ public final class KryoNamespaces {
             .register(Optional.class)
             .register(Collections.emptyList().getClass())
             .register(Collections.singleton(Object.class).getClass())
-            .build();
+            .register(int[].class)
+            .register(long[].class)
+            .register(short[].class)
+            .register(double[].class)
+            .register(float[].class)
+            .register(char[].class)
+            .register(String[].class)
+            .register(boolean[].class)
+            .build("BASIC");
 
     /**
      * KryoNamespace which can serialize ON.lab misc classes.
@@ -270,12 +296,12 @@ public final class KryoNamespaces {
             .register(Bandwidth.class)
             .register(Bandwidth.bps(1L).getClass())
             .register(Bandwidth.bps(1.0).getClass())
-            .build();
+            .build("MISC");
 
     /**
      * Kryo registration Id for user custom registration.
      */
-    public static final int BEGIN_USER_CUSTOM_ID = 300;
+    public static final int BEGIN_USER_CUSTOM_ID = 500;
 
     // TODO: Populate other classes
     /**
@@ -284,9 +310,9 @@ public final class KryoNamespaces {
     public static final KryoNamespace API = KryoNamespace.newBuilder()
             .nextId(KryoNamespace.INITIAL_ID)
             .register(BASIC)
-            .nextId(KryoNamespace.INITIAL_ID + 30)
+            .nextId(KryoNamespace.INITIAL_ID + 50)
             .register(MISC)
-            .nextId(KryoNamespace.INITIAL_ID + 30 + 20)
+            .nextId(KryoNamespace.INITIAL_ID + 50 + 30)
             .register(
                     Instructions.MeterInstruction.class,
                     MeterId.class,
@@ -315,13 +341,14 @@ public final class KryoNamespaces {
                     Leadership.class,
                     LeadershipEvent.class,
                     LeadershipEvent.Type.class,
+                    Task.class,
+                    WorkQueueStats.class,
                     HostId.class,
                     HostDescription.class,
                     DefaultHostDescription.class,
                     DefaultFlowEntry.class,
                     StoredFlowEntry.class,
                     DefaultFlowRule.class,
-                    DefaultFlowEntry.class,
                     DefaultPacketRequest.class,
                     PacketPriority.class,
                     FlowEntry.FlowEntryState.class,
@@ -367,6 +394,7 @@ public final class KryoNamespaces {
                     Instructions.NoActionInstruction.class,
                     Instructions.OutputInstruction.class,
                     Instructions.GroupInstruction.class,
+                    Instructions.SetQueueInstruction.class,
                     Instructions.TableTypeTransition.class,
                     L0ModificationInstruction.class,
                     L0ModificationInstruction.L0SubType.class,
@@ -378,9 +406,11 @@ public final class KryoNamespaces {
                     L2ModificationInstruction.L2SubType.class,
                     L2ModificationInstruction.ModEtherInstruction.class,
                     L2ModificationInstruction.PushHeaderInstructions.class,
+                    L2ModificationInstruction.PopVlanInstruction.class,
+                    L2ModificationInstruction.ModMplsHeaderInstruction.class,
                     L2ModificationInstruction.ModVlanIdInstruction.class,
                     L2ModificationInstruction.ModVlanPcpInstruction.class,
-                    L2ModificationInstruction.PopVlanInstruction.class,
+                    L2ModificationInstruction.ModVlanHeaderInstruction.class,
                     L2ModificationInstruction.ModMplsLabelInstruction.class,
                     L2ModificationInstruction.ModMplsBosInstruction.class,
                     L2ModificationInstruction.ModMplsTtlInstruction.class,
@@ -422,11 +452,14 @@ public final class KryoNamespaces {
                     OpticalConnectivityIntent.class,
                     OpticalPathIntent.class,
                     OpticalCircuitIntent.class,
+                    OpticalOduIntent.class,
+                    FlowObjectiveIntent.class,
                     DiscreteResource.class,
                     ContinuousResource.class,
                     DiscreteResourceId.class,
                     ContinuousResourceId.class,
                     ResourceAllocation.class,
+                    ResourceConsumerId.class,
                     // Constraints
                     BandwidthConstraint.class,
                     LinkTypeConstraint.class,
@@ -438,13 +471,22 @@ public final class KryoNamespaces {
                     PartialFailureConstraint.class,
                     IntentOperation.class,
                     FlowRuleExtPayLoad.class,
-                    Frequency.class,
                     DefaultAnnotations.class,
                     PortStatistics.class,
                     DefaultPortStatistics.class,
                     IntentDomainId.class,
                     TableStatisticsEntry.class,
-                    DefaultTableStatisticsEntry.class
+                    DefaultTableStatisticsEntry.class,
+                    EncapsulationConstraint.class,
+                    EncapsulationType.class,
+                    // Flow Objectives
+                    DefaultForwardingObjective.class,
+                    ForwardingObjective.Flag.class,
+                    DefaultFilteringObjective.class,
+                    FilteringObjective.Type.class,
+                    DefaultNextObjective.class,
+                    NextObjective.Type.class,
+                    Objective.Operation.class
             )
             .register(new DefaultApplicationIdSerializer(), DefaultApplicationId.class)
             .register(new UriSerializer(), URI.class)
@@ -498,8 +540,10 @@ public final class KryoNamespaces {
                     org.onlab.packet.MplsLabel.class,
                     org.onlab.packet.MPLS.class
             )
-
-            .build();
+            .register(ClosedOpenRange.class)
+            .register(DiscreteResourceCodec.class)
+            .register(new ImmutableByteSequenceSerializer(), ImmutableByteSequence.class)
+            .build("API");
 
 
     // not to be instantiated

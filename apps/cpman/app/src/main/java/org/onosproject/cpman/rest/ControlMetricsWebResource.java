@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,10 @@ package org.onosproject.cpman.rest;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.apache.commons.lang3.StringUtils;
 import org.onosproject.cluster.ClusterService;
 import org.onosproject.cluster.NodeId;
-import org.onosproject.cpman.ControlLoad;
+import org.onosproject.cpman.ControlLoadSnapshot;
 import org.onosproject.cpman.ControlMetricType;
 import org.onosproject.cpman.ControlPlaneMonitorService;
 import org.onosproject.net.DeviceId;
@@ -46,11 +47,11 @@ import static org.onosproject.cpman.ControlResource.Type.NETWORK;
 /**
  * Query control metrics.
  */
-@Path("metrics")
+@Path("controlmetrics")
 public class ControlMetricsWebResource extends AbstractWebResource {
 
     private final ControlPlaneMonitorService monitorService =
-                    get(ControlPlaneMonitorService.class);
+            get(ControlPlaneMonitorService.class);
     private final ClusterService clusterService = get(ClusterService.class);
     private final NodeId localNodeId = clusterService.getLocalNode().id();
     private final ObjectNode root = mapper().createObjectNode();
@@ -59,6 +60,7 @@ public class ControlMetricsWebResource extends AbstractWebResource {
      * Returns control message metrics of all devices.
      *
      * @return array of all control message metrics
+     * @onos.rsModel ControlMessageMetrics
      */
     @GET
     @Path("messages")
@@ -66,7 +68,7 @@ public class ControlMetricsWebResource extends AbstractWebResource {
     public Response controlMessageMetrics() {
 
         ArrayNode deviceNodes = root.putArray("devices");
-        monitorService.availableResources(CONTROL_MESSAGE).forEach(name -> {
+        monitorService.availableResourcesSync(localNodeId, CONTROL_MESSAGE).forEach(name -> {
             ObjectNode deviceNode = mapper().createObjectNode();
             ObjectNode valueNode = mapper().createObjectNode();
 
@@ -86,6 +88,7 @@ public class ControlMetricsWebResource extends AbstractWebResource {
      *
      * @param deviceId device identification
      * @return control message metrics of a given device
+     * @onos.rsModel ControlMessageMetric
      */
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -102,6 +105,7 @@ public class ControlMetricsWebResource extends AbstractWebResource {
      * Returns cpu metrics.
      *
      * @return cpu metrics
+     * @onos.rsModel CpuMetrics
      */
     @GET
     @Path("cpu_metrics")
@@ -116,6 +120,7 @@ public class ControlMetricsWebResource extends AbstractWebResource {
      * Returns memory metrics.
      *
      * @return memory metrics
+     * @onos.rsModel MemoryMetrics
      */
     @GET
     @Path("memory_metrics")
@@ -130,6 +135,7 @@ public class ControlMetricsWebResource extends AbstractWebResource {
      * Returns disk metrics of all resources.
      *
      * @return disk metrics of all resources
+     * @onos.rsModel DiskMetrics
      */
     @GET
     @Path("disk_metrics")
@@ -137,7 +143,7 @@ public class ControlMetricsWebResource extends AbstractWebResource {
     public Response diskMetrics() {
 
         ArrayNode diskNodes = root.putArray("disks");
-        monitorService.availableResources(DISK).forEach(name -> {
+        monitorService.availableResourcesSync(localNodeId, DISK).forEach(name -> {
             ObjectNode diskNode = mapper().createObjectNode();
             ObjectNode valueNode = mapper().createObjectNode();
 
@@ -155,6 +161,7 @@ public class ControlMetricsWebResource extends AbstractWebResource {
      * Returns network metrics of all resources.
      *
      * @return network metrics of all resources
+     * @onos.rsModel NetworkMetrics
      */
     @GET
     @Path("network_metrics")
@@ -162,7 +169,7 @@ public class ControlMetricsWebResource extends AbstractWebResource {
     public Response networkMetrics() {
 
         ArrayNode networkNodes = root.putArray("networks");
-        monitorService.availableResources(NETWORK).forEach(name -> {
+        monitorService.availableResourcesSync(localNodeId, NETWORK).forEach(name -> {
             ObjectNode networkNode = mapper().createObjectNode();
             ObjectNode valueNode = mapper().createObjectNode();
 
@@ -240,36 +247,54 @@ public class ControlMetricsWebResource extends AbstractWebResource {
 
         if (name == null && did == null) {
             typeSet.forEach(type -> {
-                ObjectNode metricNode = mapper().createObjectNode();
-                ControlLoad load = service.getLoad(nodeId, type, Optional.ofNullable(null));
-                if (load != null) {
-                    metricNode.set(type.toString().toLowerCase(), codec(ControlLoad.class)
-                            .encode(service.getLoad(nodeId, type, Optional.ofNullable(null)), this));
-                    metricsNode.add(metricNode);
-                }
+                ControlLoadSnapshot cls = service.getLoadSync(nodeId, type, Optional.empty());
+                processRest(cls, type, metricsNode);
             });
         } else if (name == null) {
             typeSet.forEach(type -> {
-                ObjectNode metricNode = mapper().createObjectNode();
-                ControlLoad load = service.getLoad(nodeId, type, Optional.of(did));
-                if (load != null) {
-                    metricNode.set(type.toString().toLowerCase(),
-                            codec(ControlLoad.class).encode(load, this));
-                    metricsNode.add(metricNode);
-                }
+                ControlLoadSnapshot cls = service.getLoadSync(nodeId, type, Optional.of(did));
+                processRest(cls, type, metricsNode);
             });
         } else if (did == null) {
             typeSet.forEach(type -> {
-                ObjectNode metricNode = mapper().createObjectNode();
-                ControlLoad load = service.getLoad(nodeId, type, name);
-                if (load != null) {
-                    metricNode.set(type.toString().toLowerCase(),
-                            codec(ControlLoad.class).encode(load, this));
-                    metricsNode.add(metricNode);
-                }
+                ControlLoadSnapshot cls = service.getLoadSync(nodeId, type, name);
+                processRest(cls, type, metricsNode);
             });
         }
 
         return metricsNode;
+    }
+
+    /**
+     * Camelizes the input string.
+     *
+     * @param value              original string
+     * @param startWithLowerCase flag that determines whether to use lower case
+     *                           for the camelized string
+     * @return camelized string
+     */
+    private String toCamelCase(String value, boolean startWithLowerCase) {
+        String[] strings = StringUtils.split(value.toLowerCase(), "_");
+        for (int i = startWithLowerCase ? 1 : 0; i < strings.length; i++) {
+            strings[i] = StringUtils.capitalize(strings[i]);
+        }
+        return StringUtils.join(strings);
+    }
+
+    /**
+     * Transforms control load snapshot object into JSON object.
+     *
+     * @param cls         control load snapshot
+     * @param type        control metric type
+     * @param metricsNode array of JSON node
+     */
+    private void processRest(ControlLoadSnapshot cls, ControlMetricType type, ArrayNode metricsNode) {
+        ObjectNode metricNode = mapper().createObjectNode();
+
+        if (cls != null) {
+            metricNode.set(toCamelCase(type.toString(), true),
+                    codec(ControlLoadSnapshot.class).encode(cls, this));
+            metricsNode.add(metricNode);
+        }
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@ package org.onosproject.store.cluster.messaging.impl;
  */
 public enum DecoderState {
     READ_MESSAGE_PREAMBLE,
+    READ_LOGICAL_TIME,
+    READ_LOGICAL_COUNTER,
     READ_MESSAGE_ID,
     READ_SENDER_IP_VERSION,
     READ_SENDER_IP,

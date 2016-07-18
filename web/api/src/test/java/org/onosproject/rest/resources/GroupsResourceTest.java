@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -153,6 +153,11 @@ public class GroupsResourceTest extends ResourceTest {
         @Override
         public long referenceCount() {
             return baseValue + 44;
+        }
+
+        @Override
+        public int age() {
+            return 0;
         }
 
         @Override

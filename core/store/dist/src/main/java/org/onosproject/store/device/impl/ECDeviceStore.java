@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,7 +63,7 @@ import org.onosproject.store.AbstractStore;
 import org.onosproject.store.cluster.messaging.ClusterCommunicationService;
 import org.onosproject.store.impl.MastershipBasedTimestamp;
 import org.onosproject.store.serializers.KryoNamespaces;
-import org.onosproject.store.serializers.KryoSerializer;
+import org.onosproject.store.serializers.StoreSerializer;
 import org.onosproject.store.serializers.custom.DistributedStoreSerializers;
 import org.onosproject.store.service.DistributedSet;
 import org.onosproject.store.service.EventuallyConsistentMap;
@@ -87,6 +87,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Verify.verify;
@@ -157,17 +158,13 @@ public class ECDeviceStore
     private final SetEventListener<DeviceId> deviceStatusTracker =
             new InternalDeviceStatusTracker();
 
-    protected static final KryoSerializer SERIALIZER = new KryoSerializer() {
-        @Override
-        protected void setupKryoPool() {
-            serializerPool = KryoNamespace.newBuilder()
+    protected static final StoreSerializer SERIALIZER = StoreSerializer.using(
+                  KryoNamespace.newBuilder()
                     .register(DistributedStoreSerializers.STORE_COMMON)
                     .nextId(DistributedStoreSerializers.STORE_CUSTOM_BEGIN)
                     .register(DeviceInjectedEvent.class)
                     .register(PortInjectedEvent.class)
-                    .build();
-        }
-    };
+                    .build("ECDevice"));
 
     protected static final KryoNamespace.Builder SERIALIZER_BUILDER = KryoNamespace.newBuilder()
             .register(KryoNamespaces.API)
@@ -235,7 +232,6 @@ public class ECDeviceStore
         availableDevices = storageService.<DeviceId>setBuilder()
                 .withName("onos-online-devices")
                 .withSerializer(Serializer.using(KryoNamespaces.API))
-                .withPartitionsDisabled()
                 .withRelaxedReadConsistency()
                 .build()
                 .asDistributedSet();
@@ -279,6 +275,7 @@ public class ECDeviceStore
         return devices.get(deviceId);
     }
 
+    // FIXME handle deviceDescription.isDefaultAvailable()=false case properly.
     @Override
     public DeviceEvent createOrUpdateDevice(ProviderId providerId,
             DeviceId deviceId,
@@ -396,8 +393,13 @@ public class ECDeviceStore
         return null;
     }
 
-    private boolean markOnline(DeviceId deviceId) {
-        return availableDevices.add(deviceId);
+    // FIXME publicization of markOnline -- trigger some action independently?
+    public boolean markOnline(DeviceId deviceId) {
+        if (devices.containsKey(deviceId)) {
+            return availableDevices.add(deviceId);
+        }
+        log.warn("Device {} does not exist in store", deviceId);
+        return false;
     }
 
     @Override
@@ -527,18 +529,36 @@ public class ECDeviceStore
 
     private Port buildTypedPort(Device device, PortNumber number, boolean isEnabled,
             PortDescription description, Annotations annotations) {
+        // FIXME this switch need to go away once all ports are done.
         switch (description.type()) {
         case OMS:
-            OmsPortDescription omsDesc = (OmsPortDescription) description;
-            return new OmsPort(device, number, isEnabled, omsDesc.minFrequency(),
-                    omsDesc.maxFrequency(), omsDesc.grid(), annotations);
+            if (description instanceof OmsPortDescription) {
+                // remove if-block once deprecation is complete
+                OmsPortDescription omsDesc = (OmsPortDescription) description;
+                return new OmsPort(device, number, isEnabled, omsDesc.minFrequency(),
+                        omsDesc.maxFrequency(), omsDesc.grid(), annotations);
+            }
+            // same as default
+            return new DefaultPort(device, number, isEnabled, description.type(),
+                                   description.portSpeed(), annotations);
         case OCH:
-            OchPortDescription ochDesc = (OchPortDescription) description;
-            return new OchPort(device, number, isEnabled, ochDesc.signalType(),
-                    ochDesc.isTunable(), ochDesc.lambda(), annotations);
+            if (description instanceof OchPortDescription) {
+                // remove if-block once Och deprecation is complete
+                OchPortDescription ochDesc = (OchPortDescription) description;
+                return new OchPort(device, number, isEnabled, ochDesc.signalType(),
+                                   ochDesc.isTunable(), ochDesc.lambda(), annotations);
+            }
+            return new DefaultPort(device, number, isEnabled, description.type(),
+                                   description.portSpeed(), annotations);
         case ODUCLT:
-            OduCltPortDescription oduDesc = (OduCltPortDescription) description;
-            return new OduCltPort(device, number, isEnabled, oduDesc.signalType(), annotations);
+            if (description instanceof OduCltPortDescription) {
+                // remove if-block once deprecation is complete
+                OduCltPortDescription oduDesc = (OduCltPortDescription) description;
+                return new OduCltPort(device, number, isEnabled, oduDesc.signalType(), annotations);
+            }
+            // same as default
+            return new DefaultPort(device, number, isEnabled, description.type(),
+                                   description.portSpeed(), annotations);
         default:
             return new DefaultPort(device, number, isEnabled, description.type(),
                     description.portSpeed(), annotations);
@@ -561,8 +581,24 @@ public class ECDeviceStore
     }
 
     @Override
+    public Stream<PortDescription> getPortDescriptions(ProviderId pid,
+                                                       DeviceId deviceId) {
+
+        return portDescriptions.entrySet().stream()
+                .filter(e -> e.getKey().providerId().equals(pid))
+                .map(Map.Entry::getValue);
+    }
+
+    @Override
     public Port getPort(DeviceId deviceId, PortNumber portNumber) {
         return devicePorts.getOrDefault(deviceId, Maps.newHashMap()).get(portNumber);
+    }
+
+    @Override
+    public PortDescription getPortDescription(ProviderId pid,
+                                              DeviceId deviceId,
+                                              PortNumber portNumber) {
+        return portDescriptions.get(new PortKey(pid, deviceId, portNumber));
     }
 
     @Override

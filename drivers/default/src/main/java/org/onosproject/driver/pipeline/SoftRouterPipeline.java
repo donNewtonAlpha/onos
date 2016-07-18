@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -86,10 +86,9 @@ public class SoftRouterPipeline extends AbstractHandlerBehaviour implements Pipe
     private ApplicationId driverId;
 
     private KryoNamespace appKryo = new KryoNamespace.Builder()
-        .register(DummyGroup.class)
-        .register(KryoNamespaces.API)
-        .register(byte[].class)
-        .build();
+            .register(KryoNamespaces.API)
+            .register(DummyGroup.class)
+            .build();
 
     private final Logger log = getLogger(getClass());
 
@@ -250,7 +249,8 @@ public class SoftRouterPipeline extends AbstractHandlerBehaviour implements Pipe
         // convert filtering conditions for switch-intfs into flowrules
         FlowRuleOperations.Builder ops = FlowRuleOperations.builder();
         for (Criterion c : filt.conditions()) {
-            if (c.type() == Criterion.Type.ETH_DST) {
+            if (c.type() == Criterion.Type.ETH_DST ||
+                    c.type() == Criterion.Type.ETH_DST_MASKED) {
                 e = (EthCriterion) c;
             } else if (c.type() == Criterion.Type.VLAN_VID) {
                 v = (VlanIdCriterion) c;
@@ -261,13 +261,18 @@ public class SoftRouterPipeline extends AbstractHandlerBehaviour implements Pipe
             }
         }
 
-        log.debug("adding Port/VLAN/MAC filtering rules in filter table: {}/{}/{}",
+        log.debug("Modifying Port/VLAN/MAC filtering rules in filter table: {}/{}/{}",
                   p.port(), v.vlanId(), e.mac());
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
         selector.matchInPort(p.port());
 
-        selector.matchEthDst(e.mac());
+        //Multicast MAC
+        if (e.mask() != null) {
+            selector.matchEthDstMasked(e.mac(), e.mask());
+        } else {
+            selector.matchEthDst(e.mac());
+        }
         selector.matchVlanId(v.vlanId());
         selector.matchEthType(Ethernet.TYPE_IPV4);
         if (!v.vlanId().equals(VlanId.NONE)) {
@@ -282,7 +287,6 @@ public class SoftRouterPipeline extends AbstractHandlerBehaviour implements Pipe
                 .fromApp(applicationId)
                 .makePermanent()
                 .forTable(FILTER_TABLE).build();
-        ops =  ops.add(rule);
 
         ops = install ? ops.add(rule) : ops.remove(rule);
         // apply filtering flow rules

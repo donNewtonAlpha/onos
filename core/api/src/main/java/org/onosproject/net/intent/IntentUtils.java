@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,6 +58,7 @@ public final class IntentUtils {
 
             return Objects.equals(intent1.selector(), intent2.selector()) &&
                     Objects.equals(intent1.treatment(), intent2.treatment()) &&
+                    Objects.equals(intent1.constraints(), intent2.constraints()) &&
                     Objects.equals(intent1.ingressPoint(), intent2.ingressPoint()) &&
                     Objects.equals(intent1.egressPoints(), intent2.egressPoints());
         } else if (one instanceof MultiPointToSinglePointIntent) {
@@ -66,6 +67,7 @@ public final class IntentUtils {
 
             return Objects.equals(intent1.selector(), intent2.selector()) &&
                     Objects.equals(intent1.treatment(), intent2.treatment()) &&
+                    Objects.equals(intent1.constraints(), intent2.constraints()) &&
                     Objects.equals(intent1.ingressPoints(), intent2.ingressPoints()) &&
                     Objects.equals(intent1.egressPoint(), intent2.egressPoint());
         } else if (one instanceof PointToPointIntent) {
@@ -74,6 +76,7 @@ public final class IntentUtils {
 
             return Objects.equals(intent1.selector(), intent2.selector()) &&
                     Objects.equals(intent1.treatment(), intent2.treatment()) &&
+                    Objects.equals(intent1.constraints(), intent2.constraints()) &&
                     Objects.equals(intent1.ingressPoint(), intent2.ingressPoint()) &&
                     Objects.equals(intent1.egressPoint(), intent2.egressPoint());
         } else {

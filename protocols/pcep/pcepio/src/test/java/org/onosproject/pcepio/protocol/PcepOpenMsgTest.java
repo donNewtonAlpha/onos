@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -532,6 +532,42 @@ public class PcepOpenMsgTest {
         byte[] openMsg = new byte[] {0x20, 0x01, 0x00, 0x0c, // common header
                 0x01, 0x10, 0x00, 0x08, // common object header
                 0x20, 0x05, 0x1E, 0x01 // OPEN object
+        };
+
+        byte[] testOpenMsg = {0};
+        ChannelBuffer buffer = ChannelBuffers.dynamicBuffer();
+        buffer.writeBytes(openMsg);
+
+        PcepMessageReader<PcepMessage> reader = PcepFactories.getGenericReader();
+        PcepMessage message = null;
+
+        message = reader.readFrom(buffer);
+
+        assertThat(message, instanceOf(PcepOpenMsg.class));
+
+        ChannelBuffer buf = ChannelBuffers.dynamicBuffer();
+        message.writeTo(buf);
+        testOpenMsg = buf.array();
+
+        int readLen = buf.writerIndex() - 0;
+        testOpenMsg = new byte[readLen];
+        buf.readBytes(testOpenMsg, 0, readLen);
+        assertThat(testOpenMsg, is(openMsg));
+
+    }
+
+    /**
+     * This test case checks open object with LSR id encoded.
+     */
+    @Test
+    public void openMessageTest16() throws PcepParseException, PcepOutOfBoundMessageException {
+
+        byte[] openMsg = new byte[] {0x20, 0x01, 0x00, 0x18, // common header
+                0x01, 0x10, 0x00, 0x14, // common object header
+                0x20, 0x05, 0x1E, 0x01, // OPEN object
+                (byte) 0xFF, 0x05, 0x00, 0x08, // Node attribute TLV
+                0x00, 0x11, 0x00, 0x04,  // PCEP-LS-IPv4-ROUTER-ID sub tlv
+                0x02, 0x02, 0x02, 0x02
         };
 
         byte[] testOpenMsg = {0};

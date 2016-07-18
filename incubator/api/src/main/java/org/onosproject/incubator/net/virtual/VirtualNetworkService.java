@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,6 +51,15 @@ public interface VirtualNetworkService {
     Set<VirtualDevice> getVirtualDevices(NetworkId networkId);
 
     /**
+     * Returns a collection of all virtual hosts in the specified network.
+     *
+     * @param networkId network identifier
+     * @return collection of hosts
+     * @throws org.onlab.util.ItemNotFoundException if no such network found
+     */
+    Set<VirtualHost> getVirtualHosts(NetworkId networkId);
+
+    /**
      * Returns collection of all virtual links in the specified network.
      *
      * @param networkId network identifier
@@ -60,7 +69,9 @@ public interface VirtualNetworkService {
     Set<VirtualLink> getVirtualLinks(NetworkId networkId);
 
     /**
-     * Returns list of all virtual ports of the specified device.
+     * Returns list of all virtual ports of the specified device. If the
+     * device identifier is null then all of the virtual ports in the specified
+     * network will be returned.
      *
      * @param networkId network identifier
      * @param deviceId  device identifier

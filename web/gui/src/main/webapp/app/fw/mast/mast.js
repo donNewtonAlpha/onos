@@ -1,5 +1,5 @@
 /*
- * Copyright 2014,2015 Open Networking Laboratory
+ * Copyright 2014-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,37 +20,37 @@
 (function () {
     'use strict';
 
-    // injected services
-    var $log;
-
     // configuration
-    var mastHeight = 36,
-        padMobile = 16;
-
-    var dialogId = 'app-dialog',
+    var mastHeight = 48,
+        padMobile = 16,
         dialogOpts = {
             edge: 'left'
+        },
+        msg = {
+            add: { adj: 'New', op: 'added'},
+            rem: { adj: 'Some', op: 'removed'}
         };
 
-        angular.module('onosMast', ['onosNav'])
-        .controller('MastCtrl', ['$log', '$window', 'NavService',
-                                    'DialogService', 'WebSocketService',
+    angular.module('onosMast', ['onosNav'])
+        .controller('MastCtrl',
+        ['$log', '$scope', '$window', 'WebSocketService', 'NavService',
+            'DialogService',
 
-        function (_$log_, $window, ns, ds, wss) {
+        function ($log, $scope, $window, wss, ns, ds) {
             var self = this;
 
-            $log = _$log_;
-
-            // initialize mast controller here...
-            self.radio = null;
-
             function triggerRefresh(action) {
+
                 function createConfirmationText() {
-                    var content = ds.createDiv();
-                    content.append('p').text(action + ' Press OK to update the GUI.');
+                    var content = ds.createDiv(),
+                        txt = msg[action];
+
+                    content.append('p').text(
+                        txt.adj + ' GUI components were ' + txt.op +
+                        '. Press OK to update the GUI.'
+                    );
                     return content;
                 }
-
 
                 function dOk() {
                     $log.debug('Refreshing GUI');
@@ -61,7 +61,12 @@
                     $log.debug('Canceling GUI refresh');
                 }
 
-                ds.openDialog(dialogId, dialogOpts)
+                // NOTE: We use app-dialog (CSS) since we will most likely
+                //         invoke this when we (de)activate apps.
+                //       However we have added this to the masthead, because
+                //         apps could be injected externally (via the onos-app
+                //         command) and we might be looking at some other view.
+                ds.openDialog('app-dialog', dialogOpts)
                     .setTitle('Confirm GUI Refresh')
                     .addContent(createConfirmationText())
                     .addOk(dOk)
@@ -70,14 +75,17 @@
             }
 
             wss.bindHandlers({
-                'guiAdded': function () { triggerRefresh('New GUI components were added.') },
-                'guiRemoved': function () { triggerRefresh('Some GUI components were removed.') }
+                'guiAdded': function () { triggerRefresh('add') },
+                'guiRemoved': function () { triggerRefresh('rem') }
             });
 
             // delegate to NavService
             self.toggleNav = function () {
                 ns.toggleNav();
             };
+
+            // onosAuth is a global set via the index.html generated source
+            $scope.user = onosAuth || '(no one)';
 
             $log.log('MastCtrl has been created');
         }])

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Open Networking Laboratory
+ * Copyright 2016-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -86,8 +86,6 @@ public class InfluxDbMetricsConfig {
         coreService.registerApplication("org.onosproject.influxdbmetrics");
 
         configReporter(influxDbMetricsReporter);
-        influxDbMetricsReporter.startReport();
-
         configRetriever(influxDbMetricsRetriever);
 
         log.info("Started");
@@ -97,7 +95,6 @@ public class InfluxDbMetricsConfig {
     public void deactivate() {
         cfgService.unregisterProperties(getClass(), false);
 
-        influxDbMetricsReporter.stopReport();
         log.info("Stopped");
     }
 

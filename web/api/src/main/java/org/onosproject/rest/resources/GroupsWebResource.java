@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,19 +54,19 @@ import static org.onlab.util.Tools.nullIsNotFound;
 public class GroupsWebResource extends AbstractWebResource {
 
     @Context
-    UriInfo uriInfo;
+    private UriInfo uriInfo;
 
-    public static final String DEVICE_INVALID = "Invalid deviceId in group creation request";
-    public static final String GROUP_NOT_FOUND = "Group was not found";
+    private static final String DEVICE_INVALID = "Invalid deviceId in group creation request";
+    private static final String GROUP_NOT_FOUND = "Group was not found";
 
-    final GroupService groupService = get(GroupService.class);
-    final ObjectNode root = mapper().createObjectNode();
-    final ArrayNode groupsNode = root.putArray("groups");
+    private final GroupService groupService = get(GroupService.class);
+    private final ObjectNode root = mapper().createObjectNode();
+    private final ArrayNode groupsNode = root.putArray("groups");
 
     /**
      * Returns all groups of all devices.
      *
-     * @return array of all the groups in the system
+     * @return 200 OK with array of all the groups in the system
      * @onos.rsModel Groups
      */
     @GET
@@ -87,7 +87,7 @@ public class GroupsWebResource extends AbstractWebResource {
      * Returns all groups associated with the given device.
      *
      * @param deviceId device identifier
-     * @return array of all the groups in the system
+     * @return 200 OK with array of all the groups in the system
      * @onos.rsModel Groups
      */
     @GET
@@ -106,7 +106,7 @@ public class GroupsWebResource extends AbstractWebResource {
      *
      * @param deviceId device identifier
      * @param appCookie group key
-     * @return a group entry in the system
+     * @return 200 OK with a group entry in the system
      * @onos.rsModel Group
      */
     @GET
@@ -172,15 +172,16 @@ public class GroupsWebResource extends AbstractWebResource {
      *
      * @param deviceId  device identifier
      * @param appCookie application cookie to be used for lookup
+     * @return 204 NO CONTENT
      */
     @DELETE
-    @Produces(MediaType.APPLICATION_JSON)
     @Path("{deviceId}/{appCookie}")
-    public void deleteGroupByDeviceIdAndAppCookie(@PathParam("deviceId") String deviceId,
-                                                  @PathParam("appCookie") String appCookie) {
+    public Response deleteGroupByDeviceIdAndAppCookie(@PathParam("deviceId") String deviceId,
+                                                      @PathParam("appCookie") String appCookie) {
         DeviceId deviceIdInstance = DeviceId.deviceId(deviceId);
         GroupKey appCookieInstance = new DefaultGroupKey(appCookie.getBytes());
 
         groupService.removeGroup(deviceIdInstance, appCookieInstance, null);
+        return Response.noContent().build();
     }
 }

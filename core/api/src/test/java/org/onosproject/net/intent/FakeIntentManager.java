@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Open Networking Laboratory
+ * Copyright 2014-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -155,7 +155,6 @@ public class FakeIntentManager implements TestableIntentService {
 
     @Override
     public void withdraw(Intent intent) {
-        intents.remove(intent.key());
         executeWithdraw(intent);
     }
 
@@ -167,6 +166,7 @@ public class FakeIntentManager implements TestableIntentService {
             intents.remove(intent.key());
             installables.remove(intent.key());
             intentStates.remove(intent.key());
+            dispatch(new IntentEvent(IntentEvent.Type.PURGED, intent));
         }
     }
 

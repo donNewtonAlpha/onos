@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Open Networking Laboratory
+ * Copyright 2015-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,12 +16,12 @@
 package org.onosproject.vtnweb.resources;
 
 import org.glassfish.jersey.server.ResourceConfig;
-import org.glassfish.jersey.test.JerseyTest;
+import org.onosproject.rest.resources.ResourceTest;
 
 /**
  * Base class for VTN REST API tests.  Performs common configuration operations.
  */
-public class VtnResourceTest extends JerseyTest {
+public class VtnResourceTest extends ResourceTest {
 
     /**
      * Creates a new web-resource test.
