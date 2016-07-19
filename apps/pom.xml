@@ -61,10 +61,10 @@
         <module>cpman</module>
         <module>events</module>
         <module>vrouter</module>
-        <module>tor</module>
+        <!--<module>tor</module>-->
         <module>oneping</module>
-        <module>phase1</module>
-        <module>testing-app</module>
+ <!--       <module>phase1</module>
+        <module>testing-app</module>-->
         <module>vpls</module>
         <module>openstacknode</module>
         <module>openstacknetworking</module>

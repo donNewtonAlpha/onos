@@ -9,8 +9,10 @@ import org.apache.felix.scr.annotations.*;
 import org.onlab.packet.*;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
+import org.onosproject.driver.extensions.NoviflowMatchVni;
 import org.onosproject.driver.extensions.NoviflowPopVxLan;
 import org.onosproject.driver.extensions.NoviflowSetVxLan;
+import org.onosproject.driver.extensions.ofmessages.OFNoviflowVniExperimenterMsg;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.flow.*;
@@ -28,7 +30,6 @@ import org.onosproject.openflow.controller.OpenFlowController;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.crypto.Mac;
 import java.nio.ByteBuffer;
 import java.util.*;
 
@@ -93,7 +94,8 @@ public class NoviAggSwitchComponent {
         log.debug("trying to activate");
         appId = coreService.registerApplication("org.onosproject.noviaggswitch");
 
-        openFlowController.write(Dpid.dpid(deviceId.uri()), new OFNoviflowVniExperimenterMsg());
+        OFNoviflowVniExperimenterMsg vniMatchSetup = new OFNoviflowVniExperimenterMsg(0);
+        vniMatchSetup.send(openFlowController, deviceId);
 
         processor = new NoviBngPacketProcessor();
 
@@ -187,7 +189,7 @@ public class NoviAggSwitchComponent {
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchInPort(bngPort);
-        //TODO: match on VNI
+        selector.extension(new NoviflowMatchVni(vni), deviceId);
 
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
