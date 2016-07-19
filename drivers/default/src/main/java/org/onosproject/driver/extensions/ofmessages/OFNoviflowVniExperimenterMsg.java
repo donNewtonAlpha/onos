@@ -15,7 +15,7 @@ import org.onosproject.net.DeviceId;
 /**
  * Created by nick on 7/18/16.
  */
-public class OFNoviflowVniExperimenterMsg extends ThirdPartyMessage{
+public class OFNoviflowVniExperimenterMsg extends ThirdPartyMessage {
 
     int tableId;
 
@@ -33,13 +33,13 @@ public class OFNoviflowVniExperimenterMsg extends ThirdPartyMessage{
         //Experimenter
         channelBuffer.writeInt(U32.t(0xff000002));
         // customer id
-        channelBuffer.writeByte(U8.t((short)0xff));
+        channelBuffer.writeByte(U8.t((short) 0xff));
         //reserveds
-        channelBuffer.writeByte(U8.t((short)0));
+        channelBuffer.writeByte(U8.t((short) 0));
         //Noviflow type : NOVI_MSG_UDP_PAYLOAD
-        channelBuffer.writeByte(U8.t((short)tableId));
+        channelBuffer.writeByte(U8.t((short) tableId));
         //Number of bytes to match on : 3 for the vni
-        channelBuffer.writeByte(U8.t((short)3));
+        channelBuffer.writeByte(U8.t((short) 3));
         //Payload offset : 4
         channelBuffer.writeShort(U16.t(4));
 

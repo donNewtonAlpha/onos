@@ -19,7 +19,8 @@ public class NoviflowExtensionSelectorInterpreter extends AbstractHandlerBehavio
 
     @Override
     public boolean supported(ExtensionSelectorType extensionSelectorType) {
-        if (extensionSelectorType.equals(ExtensionSelectorType.ExtensionSelectorTypes.NOVIFLOW_MATCH_UDP_PAYLOAD.type())) {
+        if (extensionSelectorType
+                .equals(ExtensionSelectorType.ExtensionSelectorTypes.NOVIFLOW_MATCH_UDP_PAYLOAD.type())) {
             return true;
         }
         return false;

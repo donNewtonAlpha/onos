@@ -22,7 +22,7 @@ public class OFOxmNoviflowUdpMatch implements OFOxm {
         this.vni = vni;
     }
 
-    public int getVni(){
+    public int getVni() {
         return vni;
     }
 
@@ -67,14 +67,14 @@ public class OFOxmNoviflowUdpMatch implements OFOxm {
         // toxm experimenter
         channelBuffer.writeShort(U16.t(0xffff));
         //NOVI_MATCH_UDP_PAYLOAD and no mask
-        channelBuffer.writeByte(U8.t((short)2));
+        channelBuffer.writeByte(U8.t((short) 2));
         //length
-        channelBuffer.writeByte(U8.t((short)11));
+        channelBuffer.writeByte(U8.t((short) 11));
         //Noviflow experimenter
         channelBuffer.writeInt(U32.t(0xff000002));
         //Vni
-        for(int i = 0; i< 3; i++) {
-            channelBuffer.writeByte(U8.t((short) ((vni >> ((2-i)*8)) & 0xff)));
+        for (int i = 0; i < 3; i++) {
+            channelBuffer.writeByte(U8.t((short) ((vni >> ((2 - i) * 8)) & 0xff)));
         }
 
 

@@ -3,14 +3,14 @@ package org.onosproject.driver.extensions;
 import org.onosproject.net.flow.AbstractExtension;
 import org.onosproject.net.flow.criteria.ExtensionSelector;
 import org.onosproject.net.flow.criteria.ExtensionSelectorType;
-import org.onosproject.net.flow.instructions.ExtensionTreatmentType;
+
 
 /**
  * Created by nick on 7/18/16.
  */
 
 
-public class NoviflowMatchVni extends AbstractExtension implements ExtensionSelector {
+public class NoviflowMatchVni extends AbstractExtension implements ExtensionSelector{
 
     int vni;
 

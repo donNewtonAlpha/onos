@@ -6,7 +6,16 @@ import org.apache.felix.scr.annotations.*;
 
 
 
-import org.onlab.packet.*;
+import org.onlab.packet.Ethernet;
+import org.onlab.packet.ARP;
+import org.onlab.packet.MacAddress;
+import org.onlab.packet.Ip4Address;
+import org.onlab.packet.IPacket;
+import org.onlab.packet.IPv4;
+import org.onlab.packet.ICMP;
+import org.onlab.packet.IpPrefix;
+import org.onlab.packet.IpAddress;
+import org.onlab.packet.VlanId;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.driver.extensions.NoviflowMatchVni;
@@ -108,9 +117,16 @@ public class NoviAggSwitchComponent {
 
         Random rand = new Random();
 
-        addAccessDevice(5, 5000, rand.nextInt(), "10.20.1.2", "68:05:ca:30:00:68", "10.20.1.1", "68:05:33:44:55:66", true);
-        addAccessDevice(6, 5001, rand.nextInt(), "10.20.1.2", "68:05:ca:30:00:68", "10.20.1.1", "68:05:33:44:55:66", false);
-        addAccessDevice(7, 5002, rand.nextInt(), "10.20.1.2", "68:05:ca:30:00:68", "10.20.1.1", "68:05:33:44:55:66", false);
+        addAccessDevice(5, 5002, rand.nextInt(), "10.20.1.2", "aa:aa:aa:aa:aa:00", "10.20.1.1", "68:05:33:44:55:66", true);
+        addAccessDevice(6, 5003, rand.nextInt(), "10.20.1.3", "aa:aa:aa:aa:aa:01", "10.20.1.1", "68:05:33:44:55:66", true);
+        /*addAccessDevice(7, 5000, rand.nextInt(), "10.20.1.5", "aa:aa:aa:aa:aa:02", "10.20.1.1", "68:05:33:44:55:66", false);
+        addAccessDevice(8, 5000, rand.nextInt(), "10.20.1.6", "aa:aa:aa:aa:aa:03", "10.20.1.1", "68:05:33:44:55:66", false);
+        addAccessDevice(9, 5000, rand.nextInt(), "10.20.1.7", "aa:aa:aa:aa:aa:04", "10.20.1.1", "68:05:33:44:55:66", false);
+        addAccessDevice(10, 5000, rand.nextInt(), "10.20.1.8", "aa:aa:aa:aa:aa:05", "10.20.1.1", "68:05:33:44:55:66", false);
+        addAccessDevice(11, 5000, rand.nextInt(), "10.20.1.9", "aa:aa:aa:aa:aa:06", "10.20.1.1", "68:05:33:44:55:66", false);
+        addAccessDevice(12, 5000, rand.nextInt(), "10.20.1.10", "aa:aa:aa:aa:aa:07", "10.20.1.1", "68:05:33:44:55:66", false);
+        addAccessDevice(13, 5000, rand.nextInt(), "10.20.1.11", "aa:aa:aa:aa:aa:08", "10.20.1.1", "68:05:33:44:55:66", false);
+        addAccessDevice(14, 5000, rand.nextInt(), "10.20.1.12", "aa:aa:aa:aa:aa:09", "10.20.1.1", "68:05:33:44:55:66", false);*/
 
 
 
