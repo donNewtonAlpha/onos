@@ -39,8 +39,13 @@ import org.onosproject.openflow.controller.OpenFlowController;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.util.*;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 
 /**
@@ -103,8 +108,10 @@ public class NoviAggSwitchComponent {
         log.debug("trying to activate");
         appId = coreService.registerApplication("org.onosproject.noviaggswitch");
 
-        OFNoviflowVniExperimenterMsg vniMatchSetup = new OFNoviflowVniExperimenterMsg(0);
-        vniMatchSetup.send(openFlowController, deviceId);
+/*        OFNoviflowVniExperimenterMsg vniMatchSetup = new OFNoviflowVniExperimenterMsg(0);
+        vniMatchSetup.send(openFlowController, deviceId);*/
+
+        noviExpSetup();
 
         processor = new NoviBngPacketProcessor();
 
@@ -271,6 +278,53 @@ public class NoviAggSwitchComponent {
         rule.makePermanent();
 
         flowRuleService.applyFlowRules(rule.build());
+
+    }
+
+
+    private void noviExpSetup() {
+
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+
+                OFNoviflowVniExperimenterMsg msg = new OFNoviflowVniExperimenterMsg(0);
+
+                try {
+                    Socket socket = new Socket(InetAddress.getByAddress(Ip4Address.valueOf("10.64.1.85").toOctets()), 6633);
+                    OutputStream os = socket.getOutputStream();
+
+                    InputStream is = socket.getInputStream();
+
+                    while (true) {
+                        os.write(msg.fullIPPayload());
+                        Thread.sleep(1000);
+
+                        if (is.available() > 0) {
+                            byte[] response = new byte[is.available()];
+                            is.read(response);
+                            //send to log
+
+                            StringBuilder builder = new StringBuilder("Response : ");
+                            for (int i = 0; i < response.length; i++) {
+                                builder.append(response[i]);
+                                builder.append(' ');
+                            }
+                            log.info(builder.toString());
+
+                        }
+                    }
+
+
+                } catch (Exception e) {
+                    log.error("Exception noviExpSetup", e);
+                }
+            }
+        };
+
+        Thread t =new Thread(r);
+        t.setDaemon(true);
+        t.start();
 
     }
 
