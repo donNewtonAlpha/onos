@@ -46,6 +46,8 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.concurrent.RunnableFuture;
+import java.util.concurrent.Semaphore;
 
 
 /**
@@ -74,8 +76,6 @@ public class NoviAggSwitchComponent {
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected PacketService packetService;
 
-    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected OpenFlowController openFlowController;
 
 
 
@@ -86,8 +86,6 @@ public class NoviAggSwitchComponent {
     static final DeviceId deviceId = DeviceId.deviceId("of:000000223d5a00d9");
 
 
-    private static MacAddress uplinkMac = MacAddress.valueOf("a0:36:9f:27:88:f0");
-    private static Ip4Address uplinkIp = Ip4Address.valueOf("10.1.4.1");
 
     private static MacAddress torMac = MacAddress.valueOf("68:05:33:44:55:66");
     private static Ip4Address torIp = Ip4Address.valueOf("10.20.1.1");
@@ -95,10 +93,7 @@ public class NoviAggSwitchComponent {
 
     private PortNumber bngPort;
 
-    private PacketProcessor processor;
-
-
-
+    private NoviBngPacketProcessor processor;
 
 
 
@@ -108,10 +103,8 @@ public class NoviAggSwitchComponent {
         log.debug("trying to activate");
         appId = coreService.registerApplication("org.onosproject.noviaggswitch");
 
-/*        OFNoviflowVniExperimenterMsg vniMatchSetup = new OFNoviflowVniExperimenterMsg(0);
-        vniMatchSetup.send(openFlowController, deviceId);*/
 
-        noviExpSetup();
+        //noviExpSetup();
 
         processor = new NoviBngPacketProcessor();
 
@@ -124,19 +117,26 @@ public class NoviAggSwitchComponent {
 
         Random rand = new Random();
 
-        addAccessDevice(5, 5002, rand.nextInt(), "10.20.1.2", "aa:aa:aa:aa:aa:00", "10.20.1.1", "68:05:33:44:55:66", true);
-        addAccessDevice(6, 5003, rand.nextInt(), "10.20.1.3", "aa:aa:aa:aa:aa:01", "10.20.1.1", "68:05:33:44:55:66", true);
-        /*addAccessDevice(7, 5000, rand.nextInt(), "10.20.1.5", "aa:aa:aa:aa:aa:02", "10.20.1.1", "68:05:33:44:55:66", false);
-        addAccessDevice(8, 5000, rand.nextInt(), "10.20.1.6", "aa:aa:aa:aa:aa:03", "10.20.1.1", "68:05:33:44:55:66", false);
-        addAccessDevice(9, 5000, rand.nextInt(), "10.20.1.7", "aa:aa:aa:aa:aa:04", "10.20.1.1", "68:05:33:44:55:66", false);
-        addAccessDevice(10, 5000, rand.nextInt(), "10.20.1.8", "aa:aa:aa:aa:aa:05", "10.20.1.1", "68:05:33:44:55:66", false);
-        addAccessDevice(11, 5000, rand.nextInt(), "10.20.1.9", "aa:aa:aa:aa:aa:06", "10.20.1.1", "68:05:33:44:55:66", false);
-        addAccessDevice(12, 5000, rand.nextInt(), "10.20.1.10", "aa:aa:aa:aa:aa:07", "10.20.1.1", "68:05:33:44:55:66", false);
-        addAccessDevice(13, 5000, rand.nextInt(), "10.20.1.11", "aa:aa:aa:aa:aa:08", "10.20.1.1", "68:05:33:44:55:66", false);
-        addAccessDevice(14, 5000, rand.nextInt(), "10.20.1.12", "aa:aa:aa:aa:aa:09", "10.20.1.1", "68:05:33:44:55:66", false);*/
+        for(int i = 0; i < 20; i++){
 
+            try{
+                addAccessDevice(5 + i, 5002+ i, rand.nextInt(), Ip4Address.valueOf(Ip4Address.valueOf("10.20.1.2").toInt() + i).toString(), "10.20.1.1", "68:05:33:44:55:66");
+            } catch (Exception e){
+                log.error("Error ", e);
+            }
 
+        }
 
+        /*addAccessDevice(5, 5002, rand.nextInt(), "10.20.1.2", "10.20.1.1", "68:05:33:44:55:66");
+        addAccessDevice(6, 5003, rand.nextInt(), "10.20.1.3", "10.20.1.1", "68:05:33:44:55:66");
+        addAccessDevice(7, 5004, rand.nextInt(), "10.20.1.4", "10.20.1.1", "68:05:33:44:55:66");
+        addAccessDevice(8, 5005, rand.nextInt(), "10.20.1.5", "10.20.1.1", "68:05:33:44:55:66");
+        addAccessDevice(9, 5006, rand.nextInt(), "10.20.1.6", "10.20.1.1", "68:05:33:44:55:66");
+        addAccessDevice(10, 5007, rand.nextInt(), "10.20.1.7", "10.20.1.1", "68:05:33:44:55:66");
+        addAccessDevice(11, 5008, rand.nextInt(), "10.20.1.8", "10.20.1.1", "68:05:33:44:55:66");
+        addAccessDevice(12, 5009, rand.nextInt(), "10.20.1.9", "10.20.1.1", "68:05:33:44:55:66");
+        addAccessDevice(13, 5010, rand.nextInt(), "10.20.1.10", "10.20.1.1", "68:05:33:44:55:66");
+        addAccessDevice(14, 5011, rand.nextInt(), "10.20.1.11", "10.20.1.1", "68:05:33:44:55:66");*/
 
 
 
@@ -171,16 +171,43 @@ public class NoviAggSwitchComponent {
         log.info("Stopped");
     }
 
-    private void addAccessDevice(int port, int vni, int udpPort, String bngVxlanIp, String bngVxlanMac, String switchVxlanIp, String switchVxlanMac, boolean twoWay) {
+    private void addAccessDevice(int port, int vni, int udpPort, String bngVxlanIp, String bngVxlanMac, String switchVxlanIp, String switchVxlanMac) {
 
         try {
             accessToBng(PortNumber.portNumber(port), vni, udpPort, Ip4Address.valueOf(bngVxlanIp), MacAddress.valueOf(bngVxlanMac), Ip4Address.valueOf(switchVxlanIp), MacAddress.valueOf(switchVxlanMac));
-            if(twoWay) {
-                bngToAccess(PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp));
-            }
+            bngToAccess(PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp));
+
         } catch(Exception e) {
             log.warn("Exception", e);
         }
+
+    }
+
+    private void addAccessDevice(int port, int vni, int udpPort, String bngVxlanIp, String switchVxlanIp, String switchVxlanMac) {
+
+        Runnable r = new Runnable() {
+
+            @Override
+            public void run() {
+                Ip4Address bngVxLanIP = Ip4Address.valueOf(bngVxlanIp);
+                MacAddress bngVxLanMac = processor.getMac(bngVxLanIP);
+                log.info("MAC found, ready to add flows");
+
+                try {
+                    accessToBng(PortNumber.portNumber(port), vni, udpPort, bngVxLanIP, bngVxLanMac, Ip4Address.valueOf(switchVxlanIp), MacAddress.valueOf(switchVxlanMac));
+                    bngToAccess(PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp));
+
+                } catch(Exception e) {
+                    log.warn("Exception", e);
+                }
+            }
+        };
+
+        Thread t = new Thread(r);
+        t.setDaemon(true);
+        t.start();
+
+
 
     }
 
@@ -208,11 +235,11 @@ public class NoviAggSwitchComponent {
     }
 
 
-    private void bngToAccess(PortNumber port, int vni, Ip4Address switchVxlanIp) {
+    private void bngToAccess(PortNumber port, int vni, Ip4Address bngVxLanIP) {
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchInPort(bngPort);
-        selector.extension(new NoviflowMatchVni(vni), deviceId);
+        selector.matchIPSrc(bngVxLanIP.toIpPrefix());
 
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
@@ -262,7 +289,7 @@ public class NoviAggSwitchComponent {
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchIPDst(respondFor.toIpPrefix());
-        //selector.matchIPProtocol(IPv4.PROTOCOL_ICMP);
+        selector.matchIPProtocol(IPv4.PROTOCOL_ICMP);
 
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
@@ -291,7 +318,17 @@ public class NoviAggSwitchComponent {
                 OFNoviflowVniExperimenterMsg msg = new OFNoviflowVniExperimenterMsg(0);
 
                 try {
-                    Socket socket = new Socket(InetAddress.getByAddress(Ip4Address.valueOf("10.64.1.85").toOctets()), 6633);
+                    byte[] ip = new byte[4];
+                    ip[0] = 10;
+                    ip[1] = 64;
+                    ip[2] = 1;
+                    ip[3] = 85;
+                    InetAddress dstIp = InetAddress.getByAddress(ip);
+                    ip[3] = 50;
+                    InetAddress sourceIp = InetAddress.getByAddress(ip);
+                    log.info("Source : " + sourceIp);
+                    log.info("Destination : " + dstIp);
+                    Socket socket = new Socket(dstIp, 40095, sourceIp, 6653);
                     OutputStream os = socket.getOutputStream();
 
                     InputStream is = socket.getInputStream();
@@ -332,6 +369,7 @@ public class NoviAggSwitchComponent {
 
     private class NoviBngPacketProcessor implements PacketProcessor {
 
+        List<MacRequest> macRequests = new LinkedList<>();
 
         @Override
         public void process(PacketContext context) {
@@ -404,17 +442,20 @@ public class NoviAggSwitchComponent {
 
         private void handleArpReply(PortNumber inPort, Ethernet ethPkt) {
             ARP arpReply = (ARP) ethPkt.getPayload();
+            log.info("ARP reply");
 
 
             // ARP reply for router. Process all pending IP packets.
             Ip4Address hostIpAddress = Ip4Address.valueOf(arpReply.getSenderProtocolAddress());
-            if(hostIpAddress.equals(uplinkIp)) {
-                MacAddress newUplinkMac = MacAddress.valueOf(arpReply.getSenderHardwareAddress());
-                //Check if the one previously on file was different
-                if(uplinkMac != null && !newUplinkMac.equals(uplinkMac)){
-                    //The Mac has changed, need to refresh the flows
+            for (MacRequest request : macRequests) {
+                if (request.getIp().equals(hostIpAddress)) {
+                    MacAddress mac = MacAddress.valueOf(arpReply.getSenderHardwareAddress());
+
+                    request.setMac(mac);
+                    request.unlock();
+                    log.info("requested MAC for " + request.getIp() +" found");
+                    macRequests.remove(request);
                 }
-                log.info("Uplink MAC found : "  +newUplinkMac.toString());
             }
         }
 
@@ -546,6 +587,59 @@ public class NoviAggSwitchComponent {
             packetService.emit(outPacket);
             log.info("ARP response sent");
         }
+
+        public MacAddress getMac(Ip4Address ip) {
+
+            MacRequest request = new MacRequest(ip);
+            macRequests.add(request);
+            sendArpRequest(ip, bngPort, VlanId.NONE);
+            log.info("ARP request for : " + ip.toString());
+            request.lock();
+
+            log.info("MAC found : " + request.getMac() + " for " + ip);
+            return request.getMac();
+
+
+        }
+
+        private class MacRequest {
+
+            private Ip4Address ip;
+            private Semaphore lock;
+            private MacAddress matchingMac;
+
+            MacRequest(Ip4Address ip) {
+                this.ip = ip;
+                lock = new Semaphore(-1);
+            }
+
+            public void lock() {
+                try{
+                    lock.acquire();
+                } catch (Exception e) {
+                    log.error("Lock exception : " , e);
+                }
+            }
+
+            public void unlock(){
+                lock.release(2);
+            }
+
+            public void setMac(MacAddress mac) {
+                matchingMac = mac;
+            }
+
+            public MacAddress getMac() {
+                return  matchingMac;
+            }
+
+            public Ip4Address getIp() {
+                return ip;
+            }
+
+
+        }
+
     }
 
 

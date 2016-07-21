@@ -11,7 +11,6 @@ import org.projectfloodlight.openflow.types.U32;
 import org.projectfloodlight.openflow.types.U8;
 import org.onosproject.net.DeviceId;
 
-import java.nio.*;
 
 
 /**
@@ -67,7 +66,7 @@ public class OFNoviflowVniExperimenterMsg extends ThirdPartyMessage {
     private void addIntToBytes(byte[] bytes, int startIndex, int toAdd) {
 
         for (int i = 0; i < 4; i++) {
-            bytes[startIndex + i] = (byte)((toAdd  >> ((3 - i) * 8)) & 0xff);
+            bytes[startIndex + i] = (byte) ((toAdd  >> ((3 - i) * 8)) & 0xff);
         }
 
     }
@@ -128,11 +127,11 @@ public class OFNoviflowVniExperimenterMsg extends ThirdPartyMessage {
 
         byte[] ipPayload = new byte[size];
 
-        for(int i = 0; i < experimenterHeader.length; i++) {
+        for (int i = 0; i < experimenterHeader.length; i++) {
             ipPayload[i] = experimenterHeader[i];
         }
 
-        for(int i = 0; i < msg.length; i++) {
+        for (int i = 0; i < msg.length; i++) {
             ipPayload[i + experimenterHeader.length] = msg[i];
         }
 

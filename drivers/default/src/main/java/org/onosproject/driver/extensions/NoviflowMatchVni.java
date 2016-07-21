@@ -10,7 +10,7 @@ import org.onosproject.net.flow.criteria.ExtensionSelectorType;
  */
 
 
-public class NoviflowMatchVni extends AbstractExtension implements ExtensionSelector{
+public class NoviflowMatchVni extends AbstractExtension implements ExtensionSelector {
 
     int vni;
 
