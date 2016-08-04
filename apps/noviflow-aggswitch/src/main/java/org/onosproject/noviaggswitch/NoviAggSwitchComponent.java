@@ -276,7 +276,7 @@ public class NoviAggSwitchComponent {
         FlowRule.Builder rule = DefaultFlowRule.builder();
         rule.withSelector(selector.build());
         rule.withTreatment(treatment.build());
-        rule.withPriority(10000);
+        rule.withPriority(15000);
         rule.forTable(0);
         rule.fromApp(appId);
         rule.forDevice(deviceId);
@@ -288,6 +288,7 @@ public class NoviAggSwitchComponent {
     private void icmpIntercept(Ip4Address respondFor) {
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+        selector.matchEthType(Ethernet.TYPE_IPV4);
         selector.matchIPDst(respondFor.toIpPrefix());
         selector.matchIPProtocol(IPv4.PROTOCOL_ICMP);
 
