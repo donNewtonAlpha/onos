@@ -96,11 +96,21 @@ public class NoviAggSwitchComponent {
     private NoviBngPacketProcessor processor;
 
 
+    private static NoviAggSwitchComponent instance = null;
+
+
+    public static NoviAggSwitchComponent getComponent() {
+        return instance;
+
+    }
+
+
 
     @Activate
     protected void activate() {
 
         log.debug("trying to activate");
+        instance = this;
         appId = coreService.registerApplication("org.onosproject.noviaggswitch");
 
 
@@ -115,7 +125,7 @@ public class NoviAggSwitchComponent {
         arpIntercept(torIp);
         icmpIntercept(torIp);
 
-        Random rand = new Random();
+        /*Random rand = new Random();
 
         for(int i = 0; i < 20; i++){
 
@@ -125,7 +135,7 @@ public class NoviAggSwitchComponent {
                 log.error("Error ", e);
             }
 
-        }
+        }*/
 
         /*addAccessDevice(5, 5002, rand.nextInt(), "10.20.1.2", "10.20.1.1", "68:05:33:44:55:66");
         addAccessDevice(6, 5003, rand.nextInt(), "10.20.1.3", "10.20.1.1", "68:05:33:44:55:66");
@@ -169,6 +179,16 @@ public class NoviAggSwitchComponent {
 
 
         log.info("Stopped");
+    }
+
+    public void addAccessDevice(int port, int vni, String bngVxlanIp) {
+
+        Random rand = new Random();
+        int udpPort = rand.nextInt() + 2000;
+
+
+        addAccessDevice(port, vni, udpPort, bngVxlanIp, torIp.toString(), torMac.toString());
+
     }
 
     private void addAccessDevice(int port, int vni, int udpPort, String bngVxlanIp, String bngVxlanMac, String switchVxlanIp, String switchVxlanMac) {

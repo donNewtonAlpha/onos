@@ -22,6 +22,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 
+import org.onosproject.noviaggswitch.NoviAggSwitchComponent;
 import org.onosproject.rest.AbstractWebResource;
 import org.slf4j.Logger;
 
@@ -52,6 +53,8 @@ public class RestNoviAggSwitch extends AbstractWebResource {
             String vbngIP = jsonTree.findValue("vxlanIP").asText();
 
             log.info("Vxlan tunnel requested for port : " +port + ", IP : " + vbngIP + ", vni : " + vni);
+
+            NoviAggSwitchComponent.getComponent().addAccessDevice(port, vni, vbngIP);
 
             return Response.ok().build();
 
