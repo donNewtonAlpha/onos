@@ -34,6 +34,13 @@
         <onos.app.name>org.onosproject.noviaggswitch</onos.app.name>
         <onos.app.origin>SDN Arena, Inc.</onos.app.origin>
         <checkstyle.skip>true</checkstyle.skip>
+        <web.context>/onos/noviaggswitch</web.context>
+        <api.version>1.0.0</api.version>
+        <api.title>ONOS NoviAggSwitch REST API</api.title>
+        <api.description>
+            APIs for interacting with the Noviflow Aggregation Switch application.
+        </api.description>
+        <api.package>org.onosproject.noviaggswitch.web</api.package>
     </properties>
 
     <dependencies>

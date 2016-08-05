@@ -1,4 +1,4 @@
-package org.onosproject.noviaggswitch;
+package org.onosproject.noviaggswitch.web;
 
 
 
