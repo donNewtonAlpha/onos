@@ -23,6 +23,7 @@ import org.onosproject.driver.extensions.NoviflowPopVxLan;
 import org.onosproject.driver.extensions.NoviflowSetVxLan;
 import org.onosproject.driver.extensions.ofmessages.OFNoviflowVniExperimenterMsg;
 import org.onosproject.net.DeviceId;
+import org.onosproject.net.Port;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.flow.*;
 import org.onosproject.net.flow.DefaultFlowRule;
@@ -34,8 +35,6 @@ import org.onosproject.net.flow.TrafficTreatment;
 import org.onosproject.net.group.*;
 import org.onosproject.net.meter.*;
 import org.onosproject.net.packet.*;
-import org.onosproject.openflow.controller.Dpid;
-import org.onosproject.openflow.controller.OpenFlowController;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,7 +45,6 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.Semaphore;
 
 
@@ -78,9 +76,7 @@ public class NoviAggSwitchComponent {
 
 
 
-
-
-
+    
     static ApplicationId appId;
 
     static final DeviceId deviceId = DeviceId.deviceId("of:000000223d5a00d9");
@@ -88,10 +84,12 @@ public class NoviAggSwitchComponent {
 
 
     private static MacAddress torMac = MacAddress.valueOf("68:05:33:44:55:66");
-    private static Ip4Address torIp = Ip4Address.valueOf("10.20.1.1");
-    private static Ip4Address torRoutedInterfaceIp = Ip4Address.valueOf("10.1.4.0");
+    private static Ip4Address aggSwitchIP = Ip4Address.valueOf("10.50.1.1");
+    private static Ip4Address primaryLinkIP = Ip4Address.valueOf("10.20.1.1");
+    private static Ip4Address secondaryLinlkIP = Ip4Address.valueOf("10.20.2.1");
 
     private PortNumber bngPort;
+    private PortNumber secondaryBngPort;
 
     private NoviBngPacketProcessor processor;
 
@@ -121,9 +119,10 @@ public class NoviAggSwitchComponent {
         packetService.addProcessor(processor, 1);
 
         bngPort =  PortNumber.portNumber(2);
+        secondaryBngPort = PortNumber.portNumber(3);
 
-        arpIntercept(torIp);
-        icmpIntercept(torIp);
+        arpIntercept(aggSwitchIP);
+        icmpIntercept(aggSwitchIP);
 
         /*Random rand = new Random();
 
@@ -187,19 +186,43 @@ public class NoviAggSwitchComponent {
         int udpPort = rand.nextInt() + 2000;
 
 
-        addAccessDevice(port, vni, udpPort, bngVxlanIp, torIp.toString(), torMac.toString());
+        addAccessDevice(port, vni, udpPort, bngVxlanIp, aggSwitchIP.toString(), torMac.toString());
 
     }
 
-    private void addAccessDevice(int port, int vni, int udpPort, String bngVxlanIp, String bngVxlanMac, String switchVxlanIp, String switchVxlanMac) {
+    public void addAccessDevice(int port, int vni, String bngVxlanIp, String viaIP) {
 
-        try {
-            accessToBng(PortNumber.portNumber(port), vni, udpPort, Ip4Address.valueOf(bngVxlanIp), MacAddress.valueOf(bngVxlanMac), Ip4Address.valueOf(switchVxlanIp), MacAddress.valueOf(switchVxlanMac));
-            bngToAccess(PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp));
+        Random rand = new Random();
+        int udpPort = rand.nextInt() + 2000;
 
-        } catch(Exception e) {
-            log.warn("Exception", e);
-        }
+
+        addAccessDevice(port, vni, udpPort, bngVxlanIp, viaIP, aggSwitchIP.toString(), torMac.toString());
+
+    }
+
+    private void addAccessDevice(int port, int vni, int udpPort, String bngVxlanIp, String viaIP, String switchVxlanIp, String switchVxlanMac) {
+
+        Runnable r = new Runnable() {
+
+            @Override
+            public void run() {
+                Ip4Address bngVxLanIP = Ip4Address.valueOf(bngVxlanIp);
+                MacAddress bngVxLanMac = processor.getMac(Ip4Address.valueOf(viaIP));
+                log.info("MAC found, ready to add flows");
+
+                try {
+                    accessToBng(PortNumber.portNumber(port), vni, udpPort, bngVxLanIP, bngVxLanMac, Ip4Address.valueOf(switchVxlanIp), MacAddress.valueOf(switchVxlanMac));
+                    bngToAccess(PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp));
+
+                } catch(Exception e) {
+                    log.warn("Exception", e);
+                }
+            }
+        };
+
+        Thread t = new Thread(r);
+        t.setDaemon(true);
+        t.start();
 
     }
 
@@ -486,7 +509,7 @@ public class NoviAggSwitchComponent {
 
 
             Ip4Address requestIpAddress = Ip4Address.valueOf(ipPkt.getDestinationAddress());
-            if(requestIpAddress.equals(torIp)) {
+            if(requestIpAddress.equals(aggSwitchIP)) {
 
                 log.info("This ping request is for this switch");
                 sendICMPreply(inPort, ethPkt);
@@ -539,11 +562,11 @@ public class NoviAggSwitchComponent {
         private boolean isArpForTor(ARP arpMsg) {
             Ip4Address targetProtocolAddress = Ip4Address.valueOf(
                     arpMsg.getTargetProtocolAddress());
-            return (targetProtocolAddress.equals(torIp)||targetProtocolAddress.equals(torRoutedInterfaceIp));
+            return (targetProtocolAddress.equals(aggSwitchIP));
         }
 
 
-        public void sendArpRequest(IpAddress targetAddress, PortNumber dstPort, VlanId vlanId) {
+        public void sendArpRequest(IpAddress targetAddress, IpAddress sourceAddress, PortNumber dstPort, VlanId vlanId) {
 
 
             ARP arpRequest = new ARP();
@@ -555,7 +578,7 @@ public class NoviAggSwitchComponent {
                     .setOpCode(ARP.OP_REQUEST)
                     .setSenderHardwareAddress(torMac.toBytes())
                     .setTargetHardwareAddress(MacAddress.ZERO.toBytes())
-                    .setSenderProtocolAddress(torIp.toOctets())
+                    .setSenderProtocolAddress(sourceAddress.toOctets())
                     .setTargetProtocolAddress(targetAddress.toOctets());
 
             Ethernet eth = new Ethernet();
@@ -613,7 +636,8 @@ public class NoviAggSwitchComponent {
 
             MacRequest request = new MacRequest(ip);
             macRequests.add(request);
-            sendArpRequest(ip, bngPort, VlanId.NONE);
+            sendArpRequest(ip, primaryLinkIP, bngPort, VlanId.NONE);
+            sendArpRequest(ip, secondaryLinlkIP, secondaryBngPort, VlanId.NONE);
             log.info("ARP request for : " + ip.toString());
             request.lock();
 

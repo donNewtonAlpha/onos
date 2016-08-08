@@ -22,6 +22,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 
+import org.onlab.packet.Ip4Address;
 import org.onosproject.noviaggswitch.NoviAggSwitchComponent;
 import org.onosproject.rest.AbstractWebResource;
 import org.slf4j.Logger;
@@ -51,10 +52,16 @@ public class RestNoviAggSwitch extends AbstractWebResource {
             int port = jsonTree.findValue("port").asInt();
             int vni = jsonTree.findValue("vni").asInt();
             String vbngIP = jsonTree.findValue("vxlanIP").asText();
+            String viaIP = jsonTree.findValue("ViaIP").asText();
 
-            log.info("Vxlan tunnel requested for port : " +port + ", IP : " + vbngIP + ", vni : " + vni);
+            log.info("Vxlan tunnel requested for port : " +port + ", IP : " + vbngIP + ", vni : " + vni + ", viaIP : " + viaIP);
 
-            NoviAggSwitchComponent.getComponent().addAccessDevice(port, vni, vbngIP);
+            try{
+                Ip4Address.valueOf(viaIP);
+                NoviAggSwitchComponent.getComponent().addAccessDevice(port, vni, vbngIP, viaIP);
+            } catch(IllegalArgumentException e) {
+                NoviAggSwitchComponent.getComponent().addAccessDevice(port, vni, vbngIP);
+            }
 
             return Response.ok().build();
 
