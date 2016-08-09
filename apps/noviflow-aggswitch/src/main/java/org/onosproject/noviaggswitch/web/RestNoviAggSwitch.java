@@ -52,13 +52,15 @@ public class RestNoviAggSwitch extends AbstractWebResource {
             int port = jsonTree.findValue("port").asInt();
             int vni = jsonTree.findValue("vni").asInt();
             String vbngIP = jsonTree.findValue("vxlanIP").asText();
-            String viaIP = jsonTree.findValue("ViaIP").asText();
+            String viaPrimaryIP = jsonTree.findValue("viaPrimaryIP").asText();
+            String viaSecondaryIP = jsonTree.findValue("viaSecondaryIP").asText();
 
-            log.info("Vxlan tunnel requested for port : " +port + ", IP : " + vbngIP + ", vni : " + vni + ", viaIP : " + viaIP);
+            log.info("Vxlan tunnel requested for port : " +port + ", IP : " + vbngIP + ", vni : " + vni + ", viaIP : " + viaPrimaryIP.toString() + ", " + viaSecondaryIP.toString());
 
             try{
-                Ip4Address.valueOf(viaIP);
-                NoviAggSwitchComponent.getComponent().addAccessDevice(port, vni, vbngIP, viaIP);
+                Ip4Address.valueOf(viaPrimaryIP);
+                Ip4Address.valueOf(viaSecondaryIP);
+                NoviAggSwitchComponent.getComponent().addAccessDevice(port, vni, vbngIP, viaPrimaryIP, viaSecondaryIP);
             } catch(IllegalArgumentException e) {
                 NoviAggSwitchComponent.getComponent().addAccessDevice(port, vni, vbngIP);
             }

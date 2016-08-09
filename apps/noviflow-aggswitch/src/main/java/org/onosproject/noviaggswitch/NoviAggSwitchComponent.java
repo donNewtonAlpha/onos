@@ -5,23 +5,14 @@ package org.onosproject.noviaggswitch;
 import org.apache.felix.scr.annotations.*;
 
 
-
-import org.onlab.packet.Ethernet;
-import org.onlab.packet.ARP;
-import org.onlab.packet.MacAddress;
-import org.onlab.packet.Ip4Address;
-import org.onlab.packet.IPacket;
-import org.onlab.packet.IPv4;
-import org.onlab.packet.ICMP;
-import org.onlab.packet.IpPrefix;
-import org.onlab.packet.IpAddress;
-import org.onlab.packet.VlanId;
+import org.onlab.packet.*;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.driver.extensions.NoviflowMatchVni;
 import org.onosproject.driver.extensions.NoviflowPopVxLan;
 import org.onosproject.driver.extensions.NoviflowSetVxLan;
 import org.onosproject.driver.extensions.ofmessages.OFNoviflowVniExperimenterMsg;
+import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.Port;
 import org.onosproject.net.PortNumber;
@@ -33,6 +24,7 @@ import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.flow.TrafficSelector;
 import org.onosproject.net.flow.TrafficTreatment;
 import org.onosproject.net.group.*;
+import org.onosproject.net.link.LinkService;
 import org.onosproject.net.meter.*;
 import org.onosproject.net.packet.*;
 import org.slf4j.Logger;
@@ -74,6 +66,9 @@ public class NoviAggSwitchComponent {
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected PacketService packetService;
 
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected LinkService linkService;
+
 
 
     
@@ -83,7 +78,7 @@ public class NoviAggSwitchComponent {
 
 
 
-    private static MacAddress torMac = MacAddress.valueOf("68:05:33:44:55:66");
+    private static MacAddress switchMac = MacAddress.valueOf("68:05:33:44:55:66");
     private static Ip4Address aggSwitchIP = Ip4Address.valueOf("10.50.1.1");
     private static Ip4Address primaryLinkIP = Ip4Address.valueOf("10.20.1.1");
     private static Ip4Address secondaryLinlkIP = Ip4Address.valueOf("10.20.2.1");
@@ -91,7 +86,8 @@ public class NoviAggSwitchComponent {
     private PortNumber bngPort;
     private PortNumber secondaryBngPort;
 
-    private NoviBngPacketProcessor processor;
+    private NoviAggSwitchPacketProcessor processor;
+    private LinkFailureDetection linkFailureDetection;
 
 
     private static NoviAggSwitchComponent instance = null;
@@ -111,41 +107,51 @@ public class NoviAggSwitchComponent {
         instance = this;
         appId = coreService.registerApplication("org.onosproject.noviaggswitch");
 
-
-        //noviExpSetup();
-
+/*        //Packet processor
         processor = new NoviBngPacketProcessor();
+        packetService.addProcessor(processor, 1);*/
 
+        bngPort =  PortNumber.portNumber(7);
+        secondaryBngPort = PortNumber.portNumber(8);
+        
+        
+        //New version with new packet processor and link failure detection
+        
+        //Packet processor
+        processor = new NoviAggSwitchPacketProcessor(packetService);
         packetService.addProcessor(processor, 1);
+        
+        //Routing info
+        //4 info
 
-        bngPort =  PortNumber.portNumber(2);
-        secondaryBngPort = PortNumber.portNumber(3);
+        //loopback
+        processor.addRoutingInfo(deviceId, PortNumber.portNumber(7), Ip4Prefix.valueOf(aggSwitchIP, 24), aggSwitchIP, MacAddress.valueOf("00:00:00:00:00:00"));
+        processor.addRoutingInfo(deviceId, PortNumber.portNumber(8), Ip4Prefix.valueOf(aggSwitchIP, 24), aggSwitchIP, MacAddress.valueOf("00:00:00:00:00:00"));
+        //Uplinks
+        processor.addRoutingInfo(deviceId, PortNumber.portNumber(7), Ip4Prefix.valueOf(primaryLinkIP, 24), primaryLinkIP, MacAddress.valueOf("68:05:11:11:11:11"));
+        processor.addRoutingInfo(deviceId, PortNumber.portNumber(8), Ip4Prefix.valueOf(secondaryLinlkIP, 24), secondaryLinlkIP, MacAddress.valueOf("68:05:22:22:22:22"));
 
-        arpIntercept(aggSwitchIP);
+
+        //LinkFailureDetection
+        List<ConnectPoint> redundancyPorts = new LinkedList<>();
+        redundancyPorts.add(new ConnectPoint(deviceId, PortNumber.portNumber(7)));
+        redundancyPorts.add(new ConnectPoint(deviceId, PortNumber.portNumber(8)));
+
+        linkFailureDetection = new LinkFailureDetection(linkService, flowRuleService, redundancyPorts);
+        linkService.addListener(linkFailureDetection);
+
+
+        //IPs the agg switch is responding to ARP
+        //arpIntercept(aggSwitchIP);
+        arpIntercept(primaryLinkIP);
+        arpIntercept(secondaryLinlkIP);
+
+        //IPs the agg switch is responding to ping
         icmpIntercept(aggSwitchIP);
+        icmpIntercept(primaryLinkIP);
+        icmpIntercept(secondaryLinlkIP);
 
-        /*Random rand = new Random();
 
-        for(int i = 0; i < 20; i++){
-
-            try{
-                addAccessDevice(5 + i, 5002+ i, rand.nextInt(), Ip4Address.valueOf(Ip4Address.valueOf("10.20.1.2").toInt() + i).toString(), "10.20.1.1", "68:05:33:44:55:66");
-            } catch (Exception e){
-                log.error("Error ", e);
-            }
-
-        }*/
-
-        /*addAccessDevice(5, 5002, rand.nextInt(), "10.20.1.2", "10.20.1.1", "68:05:33:44:55:66");
-        addAccessDevice(6, 5003, rand.nextInt(), "10.20.1.3", "10.20.1.1", "68:05:33:44:55:66");
-        addAccessDevice(7, 5004, rand.nextInt(), "10.20.1.4", "10.20.1.1", "68:05:33:44:55:66");
-        addAccessDevice(8, 5005, rand.nextInt(), "10.20.1.5", "10.20.1.1", "68:05:33:44:55:66");
-        addAccessDevice(9, 5006, rand.nextInt(), "10.20.1.6", "10.20.1.1", "68:05:33:44:55:66");
-        addAccessDevice(10, 5007, rand.nextInt(), "10.20.1.7", "10.20.1.1", "68:05:33:44:55:66");
-        addAccessDevice(11, 5008, rand.nextInt(), "10.20.1.8", "10.20.1.1", "68:05:33:44:55:66");
-        addAccessDevice(12, 5009, rand.nextInt(), "10.20.1.9", "10.20.1.1", "68:05:33:44:55:66");
-        addAccessDevice(13, 5010, rand.nextInt(), "10.20.1.10", "10.20.1.1", "68:05:33:44:55:66");
-        addAccessDevice(14, 5011, rand.nextInt(), "10.20.1.11", "10.20.1.1", "68:05:33:44:55:66");*/
 
 
 
@@ -182,40 +188,54 @@ public class NoviAggSwitchComponent {
 
     public void addAccessDevice(int port, int vni, String bngVxlanIp) {
 
+        addAccessDevice(port, vni, bngVxlanIp, bngVxlanIp, bngVxlanIp);
+
+    }
+
+    public void addAccessDevice(int port, int vni, String bngVxlanIp, String viaPrimaryIP, String viaSecondaryIP) {
+
         Random rand = new Random();
         int udpPort = rand.nextInt() + 2000;
 
 
-        addAccessDevice(port, vni, udpPort, bngVxlanIp, aggSwitchIP.toString(), torMac.toString());
+        addAccessDevice(port, vni, udpPort, bngVxlanIp, viaPrimaryIP, viaSecondaryIP, aggSwitchIP.toString(), switchMac.toString());
 
     }
 
-    public void addAccessDevice(int port, int vni, String bngVxlanIp, String viaIP) {
-
-        Random rand = new Random();
-        int udpPort = rand.nextInt() + 2000;
-
-
-        addAccessDevice(port, vni, udpPort, bngVxlanIp, viaIP, aggSwitchIP.toString(), torMac.toString());
-
-    }
-
-    private void addAccessDevice(int port, int vni, int udpPort, String bngVxlanIp, String viaIP, String switchVxlanIp, String switchVxlanMac) {
+    private void addAccessDevice(int port, int vni, int udpPort, String bngVxlanIp, String viaPrimaryIP, String viaSecondaryIP, String switchVxlanIp, String switchVxlanMac) {
 
         Runnable r = new Runnable() {
 
             @Override
             public void run() {
                 Ip4Address bngVxLanIP = Ip4Address.valueOf(bngVxlanIp);
-                MacAddress bngVxLanMac = processor.getMac(Ip4Address.valueOf(viaIP));
+
+                //PrimaryPath
+                MacAddress bngVxLanPrimaryMac = processor.getMac(Ip4Address.valueOf(viaPrimaryIP));
                 log.info("MAC found, ready to add flows");
 
                 try {
-                    accessToBng(PortNumber.portNumber(port), vni, udpPort, bngVxLanIP, bngVxLanMac, Ip4Address.valueOf(switchVxlanIp), MacAddress.valueOf(switchVxlanMac));
-                    bngToAccess(PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp));
+                    accessToBng(PortNumber.portNumber(port), vni, udpPort, bngVxLanIP, bngVxLanPrimaryMac, Ip4Address.valueOf(switchVxlanIp), MacAddress.valueOf(switchVxlanMac), true);
+                    bngToAccess(PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp), true);
 
                 } catch(Exception e) {
                     log.warn("Exception", e);
+                }
+
+                //SecondaryPath if different from primary
+
+                if(!viaSecondaryIP.equals(viaPrimaryIP)) {
+
+                    MacAddress bngVxLanSecondaryMac = processor.getMac(Ip4Address.valueOf(viaSecondaryIP));
+                    log.info("MAC found, ready to add flows");
+
+                    try {
+                        accessToBng(PortNumber.portNumber(port), vni, udpPort, bngVxLanIP, bngVxLanSecondaryMac, Ip4Address.valueOf(switchVxlanIp), MacAddress.valueOf(switchVxlanMac), false);
+                        bngToAccess(PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp), false);
+
+                    } catch (Exception e) {
+                        log.warn("Exception", e);
+                    }
                 }
             }
         };
@@ -226,35 +246,13 @@ public class NoviAggSwitchComponent {
 
     }
 
-    private void addAccessDevice(int port, int vni, int udpPort, String bngVxlanIp, String switchVxlanIp, String switchVxlanMac) {
+/*    private void addAccessDevice(int port, int vni, int udpPort, String bngVxlanIp, String switchVxlanIp, String switchVxlanMac) {
 
-        Runnable r = new Runnable() {
+        addAccessDevice(port, vni, udpPort, bngVxlanIp, bngVxlanIp, switchVxlanIp, switchVxlanMac);
 
-            @Override
-            public void run() {
-                Ip4Address bngVxLanIP = Ip4Address.valueOf(bngVxlanIp);
-                MacAddress bngVxLanMac = processor.getMac(bngVxLanIP);
-                log.info("MAC found, ready to add flows");
+    }*/
 
-                try {
-                    accessToBng(PortNumber.portNumber(port), vni, udpPort, bngVxLanIP, bngVxLanMac, Ip4Address.valueOf(switchVxlanIp), MacAddress.valueOf(switchVxlanMac));
-                    bngToAccess(PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp));
-
-                } catch(Exception e) {
-                    log.warn("Exception", e);
-                }
-            }
-        };
-
-        Thread t = new Thread(r);
-        t.setDaemon(true);
-        t.start();
-
-
-
-    }
-
-    private void accessToBng(PortNumber port, int vni, int udpPort, Ip4Address bngVxlanIp, MacAddress bngVxlanMac, Ip4Address switchVxlanIp, MacAddress switchVxlanMac){
+    private void accessToBng(PortNumber port, int vni, int udpPort, Ip4Address bngVxlanIp, MacAddress bngVxlanMac, Ip4Address switchVxlanIp, MacAddress switchVxlanMac, boolean primary){
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchInPort(port);
@@ -262,12 +260,20 @@ public class NoviAggSwitchComponent {
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
         treatment.extension(new NoviflowSetVxLan(switchVxlanMac,bngVxlanMac, switchVxlanIp, bngVxlanIp, udpPort, vni), deviceId);
-        treatment.setOutput(bngPort);
+        if(primary) {
+            treatment.setOutput(bngPort);
+        } else {
+            treatment.setOutput(secondaryBngPort);
+        }
 
         FlowRule.Builder rule = DefaultFlowRule.builder();
         rule.withSelector(selector.build());
         rule.withTreatment(treatment.build());
-        rule.withPriority(2000);
+        if(primary) {
+            rule.withPriority(2000);
+        } else {
+            rule.withPriority(1000);
+        }
         rule.forTable(0);
         rule.fromApp(appId);
         rule.forDevice(deviceId);
@@ -278,10 +284,14 @@ public class NoviAggSwitchComponent {
     }
 
 
-    private void bngToAccess(PortNumber port, int vni, Ip4Address bngVxLanIP) {
+    private void bngToAccess(PortNumber port, int vni, Ip4Address bngVxLanIP, boolean primary) {
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
-        selector.matchInPort(bngPort);
+        if(primary) {
+            selector.matchInPort(bngPort);
+        } else {
+            selector.matchInPort(secondaryBngPort);
+        }
         selector.matchIPSrc(bngVxLanIP.toIpPrefix());
 
 
@@ -292,7 +302,11 @@ public class NoviAggSwitchComponent {
         FlowRule.Builder rule = DefaultFlowRule.builder();
         rule.withSelector(selector.build());
         rule.withTreatment(treatment.build());
-        rule.withPriority(1500);
+        if(primary) {
+            rule.withPriority(1500);
+        } else {
+            rule.withPriority(750);
+        }
         rule.forTable(0);
         rule.fromApp(appId);
         rule.forDevice(deviceId);
@@ -353,7 +367,7 @@ public class NoviAggSwitchComponent {
     }
 
 
-    private void noviExpSetup() {
+    /*private void noviExpSetup() {
 
         Runnable r = new Runnable() {
             @Override
@@ -407,11 +421,11 @@ public class NoviAggSwitchComponent {
         t.setDaemon(true);
         t.start();
 
-    }
+    }*/
 
 
 
-    private class NoviBngPacketProcessor implements PacketProcessor {
+    /*private class NoviBngPacketProcessor implements PacketProcessor {
 
         List<MacRequest> macRequests = new LinkedList<>();
 
@@ -543,7 +557,7 @@ public class NoviAggSwitchComponent {
 
             //Modify the original request and send it back : It keeps the proper vlan tagging
             ethPkt.setDestinationMACAddress(ethPkt.getSourceMAC())
-                    .setSourceMACAddress(torMac)
+                    .setSourceMACAddress(switchMac)
                     .setEtherType(Ethernet.TYPE_IPV4)
                     .setPayload(ipResponse);
 
@@ -576,14 +590,14 @@ public class NoviAggSwitchComponent {
                             (byte) Ethernet.DATALAYER_ADDRESS_LENGTH)
                     .setProtocolAddressLength((byte) Ip4Address.BYTE_LENGTH)
                     .setOpCode(ARP.OP_REQUEST)
-                    .setSenderHardwareAddress(torMac.toBytes())
+                    .setSenderHardwareAddress(switchMac.toBytes())
                     .setTargetHardwareAddress(MacAddress.ZERO.toBytes())
                     .setSenderProtocolAddress(sourceAddress.toOctets())
                     .setTargetProtocolAddress(targetAddress.toOctets());
 
             Ethernet eth = new Ethernet();
             eth.setDestinationMACAddress(MacAddress.BROADCAST.toBytes())
-                    .setSourceMACAddress(torMac)
+                    .setSourceMACAddress(switchMac)
                     .setEtherType(Ethernet.TYPE_ARP).setPayload(arpRequest);
 
             if(!vlanId.equals(VlanId.NONE)){
@@ -609,7 +623,7 @@ public class NoviAggSwitchComponent {
                             (byte) Ethernet.DATALAYER_ADDRESS_LENGTH)
                     .setProtocolAddressLength((byte) Ip4Address.BYTE_LENGTH)
                     .setOpCode(ARP.OP_REPLY)
-                    .setSenderHardwareAddress(torMac.toBytes())
+                    .setSenderHardwareAddress(switchMac.toBytes())
                     .setSenderProtocolAddress(arpRequest.getTargetProtocolAddress())
                     .setTargetHardwareAddress(arpRequest.getSenderHardwareAddress())
                     .setTargetProtocolAddress(arpRequest.getSenderProtocolAddress());
@@ -617,7 +631,7 @@ public class NoviAggSwitchComponent {
 
             //Modify the original request and send it back : It keeps the proper vlan tagging
             eth.setDestinationMACAddress(arpRequest.getSenderHardwareAddress())
-                    .setSourceMACAddress(torMac)
+                    .setSourceMACAddress(switchMac)
                     .setEtherType(Ethernet.TYPE_ARP)
                     .setPayload(arpReply);
 
@@ -687,7 +701,7 @@ public class NoviAggSwitchComponent {
 
     }
 
-
+*/
 
 }
 
