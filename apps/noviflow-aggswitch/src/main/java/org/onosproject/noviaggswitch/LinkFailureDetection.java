@@ -67,7 +67,20 @@ public class LinkFailureDetection implements DeviceListener{
 
                 log.info(" Port " + affectedPort.toString() + " from device " + affectedDevice.toString() + " affected");
 
-                if(event.type() == DeviceEvent.Type.PORT_REMOVED) {
+                boolean portDown = false;
+                boolean portUp = false;
+
+                if(event.type() == DeviceEvent.Type.PORT_UPDATED) {
+
+                    if(event.port().isEnabled()) {
+                        portUp = true;
+                    } else {
+                        portDown = true;
+                    }
+
+                }
+
+                if(event.type() == DeviceEvent.Type.PORT_REMOVED || portDown) {
 
                     //Port Down
                     //remove the matching flows and
@@ -93,7 +106,7 @@ public class LinkFailureDetection implements DeviceListener{
 
                 }
 
-                if(event.type() == DeviceEvent.Type.PORT_ADDED) {
+                if(event.type() == DeviceEvent.Type.PORT_ADDED || portUp) {
                     //Port back up, reinstate the flows
                     for (WithdrawnFlows wFlows : withdrawnFlows) {
                         if(wFlows.getPort().equals(cp)){

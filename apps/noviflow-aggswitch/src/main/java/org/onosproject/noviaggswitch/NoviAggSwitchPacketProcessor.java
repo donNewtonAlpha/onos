@@ -282,7 +282,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
                 treatment.build(), ByteBuffer.wrap(eth.serialize()));
 
         packetService.emit(outPacket);
-        log.info("ARP response sent for IP : " + arpRequest.getTargetProtocolAddress() + " on port " + dstPort.toString());
+        log.info("ARP response sent for IP : " + Ip4Address.valueOf(arpRequest.getTargetProtocolAddress()) + " on port " + dstPort.toString());
     }
 
     public void addRoutingInfo(DeviceId deviceId, PortNumber port, Ip4Prefix subnet, Ip4Address ip, MacAddress mac) {
