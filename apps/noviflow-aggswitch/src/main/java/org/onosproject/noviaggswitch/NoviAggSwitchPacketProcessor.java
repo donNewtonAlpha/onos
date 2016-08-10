@@ -208,7 +208,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
                 treatment.build(), ByteBuffer.wrap(ethPkt.serialize()));
 
         packetService.emit(outPacket);
-        log.info("ICMP reply response sent");
+        log.info("ICMP reply response from " + ipPkt.getDestinationAddress() + " to " + ipPkt.getSourceAddress() + "sent on port " + port.toString());
 
     }
 
@@ -253,7 +253,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
     private void sendArpResponse(Ethernet eth, ARP arpRequest, MacAddress mac, DeviceId deviceId, PortNumber dstPort) {
 
-        log.info("Preparing to send ARP response !!");
+        //log.info("Preparing to send ARP response !!");
 
         ARP arpReply = new ARP();
         arpReply.setHardwareType(ARP.HW_TYPE_ETHERNET)
@@ -282,7 +282,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
                 treatment.build(), ByteBuffer.wrap(eth.serialize()));
 
         packetService.emit(outPacket);
-        log.info("ARP response sent");
+        log.info("ARP response sent for IP : " + arpRequest.getTargetProtocolAddress() + " on port " + dstPort.toString());
     }
 
     public void addRoutingInfo(DeviceId deviceId, PortNumber port, Ip4Prefix subnet, Ip4Address ip, MacAddress mac) {

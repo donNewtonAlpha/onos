@@ -18,6 +18,7 @@ import org.onosproject.net.Port;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.config.NetworkConfigRegistry;
 import org.onosproject.net.config.NetworkConfigService;
+import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.flow.*;
 import org.onosproject.net.flow.DefaultFlowRule;
 import org.onosproject.net.flow.DefaultTrafficSelector;
@@ -70,11 +71,12 @@ public class NoviAggSwitchComponent {
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected PacketService packetService;
 
-    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected LinkService linkService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected NetworkConfigRegistry cfgService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected DeviceService deviceService;
 
 
 
@@ -145,8 +147,8 @@ public class NoviAggSwitchComponent {
         redundancyPorts.add(new ConnectPoint(deviceId, PortNumber.portNumber(7)));
         redundancyPorts.add(new ConnectPoint(deviceId, PortNumber.portNumber(8)));
 
-        linkFailureDetection = new LinkFailureDetection(linkService, flowRuleService, redundancyPorts);
-        linkService.addListener(linkFailureDetection);
+        linkFailureDetection = new LinkFailureDetection(flowRuleService, redundancyPorts);
+        deviceService.addListener(linkFailureDetection);
 
 
 
