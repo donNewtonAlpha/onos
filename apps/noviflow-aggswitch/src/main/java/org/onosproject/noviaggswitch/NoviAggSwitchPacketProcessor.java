@@ -123,10 +123,12 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
         ARP arpRequest = (ARP) ethPkt.getPayload();
         Ip4Address targetProtocolAddress = Ip4Address.valueOf(
                 arpRequest.getTargetProtocolAddress());
+        log.info("ARP request for " + targetProtocolAddress + " on port " + inPort.toString());
         // Check if this is an ARP for the switch
         for(RoutingInfo info : routingInfos) {
 
             if(info.getPort().equals(inPort) && targetProtocolAddress.equals(info.getIp())){
+                log.info("handleArpRequest, matching routing info found");
                 sendArpResponse(ethPkt, arpRequest, info.getMac(), info.getDeviceId(), inPort);
             }
 
