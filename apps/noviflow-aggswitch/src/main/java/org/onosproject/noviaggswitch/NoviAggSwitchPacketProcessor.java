@@ -31,6 +31,31 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
     public NoviAggSwitchPacketProcessor(PacketService packetService) {
         this.packetService = packetService;
+
+        //Create thread that periodically make ARP request
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+
+                if(macRequests.size() > 0) {
+
+                    for(MacRequest request: macRequests) {
+                        request.execute();
+                    }
+                }
+
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+
+        Thread t = new Thread(r);
+        t.setDaemon(true);
+        t.start();
+
     }
 
 
@@ -187,7 +212,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
 
 
-    public void sendArpRequest(IpAddress targetAddress, IpAddress sourceAddress, MacAddress sourceMac, DeviceId deviceId, PortNumber dstPort, VlanId vlanId) {
+    public OutboundPacket getArpRequest(IpAddress targetAddress, IpAddress sourceAddress, MacAddress sourceMac, DeviceId deviceId, PortNumber dstPort, VlanId vlanId) {
 
 
         ARP arpRequest = new ARP();
@@ -216,7 +241,12 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
         OutboundPacket outPacket = new DefaultOutboundPacket(deviceId,
                 treatment.build(), ByteBuffer.wrap(eth.serialize()));
 
-        packetService.emit(outPacket);
+        return outPacket;
+    }
+
+    public void sendArpRequest(IpAddress targetAddress, IpAddress sourceAddress, MacAddress sourceMac, DeviceId deviceId, PortNumber dstPort, VlanId vlanId) {
+
+        packetService.emit(getArpRequest(targetAddress, sourceAddress, sourceMac, deviceId, dstPort, vlanId));
     }
 
     private void sendArpResponse(Ethernet eth, ARP arpRequest, MacAddress mac, DeviceId deviceId, PortNumber dstPort) {
@@ -261,6 +291,10 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
         routingInfos.remove(info);
     }
 
+    public void clearRoutingInfo() {
+        routingInfos.clear();
+    }
+
     public MacAddress getMac(Ip4Address ip) {
 
         MacRequest request = new MacRequest(ip);
@@ -275,9 +309,9 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
         if(matchingInfo != null) {
 
-            sendArpRequest(ip, matchingInfo.getIp(), matchingInfo.getMac(), matchingInfo.getDeviceId(), matchingInfo.getPort(), VlanId.NONE);
+            request.setArpRequest(getArpRequest(ip, matchingInfo.getIp(), matchingInfo.getMac(), matchingInfo.getDeviceId(), matchingInfo.getPort(), VlanId.NONE));
+            request.execute();
 
-            log.info("ARP request for : " + ip.toString());
             request.lock();
 
             log.info("MAC found : " + request.getMac() + " for " + ip);
@@ -290,11 +324,21 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
     }
 
+    public void clearMacRequests() {
+        for(MacRequest mr : macRequests) {
+            mr.unlock();
+        }
+        macRequests.clear();
+    }
+
     private class MacRequest {
 
         private Ip4Address ip;
         private Semaphore lock;
-        private MacAddress matchingMac;
+        private MacAddress matchingMac = null;
+
+        private boolean needToARP = false;
+        private OutboundPacket arpRequest = null;
 
         MacRequest(Ip4Address ip) {
             this.ip = ip;
@@ -315,6 +359,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
         public void setMac(MacAddress mac) {
             matchingMac = mac;
+            needToARP = false;
         }
 
         public MacAddress getMac() {
@@ -323,6 +368,24 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
         public Ip4Address getIp() {
             return ip;
+        }
+
+        public void setArpRequest(OutboundPacket request) {
+            this.needToARP = true;
+            this.arpRequest = request;
+        }
+
+        public void execute() {
+            if(needToARP) {
+                if(arpRequest != null){
+
+                    packetService.emit(arpRequest);
+                    log.info("ARP request for : " + ip.toString());
+
+                } else {
+                    log.warn("No ARP request assigned");
+                }
+            }
         }
 
         public boolean equals (Object otherObject) {

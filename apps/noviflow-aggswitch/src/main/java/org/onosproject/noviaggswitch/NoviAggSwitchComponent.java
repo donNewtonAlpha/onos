@@ -16,6 +16,8 @@ import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.Port;
 import org.onosproject.net.PortNumber;
+import org.onosproject.net.config.NetworkConfigRegistry;
+import org.onosproject.net.config.NetworkConfigService;
 import org.onosproject.net.flow.*;
 import org.onosproject.net.flow.DefaultFlowRule;
 import org.onosproject.net.flow.DefaultTrafficSelector;
@@ -27,6 +29,8 @@ import org.onosproject.net.group.*;
 import org.onosproject.net.link.LinkService;
 import org.onosproject.net.meter.*;
 import org.onosproject.net.packet.*;
+import org.onosproject.noviaggswitch.config.NoviAggSwitchConfig;
+import org.onosproject.noviaggswitch.config.NoviAggSwitchConfigListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,6 +73,10 @@ public class NoviAggSwitchComponent {
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected LinkService linkService;
 
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected NetworkConfigRegistry cfgService;
+
+
 
 
     
@@ -88,6 +96,7 @@ public class NoviAggSwitchComponent {
 
     private NoviAggSwitchPacketProcessor processor;
     private LinkFailureDetection linkFailureDetection;
+    private NoviAggSwitchConfigListener cfgListener;
 
 
     private static NoviAggSwitchComponent instance = null;
@@ -107,16 +116,15 @@ public class NoviAggSwitchComponent {
         instance = this;
         appId = coreService.registerApplication("org.onosproject.noviaggswitch");
 
-/*        //Packet processor
-        processor = new NoviBngPacketProcessor();
-        packetService.addProcessor(processor, 1);*/
 
         bngPort =  PortNumber.portNumber(7);
         secondaryBngPort = PortNumber.portNumber(8);
+        /*        //Config
+        cfgListener = new NoviAggSwitchConfigListener();
+        cfgService.registerConfigFactory(cfgListener.getCfgAppFactory());
+        cfgService.addListener(cfgListener);*/
         
-        
-        //New version with new packet processor and link failure detection
-        
+
         //Packet processor
         processor = new NoviAggSwitchPacketProcessor(packetService);
         packetService.addProcessor(processor, 1);
@@ -125,8 +133,8 @@ public class NoviAggSwitchComponent {
         //4 info
 
         //loopback
-        processor.addRoutingInfo(deviceId, PortNumber.portNumber(7), Ip4Prefix.valueOf(aggSwitchIP, 24), aggSwitchIP, MacAddress.valueOf("00:00:00:00:00:00"));
-        processor.addRoutingInfo(deviceId, PortNumber.portNumber(8), Ip4Prefix.valueOf(aggSwitchIP, 24), aggSwitchIP, MacAddress.valueOf("00:00:00:00:00:00"));
+        processor.addRoutingInfo(deviceId, bngPort, Ip4Prefix.valueOf(aggSwitchIP, 24), aggSwitchIP, MacAddress.valueOf("00:00:00:00:00:00"));
+        processor.addRoutingInfo(deviceId, secondaryBngPort, Ip4Prefix.valueOf(aggSwitchIP, 24), aggSwitchIP, MacAddress.valueOf("00:00:00:00:00:00"));
         //Uplinks
         processor.addRoutingInfo(deviceId, PortNumber.portNumber(7), Ip4Prefix.valueOf(primaryLinkIP, 24), primaryLinkIP, MacAddress.valueOf("68:05:11:11:11:11"));
         processor.addRoutingInfo(deviceId, PortNumber.portNumber(8), Ip4Prefix.valueOf(secondaryLinlkIP, 24), secondaryLinlkIP, MacAddress.valueOf("68:05:22:22:22:22"));
@@ -139,6 +147,11 @@ public class NoviAggSwitchComponent {
 
         linkFailureDetection = new LinkFailureDetection(linkService, flowRuleService, redundancyPorts);
         linkService.addListener(linkFailureDetection);
+
+
+
+
+
 
 
         //IPs the agg switch is responding to ARP
@@ -212,29 +225,33 @@ public class NoviAggSwitchComponent {
 
                 //PrimaryPath
                 MacAddress bngVxLanPrimaryMac = processor.getMac(Ip4Address.valueOf(viaPrimaryIP));
-                log.info("MAC found, ready to add flows");
-
-                try {
-                    accessToBng(PortNumber.portNumber(port), vni, udpPort, bngVxLanIP, bngVxLanPrimaryMac, Ip4Address.valueOf(switchVxlanIp), MacAddress.valueOf(switchVxlanMac), true);
-                    bngToAccess(PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp), true);
-
-                } catch(Exception e) {
-                    log.warn("Exception", e);
-                }
-
-                //SecondaryPath if different from primary
-
-                if(!viaSecondaryIP.equals(viaPrimaryIP)) {
-
-                    MacAddress bngVxLanSecondaryMac = processor.getMac(Ip4Address.valueOf(viaSecondaryIP));
+                if(bngVxLanPrimaryMac != null) {
                     log.info("MAC found, ready to add flows");
 
                     try {
-                        accessToBng(PortNumber.portNumber(port), vni, udpPort, bngVxLanIP, bngVxLanSecondaryMac, Ip4Address.valueOf(switchVxlanIp), MacAddress.valueOf(switchVxlanMac), false);
-                        bngToAccess(PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp), false);
+                        accessToBng(PortNumber.portNumber(port), vni, udpPort, bngVxLanIP, bngVxLanPrimaryMac, Ip4Address.valueOf(switchVxlanIp), MacAddress.valueOf(switchVxlanMac), true);
+                        bngToAccess(PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp), true);
 
                     } catch (Exception e) {
                         log.warn("Exception", e);
+                    }
+
+                    //SecondaryPath if different from primary
+
+                    if (!viaSecondaryIP.equals(viaPrimaryIP)) {
+
+                        MacAddress bngVxLanSecondaryMac = processor.getMac(Ip4Address.valueOf(viaSecondaryIP));
+                        if(bngVxLanSecondaryMac != null) {
+                            log.info("MAC found, ready to add flows");
+
+                            try {
+                                accessToBng(PortNumber.portNumber(port), vni, udpPort, bngVxLanIP, bngVxLanSecondaryMac, Ip4Address.valueOf(switchVxlanIp), MacAddress.valueOf(switchVxlanMac), false);
+                                bngToAccess(PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp), false);
+
+                            } catch (Exception e) {
+                                log.warn("Exception", e);
+                            }
+                        }
                     }
                 }
             }
