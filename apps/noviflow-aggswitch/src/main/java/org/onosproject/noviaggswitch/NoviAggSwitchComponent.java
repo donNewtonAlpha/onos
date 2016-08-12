@@ -26,8 +26,13 @@ import org.onosproject.net.flow.DefaultTrafficTreatment;
 import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.flow.TrafficSelector;
 import org.onosproject.net.flow.TrafficTreatment;
+import org.onosproject.net.flow.criteria.Criterion;
+import org.onosproject.net.flow.instructions.ExtensionTreatment;
+import org.onosproject.net.flow.instructions.ExtensionTreatmentType;
+import org.onosproject.net.flow.instructions.Instruction;
+import org.onosproject.net.flow.instructions.Instructions;
 import org.onosproject.net.group.*;
-import org.onosproject.net.link.LinkService;
+import org.onosproject.net.flow.criteria.*;
 import org.onosproject.net.meter.*;
 import org.onosproject.net.packet.*;
 import org.onosproject.noviaggswitch.config.NoviAggSwitchConfig;
@@ -90,8 +95,8 @@ public class NoviAggSwitchComponent {
 
     private static MacAddress switchMac = MacAddress.valueOf("68:05:33:44:55:66");
     private static Ip4Address aggSwitchIP = Ip4Address.valueOf("10.50.1.1");
-    private static Ip4Address primaryLinkIP = Ip4Address.valueOf("10.20.1.1");
-    private static Ip4Address secondaryLinlkIP = Ip4Address.valueOf("10.20.2.1");
+    private static Ip4Address primaryLinkIP = Ip4Address.valueOf("10.10.1.0");
+    private static Ip4Address secondaryLinlkIP = Ip4Address.valueOf("10.10.2.0");
 
     private PortNumber bngPort;
     private PortNumber secondaryBngPort;
@@ -119,8 +124,8 @@ public class NoviAggSwitchComponent {
         appId = coreService.registerApplication("org.onosproject.noviaggswitch");
 
 
-        bngPort =  PortNumber.portNumber(7);
-        secondaryBngPort = PortNumber.portNumber(8);
+        bngPort =  PortNumber.portNumber(1);
+        secondaryBngPort = PortNumber.portNumber(2);
         /*        //Config
         cfgListener = new NoviAggSwitchConfigListener();
         cfgService.registerConfigFactory(cfgListener.getCfgAppFactory());
@@ -138,8 +143,8 @@ public class NoviAggSwitchComponent {
         processor.addRoutingInfo(deviceId, bngPort, Ip4Prefix.valueOf(aggSwitchIP, 24), aggSwitchIP, MacAddress.valueOf("00:00:00:00:00:00"));
         processor.addRoutingInfo(deviceId, secondaryBngPort, Ip4Prefix.valueOf(aggSwitchIP, 24), aggSwitchIP, MacAddress.valueOf("00:00:00:00:00:00"));
         //Uplinks
-        processor.addRoutingInfo(deviceId, PortNumber.portNumber(7), Ip4Prefix.valueOf(primaryLinkIP, 24), primaryLinkIP, MacAddress.valueOf("68:05:11:11:11:11"));
-        processor.addRoutingInfo(deviceId, PortNumber.portNumber(8), Ip4Prefix.valueOf(secondaryLinlkIP, 24), secondaryLinlkIP, MacAddress.valueOf("68:05:22:22:22:22"));
+        processor.addRoutingInfo(deviceId, bngPort, Ip4Prefix.valueOf(primaryLinkIP, 31), primaryLinkIP, MacAddress.valueOf("68:05:11:11:11:11"));
+        processor.addRoutingInfo(deviceId, secondaryBngPort, Ip4Prefix.valueOf(secondaryLinlkIP, 31), secondaryLinlkIP, MacAddress.valueOf("68:05:22:22:22:22"));
 
 
         //LinkFailureDetection
@@ -149,11 +154,6 @@ public class NoviAggSwitchComponent {
 
         linkFailureDetection = new LinkFailureDetection(flowRuleService, redundancyPorts);
         deviceService.addListener(linkFailureDetection);
-
-
-
-
-
 
 
         //IPs the agg switch is responding to ARP
@@ -167,10 +167,14 @@ public class NoviAggSwitchComponent {
         icmpIntercept(secondaryLinlkIP);
 
 
-
-
-
         log.info("NoviFlow AggSwitch activated");
+
+        MulticastHandler mh = new MulticastHandler(deviceId, flowRuleService, groupService, appId);
+        int option1 = 512+256;
+        mh.createGroup(option1, 5);
+        mh.createGroup(option1, 6);
+        int option2 = 128 + 32 +64;
+        mh.createGroup(option2, 7);
 
     }
 
@@ -332,6 +336,82 @@ public class NoviAggSwitchComponent {
         rule.makePermanent();
 
         flowRuleService.applyFlowRules(rule.build());
+
+    }
+
+    public void removeTunnel(Ip4Address vxlanIP, int vni) {
+
+        Iterable<FlowRule> flows = flowRuleService.getFlowRulesById(appId);
+        for (FlowRule flow : flows) {
+
+            List<Instruction> instructions = flow.treatment().immediate();
+            for(Instruction instruction : instructions) {
+
+                if(instruction.type() == Instruction.Type.EXTENSION) {
+
+                    try {
+                        Instructions.ExtensionInstructionWrapper extensionInstruction = (Instructions.ExtensionInstructionWrapper) instruction;
+                        ExtensionTreatment extension = extensionInstruction.extensionInstruction();
+                        if(extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_SET_VXLAN)) {
+
+                            NoviflowSetVxLan noviflowVxlan = (NoviflowSetVxLan) extension;
+                            if(noviflowVxlan.getDstIp().equals(vxlanIP) && noviflowVxlan.getVxLanId() == vni) {
+                                //That is the tunnel to remove
+                                flowRuleService.removeFlowRules(flow);
+                            }
+
+                        } else if(extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_POP_VXLAN)) {
+
+                            //look in the selector for this IP
+                            if(((IPCriterion)flow.selector().getCriterion(Criterion.Type.IPV4_SRC)).ip().getIp4Prefix().address().equals(vxlanIP)) {
+                                //That is the tunnel to remove
+                                flowRuleService.removeFlowRules(flow);
+                            }
+                        }
+
+                    } catch (Exception e) {
+                        log.warn("remove tunnel exception", e);
+                    }
+                }
+
+            }
+
+        }
+
+    }
+
+    public void removeAllTunnels() {
+
+        Iterable<FlowRule> flows = flowRuleService.getFlowRulesById(appId);
+        for (FlowRule flow : flows) {
+
+            List<Instruction> instructions = flow.treatment().immediate();
+            for(Instruction instruction : instructions) {
+
+                if(instruction.type() == Instruction.Type.EXTENSION) {
+
+                    try {
+                        Instructions.ExtensionInstructionWrapper extensionInstruction = (Instructions.ExtensionInstructionWrapper) instruction;
+                        ExtensionTreatment extension = extensionInstruction.extensionInstruction();
+
+                        if(extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_SET_VXLAN)) {
+
+                            flowRuleService.removeFlowRules(flow);
+
+                        } else if(extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_POP_VXLAN)) {
+
+                            flowRuleService.removeFlowRules(flow);
+
+                        }
+
+                    } catch (Exception e) {
+                        log.warn("remove tunnel exception", e);
+                    }
+                }
+
+            }
+
+        }
 
     }
 

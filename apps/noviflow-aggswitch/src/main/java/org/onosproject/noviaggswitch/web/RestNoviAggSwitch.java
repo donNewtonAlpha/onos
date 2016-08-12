@@ -63,6 +63,7 @@ public class RestNoviAggSwitch extends AbstractWebResource {
                 NoviAggSwitchComponent.getComponent().addAccessDevice(port, vni, vbngIP, viaPrimaryIP, viaSecondaryIP);
             } catch(IllegalArgumentException e) {
                 NoviAggSwitchComponent.getComponent().addAccessDevice(port, vni, vbngIP);
+                return Response.status(406).build();
             }
 
             return Response.ok().build();
@@ -71,8 +72,60 @@ public class RestNoviAggSwitch extends AbstractWebResource {
             log.error("REST error", e);
         }
 
-        return Response.status(409).build();
+        return Response.status(406).build();
     }
+
+
+    @POST
+    @Path("removeTunnel")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response removeTunnel(InputStream stream) {
+
+        try {
+
+            ObjectNode jsonTree = (ObjectNode) mapper().readTree(stream);
+
+            String ip = jsonTree.findValue("vxlanIP").asText();
+            int vni = jsonTree.findValue("vni").asInt();
+
+
+            log.info("Vxlan tunnel removal requested for IP : " + ip + ", vni : " + vni);
+
+            try{
+                Ip4Address vxlanIP = Ip4Address.valueOf(ip);
+                NoviAggSwitchComponent.getComponent().removeTunnel(vxlanIP, vni);
+            } catch(IllegalArgumentException e) {
+                return Response.status(406).build();
+            }
+
+            return Response.ok().build();
+
+        } catch (IOException e) {
+            log.error("REST error", e);
+        }
+
+        return Response.status(406).build();
+    }
+    @POST
+    @Path("removeAllTunnels")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response removeAllTunnels(InputStream stream) {
+
+        try {
+
+            NoviAggSwitchComponent.getComponent().removeAllTunnels();
+
+            return Response.ok().build();
+
+        } catch (Exception e) {
+            log.error("REST error", e);
+        }
+
+        return Response.status(406).build();
+    }
+
 
     @GET
     @Path("test")
