@@ -105,6 +105,8 @@ public class NoviAggSwitchComponent {
     private LinkFailureDetection linkFailureDetection;
     private NoviAggSwitchConfigListener cfgListener;
 
+    private HashMap<DeviceId, MulticastHandler> multicastHandlers;
+
 
     private static NoviAggSwitchComponent instance = null;
 
@@ -123,13 +125,21 @@ public class NoviAggSwitchComponent {
         instance = this;
         appId = coreService.registerApplication("org.onosproject.noviaggswitch");
 
+        multicastHandlers = new HashMap();
+
+
 
         bngPort =  PortNumber.portNumber(1);
         secondaryBngPort = PortNumber.portNumber(2);
-        /*        //Config
+        /*
+
+        //Config
         cfgListener = new NoviAggSwitchConfigListener();
         cfgService.registerConfigFactory(cfgListener.getCfgAppFactory());
-        cfgService.addListener(cfgListener);*/
+        cfgService.addListener(cfgListener);
+
+
+        */
         
 
         //Packet processor
@@ -167,14 +177,18 @@ public class NoviAggSwitchComponent {
         icmpIntercept(secondaryLinlkIP);
 
 
-        log.info("NoviFlow AggSwitch activated");
 
-        MulticastHandler mh = new MulticastHandler(deviceId, flowRuleService, groupService, appId);
-        int option1 = 512+256;
-        mh.createGroup(option1, 5);
-        mh.createGroup(option1, 6);
-        int option2 = 128 + 32 +64;
-        mh.createGroup(option2, 7);
+
+        /*
+        //Multicast handler
+
+        igmpIntercept();
+        addMulticastHandler(deviceId);
+
+
+        */
+
+        log.info("NoviFlow AggSwitch activated");
 
     }
 
@@ -465,6 +479,46 @@ public class NoviAggSwitchComponent {
 
     }
 
+    private void igmpIntercept() {
+
+        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+        selector.matchEthType(Ethernet.TYPE_IPV4);
+        selector.matchIPProtocol(IPv4.PROTOCOL_IGMP);
+
+
+        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+        treatment.punt();
+
+        FlowRule.Builder rule = DefaultFlowRule.builder();
+        rule.withSelector(selector.build());
+        rule.withTreatment(treatment.build());
+        rule.withPriority(10002);
+        rule.forTable(0);
+        rule.fromApp(appId);
+        rule.forDevice(deviceId);
+        rule.makePermanent();
+
+        flowRuleService.applyFlowRules(rule.build());
+
+    }
+
+
+    private void addMulticastHandler(DeviceId deviceId) {
+
+        MulticastHandler multicastHandler = new MulticastHandler(deviceId, flowRuleService, groupService, appId);
+        MulticastGroupCleaningThread t = new MulticastGroupCleaningThread(multicastHandler, groupService);
+        t.setDaemon(true);
+        t.start();
+
+        multicastHandlers.put(deviceId, multicastHandler);
+
+    }
+
+    public MulticastHandler getMulticastHandler(DeviceId deviceId) {
+
+        return multicastHandlers.get(deviceId);
+
+    }
 
     /*private void noviExpSetup() {
 

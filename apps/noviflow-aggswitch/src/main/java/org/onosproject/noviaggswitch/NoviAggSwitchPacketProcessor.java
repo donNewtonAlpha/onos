@@ -111,6 +111,13 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
                             log.debug("It is a ping reply");
                         //TODO
                     }
+                } else if (ipPayload instanceof IGMP) {
+
+                    log.info("IGMP packet received");
+
+                    IGMPhandler.handlePacket(context);
+
+
                 }
             }
         } catch(Exception e){
