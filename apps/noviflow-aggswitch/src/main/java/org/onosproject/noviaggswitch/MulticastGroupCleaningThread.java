@@ -37,6 +37,8 @@ public class MulticastGroupCleaningThread extends Thread {
 
     private final int WAKE_UP_PERIOD = 5000;
 
+    private volatile boolean isRunning = true;
+
     private MulticastHandler multicastHandler;
     private GroupService groupService;
 
@@ -49,7 +51,7 @@ public class MulticastGroupCleaningThread extends Thread {
 
     public void run() {
 
-        while(true) {
+        while(isRunning) {
 
             multicastHandler.lock();
 
@@ -78,6 +80,10 @@ public class MulticastGroupCleaningThread extends Thread {
         }
 
 
+    }
+
+    public void kill() {
+        isRunning = false;
     }
 
 

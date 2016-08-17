@@ -51,6 +51,8 @@ public class MulticastHandler {
     private HashMap<Ip4Address, FlowRule> multicastFlows;
     private Lock lock;
 
+    private MulticastGroupCleaningThread thread;
+
 
 
     public MulticastHandler(DeviceId deviceId, FlowRuleService flowRuleService, GroupService groupService, ApplicationId appId) {
@@ -64,6 +66,10 @@ public class MulticastHandler {
         multicastGroups = new HashMap<>();
 
         lock = new ReentrantLock();
+
+        thread = new MulticastGroupCleaningThread(this, groupService);
+        thread.setDaemon(true);
+        thread.start();
 
     }
 
@@ -409,5 +415,10 @@ public class MulticastHandler {
 
     public void unlock() {
         lock.unlock();
+    }
+
+    public void kill() {
+        thread.kill();
+        unlock();
     }
 }

@@ -57,6 +57,8 @@ public class RestNoviAggSwitch extends AbstractWebResource {
 
             log.info("Vxlan tunnel requested for port : " +port + ", IP : " + vbngIP + ", vni : " + vni + ", viaIP : " + viaPrimaryIP.toString() + ", " + viaSecondaryIP.toString());
 
+            //TODO : check and maybe add RoutingInfo with viaIPs
+
             try{
                 Ip4Address.valueOf(viaPrimaryIP);
                 Ip4Address.valueOf(viaSecondaryIP);

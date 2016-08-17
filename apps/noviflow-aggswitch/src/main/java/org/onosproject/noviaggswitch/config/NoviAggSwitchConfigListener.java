@@ -5,6 +5,7 @@ import org.onosproject.net.config.ConfigFactory;
 import org.onosproject.net.config.NetworkConfigEvent;
 import org.onosproject.net.config.NetworkConfigListener;
 import org.onosproject.net.config.basics.SubjectFactories;
+import org.onosproject.noviaggswitch.NoviAggSwitchComponent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,8 +34,9 @@ public class NoviAggSwitchConfigListener implements NetworkConfigListener {
                     break;
                 default:
                     log.info("NoviAggSwitch config, unexpected action : "  + event.type());
+                    return;
             }
-
+            NoviAggSwitchComponent.getComponent().newConfig((NoviAggSwitchConfig) event.config().get());
         }
 
     }

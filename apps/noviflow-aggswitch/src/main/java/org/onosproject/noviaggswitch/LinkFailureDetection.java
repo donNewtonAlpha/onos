@@ -49,6 +49,14 @@ public class LinkFailureDetection implements DeviceListener{
         redundancyPorts.remove(port);
     }
 
+    public void removeDevice(DeviceId deviceId) {
+        for(ConnectPoint cp : redundancyPorts) {
+            if(cp.deviceId().equals(deviceId)) {
+                redundancyPorts.remove(cp);
+            }
+        }
+    }
+
 
     @Override
     public void event(DeviceEvent event) {
