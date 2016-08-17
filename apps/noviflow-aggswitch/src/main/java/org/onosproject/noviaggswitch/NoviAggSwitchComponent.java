@@ -101,8 +101,8 @@ public class NoviAggSwitchComponent {
     private static Ip4Address aggSwitchIP = Ip4Address.valueOf("10.50.1.1");
     private static Ip4Address primaryLinkIP = Ip4Address.valueOf("10.20.1.1");
     private static Ip4Address secondaryLinlkIP = Ip4Address.valueOf("10.20.2.1");
-    private PortNumber bngPort =  PortNumber.portNumber(1);
-    private PortNumber secondaryBngPort = PortNumber.portNumber(2);
+    private PortNumber bngPort =  PortNumber.portNumber(7);
+    private PortNumber secondaryBngPort = PortNumber.portNumber(8);
 
 
     private NoviAggSwitchPacketProcessor processor;
