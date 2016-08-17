@@ -2,7 +2,6 @@
 package org.onosproject.noviaggswitch;
 
 
-import com.sun.tools.javac.comp.Flow;
 import org.apache.felix.scr.annotations.*;
 
 
