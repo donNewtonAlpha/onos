@@ -155,8 +155,8 @@ public class NoviAggSwitchComponent {
         processor.addRoutingInfo(deviceId, bngPort, Ip4Prefix.valueOf(aggSwitchIP, 24), aggSwitchIP, MacAddress.valueOf("00:00:00:00:00:00"));
         processor.addRoutingInfo(deviceId, secondaryBngPort, Ip4Prefix.valueOf(aggSwitchIP, 24), aggSwitchIP, MacAddress.valueOf("00:00:00:00:00:00"));
         //Uplinks
-        processor.addRoutingInfo(deviceId, bngPort, Ip4Prefix.valueOf(primaryLinkIP, 31), primaryLinkIP, MacAddress.valueOf("68:05:11:11:11:11"));
-        processor.addRoutingInfo(deviceId, secondaryBngPort, Ip4Prefix.valueOf(secondaryLinlkIP, 31), secondaryLinlkIP, MacAddress.valueOf("68:05:22:22:22:22"));
+        processor.addRoutingInfo(deviceId, bngPort, Ip4Prefix.valueOf(primaryLinkIP, 24), primaryLinkIP, MacAddress.valueOf("68:05:11:11:11:11"));
+        processor.addRoutingInfo(deviceId, secondaryBngPort, Ip4Prefix.valueOf(secondaryLinlkIP, 24), secondaryLinlkIP, MacAddress.valueOf("68:05:22:22:22:22"));
 
 
         //LinkFailureDetection
