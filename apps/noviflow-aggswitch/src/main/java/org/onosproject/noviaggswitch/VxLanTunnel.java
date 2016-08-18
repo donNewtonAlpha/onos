@@ -6,6 +6,8 @@ import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.PortNumber;
 
 import java.util.List;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /**
  * Created by nick on 8/16/16.
@@ -87,4 +89,23 @@ public class VxLanTunnel {
     public MacAddress getSecondaryViaMac() {
         return secondaryViaMac;
     }
+
+    public ObjectNode jsonNode(){
+
+        ObjectNode json = new ObjectMapper().createObjectNode();
+        json.put("port", port.toLong());
+        json.put("vxlanIp", dstIp.toString());
+        json.put("vni", vni);
+        if(primaryViaMac != null) {
+            json.put("primaryViaMac", primaryViaMac.toString());
+        }
+        if(secondaryViaMac != null) {
+            json.put("secondaryViaMac", secondaryViaMac.toString());
+        }
+
+        return json;
+
+
+    }
+
 }

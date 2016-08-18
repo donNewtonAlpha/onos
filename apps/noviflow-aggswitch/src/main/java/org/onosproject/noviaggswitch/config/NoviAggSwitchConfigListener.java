@@ -36,7 +36,7 @@ public class NoviAggSwitchConfigListener implements NetworkConfigListener {
                     log.info("NoviAggSwitch config, unexpected action : "  + event.type());
                     return;
             }
-            NoviAggSwitchComponent.getComponent().newConfig((NoviAggSwitchConfig) event.config().get());
+            NoviAggSwitchComponent.getComponent().newConfig((NoviAggSwitchConfig) event.config().get(), (NoviAggSwitchConfig) event.prevConfig().get());
         }
 
     }

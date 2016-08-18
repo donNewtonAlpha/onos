@@ -221,23 +221,23 @@ public class NoviAggSwitchComponent {
         log.info("Stopped");
     }
 
-    public void addAccessDevice(int port, int vni, String bngVxlanIp) {
+/*    public void addAccessDevice(int port, int vni, String bngVxlanIp) {
 
         addAccessDevice(port, vni, bngVxlanIp, bngVxlanIp, bngVxlanIp);
 
-    }
+    }*/
 
-    public void addAccessDevice(int port, int vni, String bngVxlanIp, String viaPrimaryIP, String viaSecondaryIP) {
+    public void addAccessDevice(DeviceId deviceId, int port, int vni, String bngVxlanIp, String viaPrimaryIP, String viaSecondaryIP) {
 
         Random rand = new Random();
         int udpPort = rand.nextInt() + 2000;
 
 
-        addAccessDevice(port, vni, udpPort, bngVxlanIp, viaPrimaryIP, viaSecondaryIP, aggSwitchIP.toString(), switchMac.toString());
+        addAccessDevice(deviceId, port, vni, udpPort, bngVxlanIp, viaPrimaryIP, viaSecondaryIP, aggSwitchIP.toString(), switchMac.toString());
 
     }
 
-    private void addAccessDevice(int port, int vni, int udpPort, String bngVxlanIp, String viaPrimaryIP, String viaSecondaryIP, String switchVxlanIp, String switchVxlanMac) {
+    private void addAccessDevice(DeviceId deviceId, int port, int vni, int udpPort, String bngVxlanIp, String viaPrimaryIP, String viaSecondaryIP, String switchVxlanIp, String switchVxlanMac) {
 
         Runnable r = new Runnable() {
 
@@ -251,8 +251,8 @@ public class NoviAggSwitchComponent {
                     log.info("MAC found, ready to add flows");
 
                     try {
-                        accessToBng(PortNumber.portNumber(port), vni, udpPort, bngVxLanIP, bngVxLanPrimaryMac, Ip4Address.valueOf(switchVxlanIp), MacAddress.valueOf(switchVxlanMac), true);
-                        bngToAccess(PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp), true);
+                        accessToBng(deviceId, PortNumber.portNumber(port), vni, udpPort, bngVxLanIP, bngVxLanPrimaryMac, Ip4Address.valueOf(switchVxlanIp), MacAddress.valueOf(switchVxlanMac), true);
+                        bngToAccess(deviceId, PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp), true);
 
                     } catch (Exception e) {
                         log.warn("Exception", e);
@@ -267,8 +267,8 @@ public class NoviAggSwitchComponent {
                             log.info("MAC found, ready to add flows");
 
                             try {
-                                accessToBng(PortNumber.portNumber(port), vni, udpPort, bngVxLanIP, bngVxLanSecondaryMac, Ip4Address.valueOf(switchVxlanIp), MacAddress.valueOf(switchVxlanMac), false);
-                                bngToAccess(PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp), false);
+                                accessToBng(deviceId, PortNumber.portNumber(port), vni, udpPort, bngVxLanIP, bngVxLanSecondaryMac, Ip4Address.valueOf(switchVxlanIp), MacAddress.valueOf(switchVxlanMac), false);
+                                bngToAccess(deviceId, PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp), false);
 
                             } catch (Exception e) {
                                 log.warn("Exception", e);
@@ -285,13 +285,9 @@ public class NoviAggSwitchComponent {
 
     }
 
-/*    private void addAccessDevice(int port, int vni, int udpPort, String bngVxlanIp, String switchVxlanIp, String switchVxlanMac) {
 
-        addAccessDevice(port, vni, udpPort, bngVxlanIp, bngVxlanIp, switchVxlanIp, switchVxlanMac);
 
-    }*/
-
-    private void accessToBng(PortNumber port, int vni, int udpPort, Ip4Address bngVxlanIp, MacAddress bngVxlanMac, Ip4Address switchVxlanIp, MacAddress switchVxlanMac, boolean primary){
+    private void accessToBng(DeviceId deviceId, PortNumber port, int vni, int udpPort, Ip4Address bngVxlanIp, MacAddress bngVxlanMac, Ip4Address switchVxlanIp, MacAddress switchVxlanMac, boolean primary){
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchInPort(port);
@@ -323,7 +319,7 @@ public class NoviAggSwitchComponent {
     }
 
 
-    private void bngToAccess(PortNumber port, int vni, Ip4Address bngVxLanIP, boolean primary) {
+    private void bngToAccess(DeviceId deviceId, PortNumber port, int vni, Ip4Address bngVxLanIP, boolean primary) {
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         if(primary) {
@@ -355,9 +351,8 @@ public class NoviAggSwitchComponent {
 
     }
 
-    public void removeTunnel(Ip4Address vxlanIP, int vni) {
+    public void removeTunnel(DeviceId deviceId, Ip4Address vxlanIP, int vni) {
 
-        //TODO deviceId
         List<VxLanTunnel> tunnels = getTunnels(deviceId);
         for(VxLanTunnel tunnel : tunnels) {
             if (tunnel.match(vxlanIP, vni)) {
@@ -499,6 +494,10 @@ public class NoviAggSwitchComponent {
 
     }
 
+    public Set<DeviceId> getAggDevices() {
+        return multicastHandlers.keySet();
+    }
+
 
 
     private void arpIntercept(Ip4Address respondFor, DeviceId deviceId) {
@@ -612,7 +611,7 @@ public class NoviAggSwitchComponent {
         }
     }
 
-    public void newConfig(NoviAggSwitchConfig config) {
+    public void newConfig(NoviAggSwitchConfig config, NoviAggSwitchConfig oldConfig) {
 
         if(config == null) {
          log.warn("Null config, don't know what to do so do nothing");
@@ -621,123 +620,76 @@ public class NoviAggSwitchComponent {
 
         if(!config.isValid()) {
          log.warn("Invalid config, don't know what to do so do nothing");
+            return;
         }
 
-        //Clean up old knowledge
-        clearIntercepts(config.deviceId());
-        //TODO : multi switch ------------
-        processor.clearMacRequests();
-        processor.clearRoutingInfo();
-        // -------------------------------
-        getMulticastHandler(config.deviceId()).kill();
-        removeMulticastHandler(config.deviceId());
+        List<DeviceId> configDevices = config.deviceIds();
 
-        List<VxLanTunnel> tunnels = getTunnels(config.deviceId());
-        removeAllTunnels(config.deviceId());
+        for(DeviceId deviceId : configDevices) {
 
-        linkFailureDetection.removeDevice(config.deviceId());
+            if(config.hasChanged(oldConfig, deviceId)) {
 
-        //New Knowledge
+                //Clean up old knowledge
+                clearIntercepts(deviceId);
 
-        //IPs the agg switch is responding to ARP
-        arpIntercept(config.primaryLinkIp(), config.deviceId());
-        arpIntercept(config.secondaryLinkIp(), config.deviceId());
+                processor.clearRoutingInfo(deviceId);
 
-        //IPs the agg switch is responding to ping
-        icmpIntercept(config.loopbackIp(), config.deviceId());
-        icmpIntercept(config.primaryLinkIp(), config.deviceId());
-        icmpIntercept(config.secondaryLinkIp(), config.deviceId());
+                getMulticastHandler(deviceId).kill();
+                removeMulticastHandler(deviceId);
 
-        //loopback
-        processor.addRoutingInfo(config.deviceId(), config.primaryLinkPort(), Ip4Prefix.valueOf(config.loopbackIp(), 24), config.loopbackIp(), MacAddress.valueOf("00:00:00:00:00:00"));
-        processor.addRoutingInfo(config.deviceId(), config.secondaryLinkPort(), Ip4Prefix.valueOf(config.loopbackIp(), 24), config.loopbackIp(), MacAddress.valueOf("00:00:00:00:00:00"));
-        //Uplinks
-        processor.addRoutingInfo(config.deviceId(), config.primaryLinkPort(), Ip4Prefix.valueOf(config.primaryLinkIp(), 31), config.primaryLinkIp(), config.primaryLinkMac());
-        processor.addRoutingInfo(config.deviceId(), config.secondaryLinkPort(), Ip4Prefix.valueOf(config.secondaryLinkIp(), 31), config.secondaryLinkIp(), config.secondaryLinkMac());
+                List<VxLanTunnel> tunnels = getTunnels(deviceId);
+                removeAllTunnels(deviceId);
 
+                linkFailureDetection.removeDevice(deviceId);
 
-        igmpIntercept(config.deviceId());
-        addMulticastHandler(config.deviceId());
+                //New Knowledge
 
-        //LinkFailureDetection
+                //IPs the agg switch is responding to ARP
+                arpIntercept(config.primaryLinkIp(deviceId).address(), deviceId);
+                arpIntercept(config.secondaryLinkIp(deviceId).address(), deviceId);
 
-        linkFailureDetection.addRedundancyPort(new ConnectPoint(config.deviceId(), config.primaryLinkPort()));
-        linkFailureDetection.addRedundancyPort(new ConnectPoint(config.deviceId(), config.secondaryLinkPort()));
+                //IPs the agg switch is responding to ping
+                icmpIntercept(config.loopbackIp(deviceId), deviceId);
+                icmpIntercept(config.primaryLinkIp(deviceId).address(), deviceId);
+                icmpIntercept(config.secondaryLinkIp(deviceId).address(), deviceId);
+
+                //loopback
+                processor.addRoutingInfo(deviceId, config.primaryLinkPort(deviceId), Ip4Prefix.valueOf(config.loopbackIp(deviceId), 24), config.loopbackIp(deviceId), MacAddress.valueOf("00:00:00:00:00:00"));
+                processor.addRoutingInfo(deviceId, config.secondaryLinkPort(deviceId), Ip4Prefix.valueOf(config.loopbackIp(deviceId), 24), config.loopbackIp(deviceId), MacAddress.valueOf("00:00:00:00:00:00"));
+                //Uplinks
+                processor.addRoutingInfo(deviceId, config.primaryLinkPort(deviceId), config.primaryLinkIp(deviceId), config.primaryLinkIp(deviceId).address(), config.primaryLinkMac(deviceId));
+                processor.addRoutingInfo(deviceId, config.secondaryLinkPort(deviceId), config.secondaryLinkIp(deviceId), config.secondaryLinkIp(deviceId).address(), config.secondaryLinkMac(deviceId));
 
 
-        //Reinstate tunnels
+                igmpIntercept(deviceId);
+                addMulticastHandler(deviceId);
 
-        Random rand = new Random();
+                //LinkFailureDetection
+
+                linkFailureDetection.addRedundancyPort(new ConnectPoint(deviceId, config.primaryLinkPort(deviceId)));
+                linkFailureDetection.addRedundancyPort(new ConnectPoint(deviceId, config.secondaryLinkPort(deviceId)));
 
 
-        for(VxLanTunnel tunnel : tunnels) {
+                //Reinstate tunnels
 
-            int udpPort = rand.nextInt() + 2000;
+                Random rand = new Random();
 
-            accessToBng(tunnel.getPort(), tunnel.getVni(), udpPort, tunnel.getDstIp(), tunnel.getPrimaryViaMac(), config.loopbackIp(), config.primaryLinkMac(), true);
-            bngToAccess(tunnel.getPort(), tunnel.getVni(), tunnel.getDstIp(), true);
-            accessToBng(tunnel.getPort(), tunnel.getVni(), udpPort, tunnel.getDstIp(), tunnel.getSecondaryViaMac(), config.loopbackIp(), config.secondaryLinkMac(), false);
-            bngToAccess(tunnel.getPort(), tunnel.getVni(), tunnel.getDstIp(), false);
 
+                for (VxLanTunnel tunnel : tunnels) {
+
+                    int udpPort = rand.nextInt() + 2000;
+
+                    accessToBng(deviceId, tunnel.getPort(), tunnel.getVni(), udpPort, tunnel.getDstIp(), tunnel.getPrimaryViaMac(), config.loopbackIp(deviceId), config.primaryLinkMac(deviceId), true);
+                    bngToAccess(deviceId, tunnel.getPort(), tunnel.getVni(), tunnel.getDstIp(), true);
+                    accessToBng(deviceId, tunnel.getPort(), tunnel.getVni(), udpPort, tunnel.getDstIp(), tunnel.getSecondaryViaMac(), config.loopbackIp(deviceId), config.secondaryLinkMac(deviceId), false);
+                    bngToAccess(deviceId, tunnel.getPort(), tunnel.getVni(), tunnel.getDstIp(), false);
+
+                }
+            }
         }
 
     }
 
-    /*private void noviExpSetup() {
-
-        Runnable r = new Runnable() {
-            @Override
-            public void run() {
-
-                OFNoviflowVniExperimenterMsg msg = new OFNoviflowVniExperimenterMsg(0);
-
-                try {
-                    byte[] ip = new byte[4];
-                    ip[0] = 10;
-                    ip[1] = 64;
-                    ip[2] = 1;
-                    ip[3] = 85;
-                    InetAddress dstIp = InetAddress.getByAddress(ip);
-                    ip[3] = 50;
-                    InetAddress sourceIp = InetAddress.getByAddress(ip);
-                    log.info("Source : " + sourceIp);
-                    log.info("Destination : " + dstIp);
-                    Socket socket = new Socket(dstIp, 40095, sourceIp, 6653);
-                    OutputStream os = socket.getOutputStream();
-
-                    InputStream is = socket.getInputStream();
-
-                    while (true) {
-                        os.write(msg.fullIPPayload());
-                        Thread.sleep(1000);
-
-                        if (is.available() > 0) {
-                            byte[] response = new byte[is.available()];
-                            is.read(response);
-                            //send to log
-
-                            StringBuilder builder = new StringBuilder("Response : ");
-                            for (int i = 0; i < response.length; i++) {
-                                builder.append(response[i]);
-                                builder.append(' ');
-                            }
-                            log.info(builder.toString());
-
-                        }
-                    }
-
-
-                } catch (Exception e) {
-                    log.error("Exception noviExpSetup", e);
-                }
-            }
-        };
-
-        Thread t =new Thread(r);
-        t.setDaemon(true);
-        t.start();
-
-    }*/
 
 
 

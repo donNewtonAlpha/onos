@@ -22,11 +22,11 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    PacketService packetService;
+    private PacketService packetService;
 
 
-    List<MacRequest> macRequests = new LinkedList<>();
-    List<RoutingInfo> routingInfos = new LinkedList<>();
+    private List<MacRequest> macRequests = new LinkedList<>();
+    private List<RoutingInfo> routingInfos = new LinkedList<>();
 
 
     public NoviAggSwitchPacketProcessor(PacketService packetService) {
@@ -72,43 +72,41 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
             Ethernet ethPkt = pkt.parsed();
             IPacket payload = ethPkt.getPayload();
 
+            PortNumber inPort = pkt.receivedFrom().port();
+            DeviceId deviceId = pkt.receivedFrom().deviceId();
+
             if (payload instanceof ARP) {
 
                 log.debug("ARP packet received");
 
                 ARP arp = (ARP) payload;
 
-                //TODO: pass deviceID info when multi switch
-                PortNumber inPort = pkt.receivedFrom().port();
-
                 if (arp.getOpCode() == ARP.OP_REQUEST) {
                     log.info("It is an ARP request");
-                    handleArpRequest(inPort, ethPkt);
+                    handleArpRequest(deviceId, inPort, ethPkt);
                 } else {
                     log.debug("It is an ARP reply");
-                    handleArpReply(inPort, ethPkt);
+                    handleArpReply(deviceId, inPort, ethPkt);
                 }
             } else if(payload instanceof IPv4) {
 
-                log.info("IP packet received");
+                log.debug("IP packet received");
                 IPv4 ipPkt = (IPv4) payload;
 
                 IPacket ipPayload = ipPkt.getPayload();
 
                 if(ipPayload instanceof ICMP) {
 
-                    log.info("ICMP packet received");
+                    log.debug("ICMP packet received");
 
                     ICMP ping = (ICMP) ipPayload;
 
-                    PortNumber inPort = pkt.receivedFrom().port();
 
                     if (ping.getIcmpType() == ICMP.TYPE_ECHO_REQUEST) {
-                        log.info("It is a ping request");
-                        handlePingRequest(inPort, ethPkt);
-                    } else {
-                        if (ping.getIcmpType() == ICMP.TYPE_ECHO_REPLY)
-                            log.debug("It is a ping reply");
+                        log.info("ICMP request");
+                        handlePingRequest(deviceId, inPort, ethPkt);
+                    } else if (ping.getIcmpType() == ICMP.TYPE_ECHO_REPLY) {
+                            log.info("ICMP reply");
                         //TODO
                     }
                 } else if (ipPayload instanceof IGMP) {
@@ -126,7 +124,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
     }
 
 
-    private void handleArpRequest(PortNumber inPort, Ethernet ethPkt) {
+    private void handleArpRequest(DeviceId deviceId, PortNumber inPort, Ethernet ethPkt) {
         ARP arpRequest = (ARP) ethPkt.getPayload();
         Ip4Address targetProtocolAddress = Ip4Address.valueOf(
                 arpRequest.getTargetProtocolAddress());
@@ -134,7 +132,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
         // Check if this is an ARP for the switch
         for(RoutingInfo info : routingInfos) {
 
-            if(info.getPort().equals(inPort) && targetProtocolAddress.equals(info.getIp())){
+            if(info.getDeviceId().equals(deviceId) && info.getPort().equals(inPort) && targetProtocolAddress.equals(info.getIp())){
                 log.info("handleArpRequest, matching routing info found");
                 sendArpResponse(ethPkt, arpRequest, info.getMac(), info.getDeviceId(), inPort);
             }
@@ -143,7 +141,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
     }
 
-    private void handleArpReply(PortNumber inPort, Ethernet ethPkt) {
+    private void handleArpReply(DeviceId deviceId, PortNumber inPort, Ethernet ethPkt) {
         ARP arpReply = (ARP) ethPkt.getPayload();
         log.info("ARP reply");
 
@@ -162,7 +160,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
         }
     }
 
-    private void handlePingRequest(PortNumber inPort, Ethernet ethPkt) {
+    private void handlePingRequest(DeviceId deviceId, PortNumber inPort, Ethernet ethPkt) {
 
         IPv4 ipPkt = (IPv4) ethPkt.getPayload();
 
@@ -170,7 +168,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
         for(RoutingInfo info : routingInfos) {
 
-            if(info.getPort().equals(inPort) && pingedIpAddress.equals(info.getIp())){
+            if(info.getDeviceId().equals(deviceId) && info.getPort().equals(inPort) && pingedIpAddress.equals(info.getIp())){
                 log.info("This ping request is for this switch");
                 sendICMPreply(ethPkt, info.getMac(), info.getDeviceId(), inPort);
             }
@@ -181,7 +179,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
     private void sendICMPreply(Ethernet ethPkt, MacAddress mac, DeviceId deviceId, PortNumber port)  {
 
-        log.info("creation of the ICMP reply");
+        log.debug("creation of the ICMP reply");
 
         IPv4 ipPkt = (IPv4) ethPkt.getPayload();
         ICMP ping = (ICMP) ipPkt.getPayload();
@@ -215,7 +213,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
                 treatment.build(), ByteBuffer.wrap(ethPkt.serialize()));
 
         packetService.emit(outPacket);
-        log.info("ICMP reply response from " + ipPkt.getDestinationAddress() + " to " + ipPkt.getSourceAddress() + "sent on port " + port.toString());
+        log.info("ICMP reply response from " + Ip4Address.valueOf(ipPkt.getDestinationAddress()) + " to " + Ip4Address.valueOf(ipPkt.getSourceAddress()) + " sent on port " + port.toString());
 
     }
 
@@ -302,6 +300,14 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
     public void clearRoutingInfo() {
         routingInfos.clear();
+    }
+
+    public void clearRoutingInfo(DeviceId deviceId) {
+        for(RoutingInfo info : routingInfos) {
+            if (info.getDeviceId().equals(deviceId)) {
+                routingInfos.remove(info);
+            }
+        }
     }
 
     public MacAddress getMac(Ip4Address ip) {
