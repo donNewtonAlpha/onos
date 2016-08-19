@@ -8,17 +8,13 @@ import org.apache.felix.scr.annotations.*;
 import org.onlab.packet.*;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
-import org.onosproject.driver.extensions.NoviflowExtensionTreatmentInterpretor;
-import org.onosproject.driver.extensions.NoviflowMatchVni;
 import org.onosproject.driver.extensions.NoviflowPopVxLan;
 import org.onosproject.driver.extensions.NoviflowSetVxLan;
-import org.onosproject.driver.extensions.ofmessages.OFNoviflowVniExperimenterMsg;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.DeviceId;
-import org.onosproject.net.Port;
 import org.onosproject.net.PortNumber;
-import org.onosproject.net.config.NetworkConfigRegistry;
-import org.onosproject.net.config.NetworkConfigService;
+import org.onosproject.net.config.*;
+import org.onosproject.net.config.basics.SubjectFactories;
 import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.flow.*;
 import org.onosproject.net.flow.DefaultFlowRule;
@@ -37,7 +33,6 @@ import org.onosproject.net.flow.criteria.*;
 import org.onosproject.net.meter.*;
 import org.onosproject.net.packet.*;
 import org.onosproject.noviaggswitch.config.NoviAggSwitchConfig;
-import org.onosproject.noviaggswitch.config.NoviAggSwitchConfigListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -700,6 +695,54 @@ public class NoviAggSwitchComponent {
 
     }
 
+
+    private class NoviAggSwitchConfigListener implements NetworkConfigListener {
+
+        private Logger log = LoggerFactory.getLogger(getClass());
+
+        private final ConfigFactory<ApplicationId, NoviAggSwitchConfig> cfgFactory =
+                new ConfigFactory<ApplicationId, NoviAggSwitchConfig>(SubjectFactories.APP_SUBJECT_FACTORY,
+                        NoviAggSwitchConfig.class, "noviaggswitch") {
+
+                    @Override
+                    public NoviAggSwitchConfig createConfig() {
+                        return new NoviAggSwitchConfig();
+                    }
+                };
+
+        @Override
+        public void event(NetworkConfigEvent event){
+
+
+            if(event.configClass().equals(NoviAggSwitchConfig.class)) {
+
+                switch(event.type()){
+                    case CONFIG_ADDED:
+                        log.info("NoviAggSwitch Config added");
+                        break;
+                    case CONFIG_UPDATED:
+                        log.info("NoviAggSwitch config updated");
+                        break;
+                    case CONFIG_REMOVED:
+                        log.info("NoviAggSwitch Config removed");
+                        break;
+                    default:
+                        log.info("NoviAggSwitch config, unexpected action : "  + event.type());
+                        return;
+                }
+                NoviAggSwitchComponent.getComponent().newConfig((NoviAggSwitchConfig) event.config().get(), (NoviAggSwitchConfig) event.prevConfig().get());
+            }
+
+        }
+
+
+        public ConfigFactory<ApplicationId, NoviAggSwitchConfig> getCfgAppFactory() {
+
+            return cfgFactory;
+        }
+
+
+    }
 
 
 
