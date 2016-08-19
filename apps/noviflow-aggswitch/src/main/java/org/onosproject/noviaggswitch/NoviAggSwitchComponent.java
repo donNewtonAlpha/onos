@@ -41,14 +41,7 @@ import org.onosproject.noviaggswitch.config.NoviAggSwitchConfigListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.Inet4Address;
-import java.net.InetAddress;
-import java.net.Socket;
-import java.nio.ByteBuffer;
 import java.util.*;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.concurrent.Semaphore;
 
 
 /**
@@ -95,14 +88,14 @@ public class NoviAggSwitchComponent {
     static ApplicationId appId;
 
 
-    static final DeviceId deviceId = DeviceId.deviceId("of:000000223d5a00d9");
+/*    static final DeviceId deviceId = DeviceId.deviceId("of:000000223d5a00d9");
 
     private static MacAddress switchMac = MacAddress.valueOf("68:05:33:44:55:66");
     private static Ip4Address aggSwitchIP = Ip4Address.valueOf("10.50.1.1");
     private static Ip4Address primaryLinkIP = Ip4Address.valueOf("10.20.1.1");
     private static Ip4Address secondaryLinlkIP = Ip4Address.valueOf("10.20.2.1");
     private PortNumber bngPort =  PortNumber.portNumber(7);
-    private PortNumber secondaryBngPort = PortNumber.portNumber(8);
+    private PortNumber secondaryBngPort = PortNumber.portNumber(8);*/
 
 
     private NoviAggSwitchPacketProcessor processor;
@@ -133,7 +126,6 @@ public class NoviAggSwitchComponent {
 
 
 
-        /*
 
         //Config
         cfgListener = new NoviAggSwitchConfigListener();
@@ -141,14 +133,13 @@ public class NoviAggSwitchComponent {
         cfgService.addListener(cfgListener);
 
 
-        */
-        
+
 
         //Packet processor
         processor = new NoviAggSwitchPacketProcessor(packetService);
         packetService.addProcessor(processor, 1);
         
-        //Routing info
+       /* //Routing info
         //4 info
 
         //loopback
@@ -163,10 +154,11 @@ public class NoviAggSwitchComponent {
         List<ConnectPoint> redundancyPorts = new LinkedList<>();
         redundancyPorts.add(new ConnectPoint(deviceId, PortNumber.portNumber(7)));
         redundancyPorts.add(new ConnectPoint(deviceId, PortNumber.portNumber(8)));
-
-        linkFailureDetection = new LinkFailureDetection(flowRuleService, redundancyPorts);
+*/
+        linkFailureDetection = new LinkFailureDetection(flowRuleService, new LinkedList<>());
         deviceService.addListener(linkFailureDetection);
 
+/*
 
         //IPs the agg switch is responding to ARP
         //arpIntercept(aggSwitchIP);
@@ -178,6 +170,7 @@ public class NoviAggSwitchComponent {
         icmpIntercept(primaryLinkIP, deviceId);
         icmpIntercept(secondaryLinlkIP, deviceId);
 
+*/
 
 
 
@@ -200,23 +193,32 @@ public class NoviAggSwitchComponent {
 
         flowRuleService.removeFlowRulesById(appId);
 
+        try {
+            NoviAggSwitchConfig config = (NoviAggSwitchConfig) cfgService.getConfig(appId, NoviAggSwitchConfig.class);
 
-        Iterable<Group> appGroups = groupService.getGroups(deviceId, appId);
-        for(Group group : appGroups) {
-            groupService.removeGroup(group.deviceId(), group.appCookie(), group.appId());
-        }
+            List<DeviceId> deviceIds = config.deviceIds();
 
-        //Clear meters
-        Collection<Meter> meters = meterService.getMeters(deviceId);
-        for(Meter meter : meters) {
-            if(meter.appId().equals(appId)){
-                meterService.withdraw(DefaultMeterRequest.builder().remove(), meter.id());
+            for(DeviceId deviceId : deviceIds) {
+
+                Iterable<Group> appGroups = groupService.getGroups(deviceId, appId);
+                for (Group group : appGroups) {
+                    groupService.removeGroup(group.deviceId(), group.appCookie(), group.appId());
+                }
+
+                //Clear meters
+                Collection<Meter> meters = meterService.getMeters(deviceId);
+                for (Meter meter : meters) {
+                    if (meter.appId().equals(appId)) {
+                        meterService.withdraw(DefaultMeterRequest.builder().remove(), meter.id());
+                    }
+                }
             }
+
+            packetService.removeProcessor(processor);
+
+        } catch (Exception e) {
+            log.error("Deactivation exception", e);
         }
-
-        packetService.removeProcessor(processor);
-
-
 
         log.info("Stopped");
     }
@@ -232,12 +234,14 @@ public class NoviAggSwitchComponent {
         Random rand = new Random();
         int udpPort = rand.nextInt() + 2000;
 
+        NoviAggSwitchConfig config = (NoviAggSwitchConfig) cfgService.getConfig(appId, NoviAggSwitchConfig.class);
 
-        addAccessDevice(deviceId, port, vni, udpPort, bngVxlanIp, viaPrimaryIP, viaSecondaryIP, aggSwitchIP.toString(), switchMac.toString());
+        addAccessDevice(deviceId, port, vni, udpPort, bngVxlanIp, viaPrimaryIP, viaSecondaryIP, config.loopbackIp(deviceId), config.primaryLinkMac(deviceId), config.secondaryLinkMac(deviceId));
 
     }
 
-    private void addAccessDevice(DeviceId deviceId, int port, int vni, int udpPort, String bngVxlanIp, String viaPrimaryIP, String viaSecondaryIP, String switchVxlanIp, String switchVxlanMac) {
+    private void addAccessDevice(DeviceId deviceId, int port, int vni, int udpPort, String bngVxlanIp, String viaPrimaryIP, String viaSecondaryIP,
+                                 Ip4Address switchVxlanIp, MacAddress primaryLinkSwitchMac, MacAddress secondaryLinkSwitchMac) {
 
         Runnable r = new Runnable() {
 
@@ -251,7 +255,7 @@ public class NoviAggSwitchComponent {
                     log.info("MAC found, ready to add flows");
 
                     try {
-                        accessToBng(deviceId, PortNumber.portNumber(port), vni, udpPort, bngVxLanIP, bngVxLanPrimaryMac, Ip4Address.valueOf(switchVxlanIp), MacAddress.valueOf(switchVxlanMac), true);
+                        accessToBng(deviceId, PortNumber.portNumber(port), vni, udpPort, bngVxLanIP, bngVxLanPrimaryMac, switchVxlanIp, primaryLinkSwitchMac, true);
                         bngToAccess(deviceId, PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp), true);
 
                     } catch (Exception e) {
@@ -267,7 +271,7 @@ public class NoviAggSwitchComponent {
                             log.info("MAC found, ready to add flows");
 
                             try {
-                                accessToBng(deviceId, PortNumber.portNumber(port), vni, udpPort, bngVxLanIP, bngVxLanSecondaryMac, Ip4Address.valueOf(switchVxlanIp), MacAddress.valueOf(switchVxlanMac), false);
+                                accessToBng(deviceId, PortNumber.portNumber(port), vni, udpPort, bngVxLanIP, bngVxLanSecondaryMac, switchVxlanIp, secondaryLinkSwitchMac, false);
                                 bngToAccess(deviceId, PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp), false);
 
                             } catch (Exception e) {
@@ -289,6 +293,8 @@ public class NoviAggSwitchComponent {
 
     private void accessToBng(DeviceId deviceId, PortNumber port, int vni, int udpPort, Ip4Address bngVxlanIp, MacAddress bngVxlanMac, Ip4Address switchVxlanIp, MacAddress switchVxlanMac, boolean primary){
 
+        NoviAggSwitchConfig config = (NoviAggSwitchConfig) cfgService.getConfig(appId, NoviAggSwitchConfig.class);
+
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchInPort(port);
 
@@ -296,9 +302,9 @@ public class NoviAggSwitchComponent {
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
         treatment.extension(new NoviflowSetVxLan(switchVxlanMac,bngVxlanMac, switchVxlanIp, bngVxlanIp, udpPort, vni), deviceId);
         if(primary) {
-            treatment.setOutput(bngPort);
+            treatment.setOutput(config.primaryLinkPort(deviceId));
         } else {
-            treatment.setOutput(secondaryBngPort);
+            treatment.setOutput(config.secondaryLinkPort(deviceId));
         }
 
         FlowRule.Builder rule = DefaultFlowRule.builder();
@@ -321,11 +327,13 @@ public class NoviAggSwitchComponent {
 
     private void bngToAccess(DeviceId deviceId, PortNumber port, int vni, Ip4Address bngVxLanIP, boolean primary) {
 
+        NoviAggSwitchConfig config = (NoviAggSwitchConfig) cfgService.getConfig(appId, NoviAggSwitchConfig.class);
+
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         if(primary) {
-            selector.matchInPort(bngPort);
+            selector.matchInPort(config.primaryLinkPort(deviceId));
         } else {
-            selector.matchInPort(secondaryBngPort);
+            selector.matchInPort(config.secondaryLinkPort(deviceId));
         }
         selector.matchIPSrc(bngVxLanIP.toIpPrefix());
 
@@ -550,13 +558,15 @@ public class NoviAggSwitchComponent {
 
     private void igmpIntercept(DeviceId deviceId) {
 
+        NoviAggSwitchConfig config = (NoviAggSwitchConfig) cfgService.getConfig(appId, NoviAggSwitchConfig.class);
+
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchEthType(Ethernet.TYPE_IPV4);
         selector.matchIPProtocol(IPv4.PROTOCOL_IGMP);
 
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
-        treatment.setOutput(bngPort);
+        treatment.setOutput(config.primaryLinkPort(deviceId));
         treatment.punt();
 
         FlowRule.Builder rule = DefaultFlowRule.builder();
