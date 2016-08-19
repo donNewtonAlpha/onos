@@ -717,6 +717,9 @@ public class NoviAggSwitchComponent {
             if(event.configClass().equals(NoviAggSwitchConfig.class)) {
 
                 switch(event.type()){
+                    case CONFIG_REGISTERED:
+                        log.info("NoviAggSwitch Config registered");
+                        break;
                     case CONFIG_ADDED:
                         log.info("NoviAggSwitch Config added");
                         break;
