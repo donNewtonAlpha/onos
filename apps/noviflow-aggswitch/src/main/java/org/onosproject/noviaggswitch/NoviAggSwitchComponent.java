@@ -731,6 +731,10 @@ public class NoviAggSwitchComponent {
                         return;
                 }
                 NoviAggSwitchComponent.getComponent().newConfig((NoviAggSwitchConfig) event.config().get(), (NoviAggSwitchConfig) event.prevConfig().get());
+            } else {
+
+                log.info("Config event " + event.configClass());
+
             }
 
         }
