@@ -46,7 +46,7 @@ public class NoviAggSwitchConfigListener implements NetworkConfigListener {
 
         return new ConfigFactory<ApplicationId, NoviAggSwitchConfig>(SubjectFactories.APP_SUBJECT_FACTORY,
                 NoviAggSwitchConfig.class,
-                "phase1") {
+                "noviaggswitch") {
             @Override
             public NoviAggSwitchConfig createConfig() {
                 return new NoviAggSwitchConfig();
