@@ -242,9 +242,17 @@ public class NoviAggSwitchComponent {
         Random rand = new Random();
         int udpPort = rand.nextInt() + 2000;
 
-        NoviAggSwitchConfig config = (NoviAggSwitchConfig) cfgService.getConfig(appId, NoviAggSwitchConfig.class);
+        try {
 
-        addAccessDevice(deviceId, port, vni, udpPort, bngVxlanIp, viaPrimaryIP, viaSecondaryIP, config.loopbackIp(deviceId), config.primaryLinkMac(deviceId), config.secondaryLinkMac(deviceId));
+            NoviAggSwitchConfig config = (NoviAggSwitchConfig) cfgService.getConfig(appId, NoviAggSwitchConfig.class);
+
+            addAccessDevice(deviceId, port, vni, udpPort, bngVxlanIp, viaPrimaryIP, viaSecondaryIP, config.loopbackIp(deviceId), config.primaryLinkMac(deviceId), config.secondaryLinkMac(deviceId));
+        } catch (Exception e) {
+
+            addAccessDevice(deviceId, port, vni, udpPort, bngVxlanIp, viaPrimaryIP, viaSecondaryIP,aggSwitchIP, MacAddress.valueOf("68:05:11:11:11:11"), MacAddress.valueOf("68:05:11:11:11:22"));
+
+
+        }
 
     }
 
