@@ -63,7 +63,8 @@ public class LinkFailureDetection implements DeviceListener{
 
         log.info(event.toString());
 
-        if(event.type() == DeviceEvent.Type.PORT_STATS_UPDATED) {
+        log.info("Did it change ?");
+        if(event.type().equals(DeviceEvent.Type.PORT_STATS_UPDATED)) {
             return;
         }
 
