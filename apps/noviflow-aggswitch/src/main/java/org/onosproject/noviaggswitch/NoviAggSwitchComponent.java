@@ -309,7 +309,19 @@ public class NoviAggSwitchComponent {
 
     private void accessToBng(DeviceId deviceId, PortNumber port, int vni, int udpPort, Ip4Address bngVxlanIp, MacAddress bngVxlanMac, Ip4Address switchVxlanIp, MacAddress switchVxlanMac, boolean primary){
 
-        NoviAggSwitchConfig config = (NoviAggSwitchConfig) cfgService.getConfig(appId, NoviAggSwitchConfig.class);
+
+        PortNumber primaryPort;
+        PortNumber secondaryPort;
+
+        try {
+            NoviAggSwitchConfig config = (NoviAggSwitchConfig) cfgService.getConfig(appId, NoviAggSwitchConfig.class);
+            primaryPort = config.primaryLinkPort(deviceId);
+            secondaryPort = config.secondaryLinkPort(deviceId);
+        } catch (Exception e) {
+            log.info("Config unavailable");
+            primaryPort = bngPort;
+            secondaryPort = secondaryBngPort;
+        }
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchInPort(port);
@@ -318,9 +330,9 @@ public class NoviAggSwitchComponent {
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
         treatment.extension(new NoviflowSetVxLan(switchVxlanMac,bngVxlanMac, switchVxlanIp, bngVxlanIp, udpPort, vni), deviceId);
         if(primary) {
-            treatment.setOutput(config.primaryLinkPort(deviceId));
+            treatment.setOutput(primaryPort);
         } else {
-            treatment.setOutput(config.secondaryLinkPort(deviceId));
+            treatment.setOutput(secondaryPort);
         }
 
         FlowRule.Builder rule = DefaultFlowRule.builder();
@@ -343,13 +355,24 @@ public class NoviAggSwitchComponent {
 
     private void bngToAccess(DeviceId deviceId, PortNumber port, int vni, Ip4Address bngVxLanIP, boolean primary) {
 
-        NoviAggSwitchConfig config = (NoviAggSwitchConfig) cfgService.getConfig(appId, NoviAggSwitchConfig.class);
+        PortNumber primaryPort;
+        PortNumber secondaryPort;
+
+        try {
+            NoviAggSwitchConfig config = (NoviAggSwitchConfig) cfgService.getConfig(appId, NoviAggSwitchConfig.class);
+            primaryPort = config.primaryLinkPort(deviceId);
+            secondaryPort = config.secondaryLinkPort(deviceId);
+        } catch (Exception e) {
+            log.info("Config unavailable");
+            primaryPort = bngPort;
+            secondaryPort = secondaryBngPort;
+        }
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         if(primary) {
-            selector.matchInPort(config.primaryLinkPort(deviceId));
+            selector.matchInPort(primaryPort);
         } else {
-            selector.matchInPort(config.secondaryLinkPort(deviceId));
+            selector.matchInPort(secondaryPort);
         }
         selector.matchIPSrc(bngVxLanIP.toIpPrefix());
 
