@@ -34,7 +34,7 @@ public class NoviAggSwitchConfig extends Config<ApplicationId> {
     private static final String PRIMARY_LINK_PORT = "primaryLinkPort";
     private static final String SECONDARY_LINK_PORT = "secondaryLinkPort";
     private static final String DEVICE_ID = "deviceId";
-    private static final String DEVICES = "devices";
+    private static final String DEVICES = "elements";
 
 
     @Override

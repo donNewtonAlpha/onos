@@ -763,7 +763,9 @@ public class NoviAggSwitchComponent {
                         log.info("NoviAggSwitch config, unexpected action : "  + event.type());
                         return;
                 }
-                NoviAggSwitchComponent.getComponent().newConfig((NoviAggSwitchConfig) event.config().get(), (NoviAggSwitchConfig) event.prevConfig().get());
+                log.info("Applying new config");
+
+                //NoviAggSwitchComponent.getComponent().newConfig((NoviAggSwitchConfig) event.config().get(), (NoviAggSwitchConfig) event.prevConfig().get());
             } else {
 
                 log.info("Config event " + event.configClass() + " != " + NoviAggSwitchConfig.class);
