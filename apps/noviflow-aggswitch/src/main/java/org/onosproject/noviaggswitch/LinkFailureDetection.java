@@ -63,73 +63,76 @@ public class LinkFailureDetection implements DeviceListener{
 
         log.info(event.toString());
 
-        PortNumber affectedPort = event.port().number();
-        DeviceId affectedDevice = event.subject().id();
+        if(event.type() == DeviceEvent.Type.PORT_ADDED || event.type() == DeviceEvent.Type.PORT_REMOVED || event.type() == DeviceEvent.Type.PORT_UPDATED) {
+
+            PortNumber affectedPort = event.port().number();
+            DeviceId affectedDevice = event.subject().id();
 
 
-        for(ConnectPoint cp : redundancyPorts) {
+            for (ConnectPoint cp : redundancyPorts) {
 
 
-            if(cp.port().equals(affectedPort) && cp.deviceId().equals(affectedDevice)){
-                //this port is affected
+                if (cp.port().equals(affectedPort) && cp.deviceId().equals(affectedDevice)) {
+                    //this port is affected
 
-                log.info(" Port " + affectedPort.toString() + " from device " + affectedDevice.toString() + " affected");
+                    log.info(" Port " + affectedPort.toString() + " from device " + affectedDevice.toString() + " affected");
 
-                boolean portDown = false;
-                boolean portUp = false;
+                    boolean portDown = false;
+                    boolean portUp = false;
 
-                if(event.type() == DeviceEvent.Type.PORT_UPDATED) {
+                    if (event.type() == DeviceEvent.Type.PORT_UPDATED) {
 
-                    if(event.port().isEnabled()) {
-                        portUp = true;
-                    } else {
-                        portDown = true;
+                        if (event.port().isEnabled()) {
+                            portUp = true;
+                        } else {
+                            portDown = true;
+                        }
+
                     }
 
-                }
+                    if (event.type() == DeviceEvent.Type.PORT_REMOVED || portDown) {
 
-                if(event.type() == DeviceEvent.Type.PORT_REMOVED || portDown) {
+                        //Port Down
+                        //remove the matching flows and
+                        //TODO : notify maintenance/...
 
-                    //Port Down
-                    //remove the matching flows and
-                    //TODO : notify maintenance/...
+                        Iterable<FlowRule> flows = flowRuleService.getFlowRulesById(NoviAggSwitchComponent.appId);
+                        List<FlowRule> flowsToWithdraw = new LinkedList<>();
+                        Instruction outputToDeadLink = DefaultTrafficTreatment.builder().setOutput(cp.port()).build().immediate().get(0);
 
-                    Iterable<FlowRule> flows = flowRuleService.getFlowRulesById(NoviAggSwitchComponent.appId);
-                    List<FlowRule> flowsToWithdraw = new LinkedList<>();
-                    Instruction outputToDeadLink = DefaultTrafficTreatment.builder().setOutput(cp.port()).build().immediate().get(0);
-
-                    for(FlowRule flow : flows) {
-                        if(flow.deviceId().equals(cp.deviceId())) {
-                            if (flow.treatment().immediate().contains(outputToDeadLink)) {
-                                //flow affected
-                                flowsToWithdraw.add(flow);
-                                flowRuleService.removeFlowRules(flow);
+                        for (FlowRule flow : flows) {
+                            if (flow.deviceId().equals(cp.deviceId())) {
+                                if (flow.treatment().immediate().contains(outputToDeadLink)) {
+                                    //flow affected
+                                    flowsToWithdraw.add(flow);
+                                    flowRuleService.removeFlowRules(flow);
+                                }
                             }
                         }
+
+                        log.warn("Port down : " + affectedPort.toString() + " on device " + affectedDevice.toString() + ", " + flowsToWithdraw.size() + " flows withdrawn. Maintenance requested");
+
+                        withdrawnFlows.add(new WithdrawnFlows(flowsToWithdraw, event.time(), cp));
+
                     }
 
-                    log.warn("Port down : " + affectedPort.toString() + " on device " + affectedDevice.toString() + ", " + flowsToWithdraw.size() + " flows withdrawn. Maintenance requested");
+                    if (event.type() == DeviceEvent.Type.PORT_ADDED || portUp) {
+                        //Port back up, reinstate the flows
+                        for (WithdrawnFlows wFlows : withdrawnFlows) {
+                            if (wFlows.getPort().equals(cp)) {
+                                //Previous flows are reinstanted
+                                for (FlowRule flow : wFlows.getFlows()) {
+                                    flowRuleService.applyFlowRules(flow);
+                                }
+                                log.warn("Port up : " + affectedPort.toString() + " on " + affectedDevice.toString() + ", " + wFlows.getFlows().size() + " flows reinstanted.");
 
-                    withdrawnFlows.add(new WithdrawnFlows(flowsToWithdraw, event.time(), cp));
-
-                }
-
-                if(event.type() == DeviceEvent.Type.PORT_ADDED || portUp) {
-                    //Port back up, reinstate the flows
-                    for (WithdrawnFlows wFlows : withdrawnFlows) {
-                        if(wFlows.getPort().equals(cp)){
-                            //Previous flows are reinstanted
-                            for(FlowRule flow : wFlows.getFlows()) {
-                                flowRuleService.applyFlowRules(flow);
+                                withdrawnFlows.remove(wFlows);
                             }
-                            log.warn("Port up : " + affectedPort.toString() + " on " + affectedDevice.toString() + ", " + wFlows.getFlows().size() + " flows reinstanted.");
-
-                            withdrawnFlows.remove(wFlows);
                         }
+
                     }
 
                 }
-
             }
         }
 
