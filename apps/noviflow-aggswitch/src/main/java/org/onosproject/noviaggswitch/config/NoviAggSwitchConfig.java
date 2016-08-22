@@ -41,10 +41,10 @@ public class NoviAggSwitchConfig extends Config<ApplicationId> {
     public boolean isValid() {
 
         boolean b = hasOnlyFields(DEVICES);
-        List<ObjectNode> devices = devices();
+        /*List<ObjectNode> devices = devices();
         for(ObjectNode device: devices) {
             b = b && deviceIsValid(device);
-        }
+        }*/
 
         return b;
     }
