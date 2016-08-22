@@ -774,6 +774,8 @@ public class NoviAggSwitchComponent {
         @Override
         public void event(NetworkConfigEvent event){
 
+            log.info(event.toString());
+
 
             if(event.configClass().equals(NoviAggSwitchConfig.class)) {
 
