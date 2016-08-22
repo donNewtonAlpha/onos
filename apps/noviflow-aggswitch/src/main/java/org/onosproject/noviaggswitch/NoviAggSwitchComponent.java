@@ -83,14 +83,14 @@ public class NoviAggSwitchComponent {
     static ApplicationId appId;
 
 
-/*    static final DeviceId deviceId = DeviceId.deviceId("of:000000223d5a00d9");
+    static final DeviceId deviceId = DeviceId.deviceId("of:000000223d5a00d9");
 
     private static MacAddress switchMac = MacAddress.valueOf("68:05:33:44:55:66");
     private static Ip4Address aggSwitchIP = Ip4Address.valueOf("10.50.1.1");
-    private static Ip4Address primaryLinkIP = Ip4Address.valueOf("10.20.1.1");
-    private static Ip4Address secondaryLinlkIP = Ip4Address.valueOf("10.20.2.1");
+    private static Ip4Address primaryLinkIP = Ip4Address.valueOf("10.10.1.1");
+    private static Ip4Address secondaryLinlkIP = Ip4Address.valueOf("10.10.2.1");
     private PortNumber bngPort =  PortNumber.portNumber(7);
-    private PortNumber secondaryBngPort = PortNumber.portNumber(8);*/
+    private PortNumber secondaryBngPort = PortNumber.portNumber(8);
 
 
     private NoviAggSwitchPacketProcessor processor;
@@ -134,26 +134,26 @@ public class NoviAggSwitchComponent {
         processor = new NoviAggSwitchPacketProcessor(packetService);
         packetService.addProcessor(processor, 1);
         
-       /* //Routing info
+        //Routing info
         //4 info
 
         //loopback
         processor.addRoutingInfo(deviceId, bngPort, Ip4Prefix.valueOf(aggSwitchIP, 24), aggSwitchIP, MacAddress.valueOf("00:00:00:00:00:00"));
         processor.addRoutingInfo(deviceId, secondaryBngPort, Ip4Prefix.valueOf(aggSwitchIP, 24), aggSwitchIP, MacAddress.valueOf("00:00:00:00:00:00"));
         //Uplinks
-        processor.addRoutingInfo(deviceId, bngPort, Ip4Prefix.valueOf(primaryLinkIP, 24), primaryLinkIP, MacAddress.valueOf("68:05:11:11:11:11"));
-        processor.addRoutingInfo(deviceId, secondaryBngPort, Ip4Prefix.valueOf(secondaryLinlkIP, 24), secondaryLinlkIP, MacAddress.valueOf("68:05:22:22:22:22"));
+        processor.addRoutingInfo(deviceId, bngPort, Ip4Prefix.valueOf(primaryLinkIP, 31), primaryLinkIP, MacAddress.valueOf("68:05:11:11:11:11"));
+        processor.addRoutingInfo(deviceId, secondaryBngPort, Ip4Prefix.valueOf(secondaryLinlkIP, 31), secondaryLinlkIP, MacAddress.valueOf("68:05:22:22:22:22"));
 
 
         //LinkFailureDetection
         List<ConnectPoint> redundancyPorts = new LinkedList<>();
-        redundancyPorts.add(new ConnectPoint(deviceId, PortNumber.portNumber(7)));
-        redundancyPorts.add(new ConnectPoint(deviceId, PortNumber.portNumber(8)));
-*/
+        redundancyPorts.add(new ConnectPoint(deviceId, bngPort));
+        redundancyPorts.add(new ConnectPoint(deviceId, secondaryBngPort));
+
         linkFailureDetection = new LinkFailureDetection(flowRuleService, new LinkedList<>());
         deviceService.addListener(linkFailureDetection);
 
-/*
+
 
         //IPs the agg switch is responding to ARP
         //arpIntercept(aggSwitchIP);
@@ -165,7 +165,16 @@ public class NoviAggSwitchComponent {
         icmpIntercept(primaryLinkIP, deviceId);
         icmpIntercept(secondaryLinlkIP, deviceId);
 
-*/
+
+
+        //Tunnel
+        Random rand = new Random();
+        int udpPort = rand.nextInt() + 2000;
+        int udpPort2 = rand.nextInt() + 2000;
+
+
+        addAccessDevice(deviceId, 5, 5002, udpPort, "10.50.1.2", "10.10.1.1", "10.10.2.1", aggSwitchIP, MacAddress.valueOf("68:05:11:11:11:11"), MacAddress.valueOf("68:05:22:22:22:22"));
+        addAccessDevice(deviceId, 9, 5003, udpPort2, "10.50.1.3", "10.10.1.1", "10.10.2.1", aggSwitchIP, MacAddress.valueOf("68:05:11:11:11:11"), MacAddress.valueOf("68:05:22:22:22:22"));
 
 
 
