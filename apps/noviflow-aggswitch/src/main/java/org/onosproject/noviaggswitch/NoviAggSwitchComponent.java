@@ -186,6 +186,11 @@ public class NoviAggSwitchComponent {
     @Deactivate
     protected void deactivate() {
 
+        packetService.removeProcessor(processor);
+
+        cfgService.unregisterConfigFactory(cfgListener.getCfgAppFactory());
+        cfgService.removeListener(cfgListener);
+
         flowRuleService.removeFlowRulesById(appId);
 
         try {
@@ -209,7 +214,6 @@ public class NoviAggSwitchComponent {
                 }
             }
 
-            packetService.removeProcessor(processor);
 
         } catch (Exception e) {
             log.error("Deactivation exception", e);
@@ -628,11 +632,17 @@ public class NoviAggSwitchComponent {
             return;
         }
 
+        log.info("Ready to apply new config");
+
         List<DeviceId> configDevices = config.deviceIds();
+
+        log.info(configDevices.size() + " devices to configure");
 
         for(DeviceId deviceId : configDevices) {
 
             if(config.hasChanged(oldConfig, deviceId)) {
+
+                log.info("Config for this device has changed, device : " + deviceId);
 
                 //Clean up old knowledge
                 clearIntercepts(deviceId);
@@ -647,6 +657,8 @@ public class NoviAggSwitchComponent {
 
                 linkFailureDetection.removeDevice(deviceId);
 
+                log.info("Old knowledge cleared");
+
                 //New Knowledge
 
                 //IPs the agg switch is responding to ARP
@@ -658,6 +670,8 @@ public class NoviAggSwitchComponent {
                 icmpIntercept(config.primaryLinkIp(deviceId).address(), deviceId);
                 icmpIntercept(config.secondaryLinkIp(deviceId).address(), deviceId);
 
+                log.info("New intercepts set up");
+
                 //loopback
                 processor.addRoutingInfo(deviceId, config.primaryLinkPort(deviceId), Ip4Prefix.valueOf(config.loopbackIp(deviceId), 24), config.loopbackIp(deviceId), MacAddress.valueOf("00:00:00:00:00:00"));
                 processor.addRoutingInfo(deviceId, config.secondaryLinkPort(deviceId), Ip4Prefix.valueOf(config.loopbackIp(deviceId), 24), config.loopbackIp(deviceId), MacAddress.valueOf("00:00:00:00:00:00"));
@@ -665,14 +679,19 @@ public class NoviAggSwitchComponent {
                 processor.addRoutingInfo(deviceId, config.primaryLinkPort(deviceId), config.primaryLinkIp(deviceId), config.primaryLinkIp(deviceId).address(), config.primaryLinkMac(deviceId));
                 processor.addRoutingInfo(deviceId, config.secondaryLinkPort(deviceId), config.secondaryLinkIp(deviceId), config.secondaryLinkIp(deviceId).address(), config.secondaryLinkMac(deviceId));
 
+                log.info("Routing infos added");
 
-                igmpIntercept(deviceId);
+               /* igmpIntercept(deviceId);
                 addMulticastHandler(deviceId);
+
+                log.info("Multicast handler added");*/
 
                 //LinkFailureDetection
 
                 linkFailureDetection.addRedundancyPort(new ConnectPoint(deviceId, config.primaryLinkPort(deviceId)));
                 linkFailureDetection.addRedundancyPort(new ConnectPoint(deviceId, config.secondaryLinkPort(deviceId)));
+
+                log.info("Link failure detection set up");
 
 
                 //Reinstate tunnels
@@ -690,6 +709,8 @@ public class NoviAggSwitchComponent {
                     bngToAccess(deviceId, tunnel.getPort(), tunnel.getVni(), tunnel.getDstIp(), false);
 
                 }
+
+                log.info(tunnels.size() + " tunnels have been reset");
             }
         }
 
@@ -736,7 +757,7 @@ public class NoviAggSwitchComponent {
                 NoviAggSwitchComponent.getComponent().newConfig((NoviAggSwitchConfig) event.config().get(), (NoviAggSwitchConfig) event.prevConfig().get());
             } else {
 
-                log.info("Config event " + event.configClass());
+                log.info("Config event " + event.configClass() + " != " + NoviAggSwitchConfig.class);
 
             }
 
