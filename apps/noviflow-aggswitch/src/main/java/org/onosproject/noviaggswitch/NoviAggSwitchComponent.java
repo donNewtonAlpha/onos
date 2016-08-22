@@ -87,8 +87,8 @@ public class NoviAggSwitchComponent {
 
     private static MacAddress switchMac = MacAddress.valueOf("68:05:33:44:55:66");
     private static Ip4Address aggSwitchIP = Ip4Address.valueOf("10.50.1.1");
-    private static Ip4Address primaryLinkIP = Ip4Address.valueOf("10.10.1.1");
-    private static Ip4Address secondaryLinlkIP = Ip4Address.valueOf("10.10.2.1");
+    private static Ip4Address primaryLinkIP = Ip4Address.valueOf("10.10.1.0");
+    private static Ip4Address secondaryLinlkIP = Ip4Address.valueOf("10.10.2.0");
     private PortNumber bngPort =  PortNumber.portNumber(7);
     private PortNumber secondaryBngPort = PortNumber.portNumber(8);
 
