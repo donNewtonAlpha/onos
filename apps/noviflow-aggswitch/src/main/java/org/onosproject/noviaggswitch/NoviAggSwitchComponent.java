@@ -132,7 +132,10 @@ public class NoviAggSwitchComponent {
         //Packet processor
         processor = new NoviAggSwitchPacketProcessor(packetService);
         packetService.addProcessor(processor, 1);
-        
+
+        linkFailureDetection = new LinkFailureDetection(flowRuleService, new LinkedList<>());
+        deviceService.addListener(linkFailureDetection);
+
        /* //Routing info
         //4 info
 
@@ -149,8 +152,7 @@ public class NoviAggSwitchComponent {
         redundancyPorts.add(new ConnectPoint(deviceId, bngPort));
         redundancyPorts.add(new ConnectPoint(deviceId, secondaryBngPort));
 
-        linkFailureDetection = new LinkFailureDetection(flowRuleService, new LinkedList<>());
-        deviceService.addListener(linkFailureDetection);
+
 
 
 

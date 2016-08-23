@@ -43,7 +43,7 @@ public class RestNoviAggSwitch extends AbstractWebResource {
 
     private final Logger log = getLogger(getClass());
 
-    private static final String LOOPBACK_IP = "loopbakcIp";
+    private static final String LOOPBACK_IP = "loopbackIp";
     private static final String PRIMARY_LINK_IP = "primaryLinkIp";
     private static final String SECONDARY_LINK_IP = "secondaryLinkIp";
     private static final String PRIMARY_LINK_MAC = "primaryLinkMac";
