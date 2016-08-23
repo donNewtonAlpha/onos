@@ -472,12 +472,16 @@ public class NoviAggSwitchComponent {
                 for (Instruction instruction : instructions) {
 
                     if (instruction.type() == Instruction.Type.EXTENSION) {
+                        log.info("Extension instruction found");
 
                         try {
                             Instructions.ExtensionInstructionWrapper extensionInstruction = (Instructions.ExtensionInstructionWrapper) instruction;
                             ExtensionTreatment extension = extensionInstruction.extensionInstruction();
 
+                            log.info("Extension treatment : " + extension.toString());
+
                             if (extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_SET_VXLAN)) {
+                                log.info("set vxlan extension found");
 
                                 NoviflowSetVxLan noviflowVxlan = (NoviflowSetVxLan) extension;
                                 Criterion criterion = flow.selector().getCriterion(Criterion.Type.IN_PORT);
@@ -508,6 +512,7 @@ public class NoviAggSwitchComponent {
 
 
                             } else if (extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_POP_VXLAN)) {
+                                log.info("pop vxlan extension found");
 
                                 //look in the selector for the IP
 
