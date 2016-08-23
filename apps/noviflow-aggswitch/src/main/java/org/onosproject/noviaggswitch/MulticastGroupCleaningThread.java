@@ -1,8 +1,7 @@
 package org.onosproject.noviaggswitch;
 
 import java.nio.ByteBuffer;
-import java.util.Collection;
-import java.util.HashMap;
+import java.util.*;
 
 import org.onlab.packet.Ip4Address;
 import org.onlab.packet.VlanId;
@@ -24,9 +23,6 @@ import org.onosproject.net.group.DefaultGroupBucket;
 import org.onosproject.net.group.GroupDescription;
 import org.onosproject.net.group.DefaultGroupDescription;
 import org.slf4j.Logger;
-
-import java.util.List;
-import java.util.LinkedList;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -55,14 +51,16 @@ public class MulticastGroupCleaningThread extends Thread {
 
             multicastHandler.lock();
 
-            List<GroupId> outdateGroups = multicastHandler.outdatedGroups();
+            List<GroupId> outdatedGroups = multicastHandler.outdatedGroups();
             Iterable<Group> allGroups = groupService.getGroups(multicastHandler.getDeviceId(), multicastHandler.getAppId());
             for(Group group : allGroups) {
-                for (GroupId groupToRemove : outdateGroups) {
+                Iterator<GroupId> it = outdatedGroups.listIterator();
+                while(it.hasNext()) {
+                    GroupId groupToRemove = it.next();
                     if(group.id().equals(groupToRemove)){
                         //Group to remove found
                         groupService.removeGroup(group.deviceId(), group.appCookie(), group.appId());
-                        outdateGroups.remove(groupToRemove);
+                        it.remove();
 
                     }
                 }

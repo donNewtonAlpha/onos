@@ -342,7 +342,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
             log.info("MAC found : " + request.getMac() + " for " + ip);
             return request.getMac();
         } else {
-            log.warn("No matching routing info for : " + ip.toString());
+            log.error("No matching routing info for : " + ip.toString());
             return null;
         }
 

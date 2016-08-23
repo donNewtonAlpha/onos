@@ -199,7 +199,6 @@ public class NoviAggSwitchComponent {
         packetService.removeProcessor(processor);
 
 
-
         flowRuleService.removeFlowRulesById(appId);
 
         try {

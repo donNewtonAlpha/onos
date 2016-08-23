@@ -16,6 +16,7 @@ import org.onosproject.net.link.LinkService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -50,9 +51,13 @@ public class LinkFailureDetection implements DeviceListener{
     }
 
     public void removeDevice(DeviceId deviceId) {
-        for(ConnectPoint cp : redundancyPorts) {
+
+        Iterator<ConnectPoint> it = redundancyPorts.listIterator();
+
+        while(it.hasNext()) {
+            ConnectPoint cp = it.next();
             if(cp.deviceId().equals(deviceId)) {
-                redundancyPorts.remove(cp);
+                it.remove();
             }
         }
     }
@@ -124,7 +129,10 @@ public class LinkFailureDetection implements DeviceListener{
 
                     if (event.type() == DeviceEvent.Type.PORT_ADDED || portUp) {
                         //Port back up, reinstate the flows
-                        for (WithdrawnFlows wFlows : withdrawnFlows) {
+                        Iterator<WithdrawnFlows> it = withdrawnFlows.listIterator();
+
+                        while(it.hasNext()) {
+                            WithdrawnFlows wFlows = it.next();
                             if (wFlows.getPort().equals(cp)) {
                                 //Previous flows are reinstanted
                                 for (FlowRule flow : wFlows.getFlows()) {
@@ -132,7 +140,7 @@ public class LinkFailureDetection implements DeviceListener{
                                 }
                                 log.warn("Port up : " + affectedPort.toString() + " on " + affectedDevice.toString() + ", " + wFlows.getFlows().size() + " flows reinstanted.");
 
-                                withdrawnFlows.remove(wFlows);
+                                it.remove();
                             }
                         }
 
