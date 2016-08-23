@@ -438,11 +438,11 @@ public class NoviAggSwitchComponent {
                             Instructions.ExtensionInstructionWrapper extensionInstruction = (Instructions.ExtensionInstructionWrapper) instruction;
                             ExtensionTreatment extension = extensionInstruction.extensionInstruction();
 
-                            if (extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_SET_VXLAN)) {
+                            if (extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_SET_VXLAN.type())) {
 
                                 flowRuleService.removeFlowRules(flow);
 
-                            } else if (extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_POP_VXLAN)) {
+                            } else if (extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_POP_VXLAN.type())) {
 
                                 flowRuleService.removeFlowRules(flow);
 
@@ -461,6 +461,8 @@ public class NoviAggSwitchComponent {
 
     public List<VxLanTunnel> getTunnels(DeviceId deviceId) {
 
+        log.info("get tunnel fonction");
+
         List<VxLanTunnel> tunnels = new LinkedList<>();
 
         Iterable<FlowRule> flows = flowRuleService.getFlowRulesById(appId);
@@ -472,7 +474,7 @@ public class NoviAggSwitchComponent {
                 for (Instruction instruction : instructions) {
 
                     if (instruction.type() == Instruction.Type.EXTENSION) {
-                        log.info("Extension instruction found");
+
 
                         try {
                             Instructions.ExtensionInstructionWrapper extensionInstruction = (Instructions.ExtensionInstructionWrapper) instruction;
@@ -480,7 +482,7 @@ public class NoviAggSwitchComponent {
 
                             log.info("Extension treatment : " + extension.toString());
 
-                            if (extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_SET_VXLAN)) {
+                            if (extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_SET_VXLAN.type())) {
                                 log.info("set vxlan extension found");
 
                                 NoviflowSetVxLan noviflowVxlan = (NoviflowSetVxLan) extension;
@@ -511,7 +513,7 @@ public class NoviAggSwitchComponent {
                                 }
 
 
-                            } else if (extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_POP_VXLAN)) {
+                            } else if (extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_POP_VXLAN.type())) {
                                 log.info("pop vxlan extension found");
 
                                 //look in the selector for the IP
@@ -550,7 +552,7 @@ public class NoviAggSwitchComponent {
     }
 
     public Set<DeviceId> getAggDevices() {
-        return multicastHandlers.keySet();
+        return devicesConfig.keySet();
     }
 
 

@@ -162,7 +162,7 @@ public class RestNoviAggSwitch extends AbstractWebResource {
     @Path("showTunnels")
     //@Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response test() {
+    public Response showTunnels() {
 
 
         try {
