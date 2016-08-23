@@ -198,12 +198,15 @@ public class NoviAggSwitchComponent {
 
         packetService.removeProcessor(processor);
 
-        cfgService.unregisterConfigFactory(cfgListener.getCfgAppFactory());
-        cfgService.removeListener(cfgListener);
+
 
         flowRuleService.removeFlowRulesById(appId);
 
         try {
+
+            cfgService.unregisterConfigFactory(cfgListener.getCfgAppFactory());
+            cfgService.removeListener(cfgListener);
+
             //NoviAggSwitchConfig config = (NoviAggSwitchConfig) cfgService.getConfig(appId, NoviAggSwitchConfig.class);
 
             Set<DeviceId> deviceIds = devicesConfig.keySet();

@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Iterator;
 import java.util.concurrent.Semaphore;
 
 /**
@@ -148,14 +149,19 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
         // ARP reply for router. Process all pending IP packets.
         Ip4Address hostIpAddress = Ip4Address.valueOf(arpReply.getSenderProtocolAddress());
-        for (MacRequest request : macRequests) {
+        Iterator<MacRequest> it = macRequests.listIterator();
+
+        while(it.hasNext()) {
+
+            MacRequest request = it.next();
+
             if (request.getIp().equals(hostIpAddress)) {
                 MacAddress mac = MacAddress.valueOf(arpReply.getSenderHardwareAddress());
 
                 request.setMac(mac);
                 request.unlock();
                 log.info("requested MAC for " + request.getIp() +" found");
-                macRequests.remove(request);
+                it.remove();
             }
         }
     }
@@ -303,9 +309,13 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
     }
 
     public void clearRoutingInfo(DeviceId deviceId) {
-        for(RoutingInfo info : routingInfos) {
+
+        Iterator<RoutingInfo> it = routingInfos.listIterator();
+
+        while(it.hasNext()) {
+            RoutingInfo info = it.next();
             if (info.getDeviceId().equals(deviceId)) {
-                routingInfos.remove(info);
+                it.remove();
             }
         }
     }
