@@ -25,7 +25,11 @@ import javax.ws.rs.core.Response;
 
 
 import org.onlab.packet.Ip4Address;
+import org.onlab.packet.Ip4Prefix;
+import org.onlab.packet.MacAddress;
 import org.onosproject.net.DeviceId;
+import org.onosproject.net.PortNumber;
+import org.onosproject.noviaggswitch.AggDeviceConfig;
 import org.onosproject.noviaggswitch.NoviAggSwitchComponent;
 import org.onosproject.noviaggswitch.VxLanTunnel;
 import org.onosproject.rest.AbstractWebResource;
@@ -38,6 +42,15 @@ import org.slf4j.Logger;
 public class RestNoviAggSwitch extends AbstractWebResource {
 
     private final Logger log = getLogger(getClass());
+
+    private static final String LOOPBACK_IP = "loopbakcIp";
+    private static final String PRIMARY_LINK_IP = "primaryLinkIp";
+    private static final String SECONDARY_LINK_IP = "secondaryLinkIp";
+    private static final String PRIMARY_LINK_MAC = "primaryLinkMac";
+    private static final String SECONDARY_LINK_MAC = "secondaryLinkMac";
+    private static final String PRIMARY_LINK_PORT = "primaryLinkPort";
+    private static final String SECONDARY_LINK_PORT = "secondaryLinkPort";
+    private static final String DEVICE_ID = "deviceId";
 
     /**
      * Create a new virtual VxLAN tunnel.
@@ -147,7 +160,51 @@ public class RestNoviAggSwitch extends AbstractWebResource {
 
     @GET
     @Path("showTunnels")
-    @Consumes(MediaType.APPLICATION_JSON)
+    //@Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response test() {
+
+
+        try {
+
+
+            ObjectNode result = new ObjectMapper().createObjectNode();
+
+            ArrayNode devices = result.putArray("devices");
+
+            Set<DeviceId> aggDevices = NoviAggSwitchComponent.getComponent().getAggDevices();
+            for(DeviceId deviceId : aggDevices) {
+
+
+
+                ObjectNode device = new ObjectMapper().createObjectNode();
+                device.put("deviceId", deviceId.toString());
+                ArrayNode deviceTunnels = device.putArray("tunnels");
+
+                List<VxLanTunnel> tunnels = NoviAggSwitchComponent.getComponent().getTunnels(deviceId);
+
+                for (VxLanTunnel tunnel : tunnels) {
+                    deviceTunnels.add(tunnel.jsonNode());
+                }
+
+                devices.add(device);
+
+            }
+
+
+            return Response.ok(result.toString()).build();
+
+        } catch (Exception e) {
+            log.error("REST error", e);
+        }
+
+        return Response.status(406).build();
+
+    }
+
+   /* @GET
+    @Path("showTunnel")
+    //@Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response test(InputStream stream) {
 
@@ -201,6 +258,53 @@ public class RestNoviAggSwitch extends AbstractWebResource {
 
         return Response.status(406).build();
 
+    }
+*/
+    /**
+     * Add/modify the config for one device
+     *
+     * @return 200 ok
+     */
+    @POST
+    @Path("config")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response config(InputStream stream) {
+
+        try {
+
+            ObjectNode jsonTree = (ObjectNode) mapper().readTree(stream);
+
+            String deviceUri = jsonTree.findValue(DEVICE_ID).asText();
+            String loopbackIp = jsonTree.findValue(LOOPBACK_IP).asText();
+            String primaryLinkSubnet = jsonTree.findValue(PRIMARY_LINK_IP).asText();
+            String secondaryLinkSubnet = jsonTree.findValue(SECONDARY_LINK_IP).asText();
+            String primaryLinkMac = jsonTree.findValue(PRIMARY_LINK_MAC).asText();
+            String secondaryLinkMac = jsonTree.findValue(SECONDARY_LINK_MAC).asText();
+            int primaryPort = jsonTree.findValue(PRIMARY_LINK_PORT).asInt();
+            int secondaryPort = jsonTree.findValue(SECONDARY_LINK_PORT).asInt();
+
+
+
+            try{
+                AggDeviceConfig newConfig = new AggDeviceConfig(DeviceId.deviceId(deviceUri), Ip4Address.valueOf(loopbackIp), Ip4Prefix.valueOf(primaryLinkSubnet),
+                        Ip4Prefix.valueOf(secondaryLinkSubnet), MacAddress.valueOf(primaryLinkMac), MacAddress.valueOf(secondaryLinkMac), PortNumber.portNumber(primaryPort), PortNumber.portNumber(secondaryPort));
+
+                //TODO : check validity of config
+
+                NoviAggSwitchComponent.getComponent().checkNewConfig(newConfig);
+            } catch(IllegalArgumentException e) {
+                log.error("REST API config error, likely invalid config", e);
+                return Response.status(406).entity("Invalid Config").build();
+            }
+
+            return Response.ok("Config for " + deviceUri + " added/modified").build();
+
+        } catch (IOException e) {
+            log.error("REST error", e);
+        }
+
+        return Response.status(406).build();
     }
 
 }
