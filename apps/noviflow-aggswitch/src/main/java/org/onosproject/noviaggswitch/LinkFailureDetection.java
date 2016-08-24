@@ -1,5 +1,8 @@
 package org.onosproject.noviaggswitch;
 
+import org.onlab.packet.Ip4Address;
+import org.onlab.packet.MacAddress;
+import org.onosproject.driver.extensions.NoviflowSetVxLan;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.Link;
@@ -9,7 +12,13 @@ import org.onosproject.net.device.DeviceListener;
 import org.onosproject.net.flow.DefaultTrafficTreatment;
 import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.flow.FlowRuleService;
+import org.onosproject.net.flow.criteria.Criterion;
+import org.onosproject.net.flow.criteria.IPCriterion;
+import org.onosproject.net.flow.criteria.PortCriterion;
+import org.onosproject.net.flow.instructions.ExtensionTreatment;
+import org.onosproject.net.flow.instructions.ExtensionTreatmentType;
 import org.onosproject.net.flow.instructions.Instruction;
+import org.onosproject.net.flow.instructions.Instructions;
 import org.onosproject.net.link.LinkEvent;
 import org.onosproject.net.link.LinkListener;
 import org.onosproject.net.link.LinkService;
@@ -24,7 +33,7 @@ import java.util.Set;
 /**
  * Created by nick on 8/8/16.
  */
-public class LinkFailureDetection implements DeviceListener{
+public class LinkFailureDetection {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -63,82 +72,78 @@ public class LinkFailureDetection implements DeviceListener{
     }
 
 
-    @Override
-    public void event(DeviceEvent event) {
-
-        if(event.type().equals(DeviceEvent.Type.PORT_STATS_UPDATED)) {
-            return;
-        }
-
-        log.info(event.toString());
+    public void event(ConnectPoint eventPort, boolean failure, boolean newMac, MacAddress newDstMac) {
 
 
 
-        if(event.type() == DeviceEvent.Type.PORT_ADDED || event.type() == DeviceEvent.Type.PORT_REMOVED || event.type() == DeviceEvent.Type.PORT_UPDATED) {
-
-            PortNumber affectedPort = event.port().number();
-            DeviceId affectedDevice = event.subject().id();
+        PortNumber affectedPort = eventPort.port();
+        DeviceId affectedDevice = eventPort.deviceId();
 
 
-            for (ConnectPoint cp : redundancyPorts) {
+        for (ConnectPoint cp : redundancyPorts) {
 
 
-                if (cp.port().equals(affectedPort) && cp.deviceId().equals(affectedDevice)) {
-                    //this port is affected
+            if (cp.port().equals(affectedPort) && cp.deviceId().equals(affectedDevice)) {
+                //this port is affected
 
-                    log.info(" Port " + affectedPort.toString() + " from device " + affectedDevice.toString() + " affected");
+                log.info(" Port " + affectedPort.toString() + " from device " + affectedDevice.toString() + " affected");
 
-                    boolean portDown = false;
-                    boolean portUp = false;
 
-                    if (event.type() == DeviceEvent.Type.PORT_UPDATED) {
 
-                        if (event.port().isEnabled()) {
-                            portUp = true;
-                        } else {
-                            portDown = true;
-                        }
+                if (failure) {
 
-                    }
+                    //Port Down
+                    //remove the matching flows and
+                    //TODO : notify maintenance/...
 
-                    if (event.type() == DeviceEvent.Type.PORT_REMOVED || portDown) {
+                    Iterable<FlowRule> flows = flowRuleService.getFlowRulesById(NoviAggSwitchComponent.appId);
+                    List<FlowRule> flowsToWithdraw = new LinkedList<>();
+                    Instruction outputToDeadLink = DefaultTrafficTreatment.builder().setOutput(cp.port()).build().immediate().get(0);
 
-                        //Port Down
-                        //remove the matching flows and
-                        //TODO : notify maintenance/...
-
-                        Iterable<FlowRule> flows = flowRuleService.getFlowRulesById(NoviAggSwitchComponent.appId);
-                        List<FlowRule> flowsToWithdraw = new LinkedList<>();
-                        Instruction outputToDeadLink = DefaultTrafficTreatment.builder().setOutput(cp.port()).build().immediate().get(0);
-
-                        for (FlowRule flow : flows) {
-                            if (flow.deviceId().equals(cp.deviceId())) {
-                                if (flow.treatment().immediate().contains(outputToDeadLink)) {
-                                    //flow affected
-                                    flowsToWithdraw.add(flow);
-                                    flowRuleService.removeFlowRules(flow);
-                                }
+                    for (FlowRule flow : flows) {
+                        if (flow.deviceId().equals(cp.deviceId())) {
+                            if (flow.treatment().immediate().contains(outputToDeadLink)) {
+                                //flow affected
+                                flowsToWithdraw.add(flow);
+                                flowRuleService.removeFlowRules(flow);
                             }
                         }
-
-                        log.warn("Port down : " + affectedPort.toString() + " on device " + affectedDevice.toString() + ", " + flowsToWithdraw.size() + " flows withdrawn. Maintenance requested");
-
-                        withdrawnFlows.add(new WithdrawnFlows(flowsToWithdraw, event.time(), cp));
-
                     }
 
-                    if (event.type() == DeviceEvent.Type.PORT_ADDED || portUp) {
-                        //Port back up, reinstate the flows
-                        Iterator<WithdrawnFlows> it = withdrawnFlows.listIterator();
+                    log.warn("Port down : " + affectedPort.toString() + " on device " + affectedDevice.toString() + ", " + flowsToWithdraw.size() + " flows withdrawn. Maintenance requested");
 
-                        while(it.hasNext()) {
+                    withdrawnFlows.add(new WithdrawnFlows(flowsToWithdraw, System.currentTimeMillis(), cp));
+
+                } else {
+                    // Port back up, reinstate the flows
+                    Iterator<WithdrawnFlows> it = withdrawnFlows.listIterator();
+
+                    if(!newMac) {
+                        //Reinstate as is
+                        while (it.hasNext()) {
                             WithdrawnFlows wFlows = it.next();
                             if (wFlows.getPort().equals(cp)) {
                                 //Previous flows are reinstanted
                                 for (FlowRule flow : wFlows.getFlows()) {
                                     flowRuleService.applyFlowRules(flow);
                                 }
+
                                 log.warn("Port up : " + affectedPort.toString() + " on " + affectedDevice.toString() + ", " + wFlows.getFlows().size() + " flows reinstanted.");
+                                it.remove();
+                            }
+                        }
+                    } else {
+                        //New dst mac
+
+                        while(it.hasNext()) {
+                            WithdrawnFlows wFlows = it.next();
+                            if (wFlows.getPort().equals(cp)) {
+
+                                List<FlowRule> flows = wFlows.getFlows();
+                                for(FlowRule flow : flows) {
+                                    //changing the dst Mac
+                                    alterMacAndApply(flow, newDstMac);
+                                }
 
                                 it.remove();
                             }
@@ -147,9 +152,42 @@ public class LinkFailureDetection implements DeviceListener{
                     }
 
                 }
+
             }
         }
 
+
+    }
+
+    private void alterMacAndApply(FlowRule flow, MacAddress newMac) {
+
+        //Look for setVxlan and alter remote Mac
+        List<Instruction> instructions = flow.treatment().immediate();
+        for (Instruction instruction : instructions) {
+
+            if (instruction.type() == Instruction.Type.EXTENSION) {
+
+
+                try {
+                    Instructions.ExtensionInstructionWrapper extensionInstruction = (Instructions.ExtensionInstructionWrapper) instruction;
+                    ExtensionTreatment extension = extensionInstruction.extensionInstruction();
+
+
+                    if (extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_SET_VXLAN.type())) {
+                        log.info("set vxlan extension found");
+
+                        NoviflowSetVxLan noviflowVxlan = (NoviflowSetVxLan) extension;
+                        noviflowVxlan.setDstMac(newMac);
+
+                    }
+
+                } catch (Exception e) {
+                    log.warn("alterMacAndApply exception", e);
+                }
+            }
+        }
+
+        flowRuleService.applyFlowRules(flow);
     }
 
     private class WithdrawnFlows {

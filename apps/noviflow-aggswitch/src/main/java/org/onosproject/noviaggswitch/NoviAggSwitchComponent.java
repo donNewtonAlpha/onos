@@ -134,7 +134,7 @@ public class NoviAggSwitchComponent {
         packetService.addProcessor(processor, 1);
 
         linkFailureDetection = new LinkFailureDetection(flowRuleService, new LinkedList<>());
-        deviceService.addListener(linkFailureDetection);
+        //deviceService.addListener(linkFailureDetection);
 
        /* //Routing info
         //4 info
@@ -459,15 +459,22 @@ public class NoviAggSwitchComponent {
             }
 
         }
+        log.info("Tunnels for device " + deviceId + " have been removed");
     }
 
     public List<VxLanTunnel> getTunnels(DeviceId deviceId) {
+        Iterable<FlowRule> flows = flowRuleService.getFlowRulesById(appId);
+        return getTunnels(deviceId, flows);
+
+    }
+
+    public List<VxLanTunnel> getTunnels(DeviceId deviceId, Iterable<FlowRule> flows) {
 
         log.info("get tunnel fonction");
 
         List<VxLanTunnel> tunnels = new LinkedList<>();
 
-        Iterable<FlowRule> flows = flowRuleService.getFlowRulesById(appId);
+
         for (FlowRule flow : flows) {
 
             if(flow.deviceId().equals(deviceId)) {
@@ -787,7 +794,24 @@ public class NoviAggSwitchComponent {
 
     }
 
-    public void newConfig(NoviAggSwitchConfig config, NoviAggSwitchConfig oldConfig) {
+    public void notifyFailure(DeviceId deviceId, PortNumber port) {
+        linkFailureDetection.event(new ConnectPoint(deviceId, port), true, false, null);
+    }
+
+    public void notifyRecovery(DeviceId deviceId, PortNumber port, MacAddress newDstMac) {
+        linkFailureDetection.event(new ConnectPoint(deviceId, port), false, true, newDstMac);
+    }
+
+    public void notifyRecovery(DeviceId deviceId, PortNumber port) {
+        linkFailureDetection.event(new ConnectPoint(deviceId, port), false, false, null);
+    }
+
+    public void notifyMacChange(DeviceId deviceId, PortNumber port, MacAddress newDstMac) {
+        notifyFailure(deviceId, port);
+        notifyRecovery(deviceId, port, newDstMac);
+    }
+
+    /*public void newConfig(NoviAggSwitchConfig config, NoviAggSwitchConfig oldConfig) {
 
         if(config == null) {
          log.warn("Null config, don't know what to do so do nothing");
@@ -848,10 +872,10 @@ public class NoviAggSwitchComponent {
 
                 log.info("Routing infos added");
 
-               /* igmpIntercept(deviceId);
+               *//* igmpIntercept(deviceId);
                 addMulticastHandler(deviceId);
 
-                log.info("Multicast handler added");*/
+                log.info("Multicast handler added");*//*
 
                 //LinkFailureDetection
 
@@ -881,7 +905,7 @@ public class NoviAggSwitchComponent {
             }
         }
 
-    }
+    }*/
 
 
     private class NoviAggSwitchConfigListener implements NetworkConfigListener {

@@ -184,7 +184,9 @@ public class RestNoviAggSwitch extends AbstractWebResource {
                 List<VxLanTunnel> tunnels = NoviAggSwitchComponent.getComponent().getTunnels(deviceId);
 
                 for (VxLanTunnel tunnel : tunnels) {
-                    deviceTunnels.add(tunnel.jsonNode());
+                    if(tunnel.isValid()) {
+                        deviceTunnels.add(tunnel.jsonNode());
+                    }
                 }
 
                 devices.add(device);

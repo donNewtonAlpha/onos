@@ -7,6 +7,7 @@ import org.onosproject.net.PortNumber;
 import org.onosproject.net.flow.DefaultTrafficTreatment;
 import org.onosproject.net.flow.TrafficTreatment;
 import org.onosproject.net.packet.*;
+import org.onosproject.noviaggswitch.config.NoviAggSwitchConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,6 +29,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
     private List<MacRequest> macRequests = new LinkedList<>();
     private List<RoutingInfo> routingInfos = new LinkedList<>();
+    private List<MacCheck> macChecks = new LinkedList<>();
 
 
     public NoviAggSwitchPacketProcessor(PacketService packetService) {
@@ -42,6 +44,13 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
                     for(MacRequest request: macRequests) {
                         request.execute();
+                    }
+                }
+
+                if(macChecks.size() > 0) {
+
+                    for(MacCheck mc : macChecks){
+                        mc.execute();
                     }
                 }
 
@@ -149,6 +158,8 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
         // ARP reply for router. Process all pending IP packets.
         Ip4Address hostIpAddress = Ip4Address.valueOf(arpReply.getSenderProtocolAddress());
+        MacAddress mac = MacAddress.valueOf(arpReply.getSenderHardwareAddress());
+
         Iterator<MacRequest> it = macRequests.listIterator();
 
         while(it.hasNext()) {
@@ -156,7 +167,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
             MacRequest request = it.next();
 
             if (request.getIp().equals(hostIpAddress)) {
-                MacAddress mac = MacAddress.valueOf(arpReply.getSenderHardwareAddress());
+
 
                 request.setMac(mac);
                 request.unlock();
@@ -164,6 +175,15 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
                 it.remove();
             }
         }
+
+        for(MacCheck macCheck : macChecks) {
+
+            if(macCheck.getIp().equals(hostIpAddress)) {
+                macCheck.success(mac);
+            }
+
+        }
+
     }
 
     private void handlePingRequest(DeviceId deviceId, PortNumber inPort, Ethernet ethPkt) {
@@ -334,12 +354,30 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
         if(matchingInfo != null) {
 
-            request.setArpRequest(getArpRequest(ip, matchingInfo.getIp(), matchingInfo.getMac(), matchingInfo.getDeviceId(), matchingInfo.getPort(), VlanId.NONE));
+            OutboundPacket arpRequest = getArpRequest(ip, matchingInfo.getIp(), matchingInfo.getMac(), matchingInfo.getDeviceId(), matchingInfo.getPort(), VlanId.NONE);
+
+            request.setArpRequest(arpRequest);
             request.execute();
 
             request.lock();
 
             log.info("MAC found : " + request.getMac() + " for " + ip);
+
+            //Create a MacCheck
+            MacCheck macCheck = new MacCheck(matchingInfo.deviceId, matchingInfo.getPort(), ip, request.getMac());
+            //Look if one already exist
+            boolean needNew = true;
+            for(MacCheck mc : macChecks) {
+                if (mc.equals(macCheck)){
+                    //already exist
+                    needNew = false;
+                }
+            }
+            if(needNew) {
+                macCheck.setArpRequest(arpRequest);
+                macChecks.add(macCheck);
+            }
+
             return request.getMac();
         } else {
             log.error("No matching routing info for : " + ip.toString());
@@ -354,6 +392,95 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
             mr.unlock();
         }
         macRequests.clear();
+    }
+
+    private class MacCheck {
+
+        private static final int LOSS_BEFORE_FAILURE = 5;
+        private static final int CYCLE = 15;
+
+
+        private DeviceId deviceId;
+        private PortNumber port;
+        private Ip4Address ip;
+        private MacAddress mac;
+
+        private int failedAttempt;
+        private int delay;
+
+        private OutboundPacket arpRequest;
+
+
+
+        public MacCheck(DeviceId deviceId, PortNumber port, Ip4Address ip, MacAddress mac) {
+            this.deviceId = deviceId;
+            this.port = port;
+            this.ip = ip;
+            this.mac = mac;
+        }
+
+        public Ip4Address getIp() {
+            return ip;
+        }
+
+        public void setArpRequest(OutboundPacket arpRequest) {
+            this.arpRequest = arpRequest;
+        }
+
+        public synchronized void execute(){
+
+            delay++;
+            failedAttempt ++;
+
+            if(delay > CYCLE) {
+                //need to ARP
+                if (arpRequest != null) {
+
+                    packetService.emit(arpRequest);
+                    log.info("ARP request check for : " + ip.toString());
+
+                } else {
+                    log.warn("No ARP request assigned");
+                }
+            }
+            if(failedAttempt > LOSS_BEFORE_FAILURE) {
+                NoviAggSwitchComponent.getComponent().notifyFailure(deviceId, port);
+            }
+
+        }
+
+        public synchronized void success(MacAddress responseMac) {
+
+            if(failedAttempt > LOSS_BEFORE_FAILURE) {
+                //Recovery situation
+                if(responseMac.equals(mac)) {
+                    //Same mac
+                    NoviAggSwitchComponent.getComponent().notifyRecovery(deviceId, port);
+                } else {
+                    //change of mac after recovery
+                    NoviAggSwitchComponent.getComponent().notifyRecovery(deviceId, port, responseMac);
+                }
+            } else{
+                // Normal situation, chack if mac has changed
+                if(!responseMac.equals(mac)) {
+                    mac = responseMac;
+                    NoviAggSwitchComponent.getComponent().notifyMacChange(deviceId, port, responseMac);
+                }
+            }
+
+            failedAttempt = 0;
+            delay = 0;
+        }
+
+        public boolean equals (Object otherObject) {
+            if(otherObject instanceof MacCheck) {
+                MacCheck other = (MacCheck) otherObject;
+                return ip.equals(other.ip) && deviceId.equals(other.deviceId) && port.equals(other.port);
+            }
+
+            return false;
+        }
+
     }
 
     private class MacRequest {

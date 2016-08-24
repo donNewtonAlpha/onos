@@ -82,6 +82,10 @@ public class NoviflowSetVxLan extends AbstractExtension implements ExtensionTrea
         return vXlanId;
     }
 
+    public void setDstMac(MacAddress newDstMac) {
+        dstMac = newDstMac;
+    }
+
     @Override
     public ExtensionTreatmentType type() {
         return ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_SET_VXLAN.type();
