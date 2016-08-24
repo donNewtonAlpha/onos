@@ -83,14 +83,14 @@ public class NoviAggSwitchComponent {
     static ApplicationId appId;
 
 
-    static final DeviceId deviceId = DeviceId.deviceId("of:000000223d5a00d9");
+    /*static final DeviceId deviceId = DeviceId.deviceId("of:000000223d5a00d9");
 
     private static MacAddress switchMac = MacAddress.valueOf("68:05:33:44:55:66");
     private static Ip4Address aggSwitchIP = Ip4Address.valueOf("10.50.1.1");
     private static Ip4Address primaryLinkIP = Ip4Address.valueOf("10.10.1.0");
     private static Ip4Address secondaryLinlkIP = Ip4Address.valueOf("10.10.2.0");
     private PortNumber bngPort =  PortNumber.portNumber(7);
-    private PortNumber secondaryBngPort = PortNumber.portNumber(8);
+    private PortNumber secondaryBngPort = PortNumber.portNumber(8);*/
 
 
     private NoviAggSwitchPacketProcessor processor;
@@ -245,17 +245,17 @@ public class NoviAggSwitchComponent {
         Random rand = new Random();
         int udpPort = rand.nextInt() + 2000;
 
-        try {
+        //try {
 
             //NoviAggSwitchConfig config = (NoviAggSwitchConfig) cfgService.getConfig(appId, NoviAggSwitchConfig.class);
 
             addAccessDevice(deviceId, port, vni, udpPort, bngVxlanIp, viaPrimaryIP, viaSecondaryIP, devicesConfig.get(deviceId).getLoopbackIP(), devicesConfig.get(deviceId).getPrimaryLinkMac(), devicesConfig.get(deviceId).getSecondaryLinkMac());
-        } catch (Exception e) {
+        /*} catch (Exception e) {
 
             addAccessDevice(deviceId, port, vni, udpPort, bngVxlanIp, viaPrimaryIP, viaSecondaryIP, aggSwitchIP, MacAddress.valueOf("68:05:11:11:11:11"), MacAddress.valueOf("68:05:11:11:11:22"));
 
 
-        }
+        }*/
 
     }
 
@@ -321,9 +321,10 @@ public class NoviAggSwitchComponent {
             primaryPort = devicesConfig.get(deviceId).getPrimaryLinkPort();
             secondaryPort = devicesConfig.get(deviceId).getSecondaryLinkPort();
         } catch (Exception e) {
-            log.info("Config unavailable");
-            primaryPort = bngPort;
-            secondaryPort = secondaryBngPort;
+            log.warn("Config unavailable");
+            return;
+            /*primaryPort = bngPort;
+            secondaryPort = secondaryBngPort;*/
         }
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
@@ -366,9 +367,10 @@ public class NoviAggSwitchComponent {
             primaryPort = devicesConfig.get(deviceId).getPrimaryLinkPort();
             secondaryPort = devicesConfig.get(deviceId).getSecondaryLinkPort();
         } catch (Exception e) {
-            log.info("Config unavailable");
+            log.warn("Config unavailable");
+            return;/*
             primaryPort = bngPort;
-            secondaryPort = secondaryBngPort;
+            secondaryPort = secondaryBngPort;*/
         }
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
@@ -509,6 +511,7 @@ public class NoviAggSwitchComponent {
                                     newTunnel.setVni(vni);
                                     newTunnel.setPort(aggPort);
                                     newTunnel.setViaMac(flow.priority(), dstMac);
+                                    newTunnel.addFlow(flow);
                                     tunnels.add(newTunnel);
                                 }
 
@@ -531,6 +534,7 @@ public class NoviAggSwitchComponent {
                                 }
                                 if (needNew) {
                                     VxLanTunnel newTunnel = new VxLanTunnel(vxlanIp);
+                                    newTunnel.addFlow(flow);
                                     tunnels.add(newTunnel);
                                 }
 
@@ -759,19 +763,26 @@ public class NoviAggSwitchComponent {
 
         Random rand = new Random();
 
+        int validTunnels = 0;
+        int invalidTunnels = 0;
 
         for (VxLanTunnel tunnel : tunnels) {
 
-            int udpPort = rand.nextInt() + 2000;
+            if(tunnel.isValid()) {
+                validTunnels ++;
 
-            accessToBng(deviceId, tunnel.getPort(), tunnel.getVni(), udpPort, tunnel.getDstIp(), tunnel.getPrimaryViaMac(), config.getLoopbackIP(), config.getPrimaryLinkMac(), true);
-            bngToAccess(deviceId, tunnel.getPort(), tunnel.getVni(), tunnel.getDstIp(), true);
-            accessToBng(deviceId, tunnel.getPort(), tunnel.getVni(), udpPort, tunnel.getDstIp(), tunnel.getSecondaryViaMac(), config.getLoopbackIP(), config.getSecondaryLinkMac(), false);
-            bngToAccess(deviceId, tunnel.getPort(), tunnel.getVni(), tunnel.getDstIp(), false);
+                int udpPort = rand.nextInt() + 2000;
 
+                accessToBng(deviceId, tunnel.getPort(), tunnel.getVni(), udpPort, tunnel.getDstIp(), tunnel.getPrimaryViaMac(), config.getLoopbackIP(), config.getPrimaryLinkMac(), true);
+                bngToAccess(deviceId, tunnel.getPort(), tunnel.getVni(), tunnel.getDstIp(), true);
+                accessToBng(deviceId, tunnel.getPort(), tunnel.getVni(), udpPort, tunnel.getDstIp(), tunnel.getSecondaryViaMac(), config.getLoopbackIP(), config.getSecondaryLinkMac(), false);
+                bngToAccess(deviceId, tunnel.getPort(), tunnel.getVni(), tunnel.getDstIp(), false);
+            } else {
+                invalidTunnels++;
+            }
         }
 
-        log.info(tunnels.size() + " tunnels have been reset");
+        log.info(validTunnels + " tunnels have been reset,  " + invalidTunnels + " tunnels were invalid" );
 
 
     }

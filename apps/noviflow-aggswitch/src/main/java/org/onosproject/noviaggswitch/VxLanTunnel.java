@@ -5,6 +5,7 @@ import org.onlab.packet.MacAddress;
 import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.PortNumber;
 
+import java.util.LinkedList;
 import java.util.List;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -22,7 +23,7 @@ public class VxLanTunnel {
     private MacAddress secondaryViaMac = null;
     private int weight;
 
-    private List<FlowRule> flows;
+    private List<FlowRule> flows = new LinkedList<>();
 
     public VxLanTunnel(Ip4Address ip) {
         this.dstIp = ip;
@@ -88,6 +89,10 @@ public class VxLanTunnel {
 
     public MacAddress getSecondaryViaMac() {
         return secondaryViaMac;
+    }
+
+    public boolean isValid() {
+        return port != null && dstIp != null && vni != 0 && primaryViaMac != null && secondaryViaMac != null;
     }
 
     public ObjectNode jsonNode(){
