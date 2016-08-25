@@ -335,9 +335,24 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
         while(it.hasNext()) {
             RoutingInfo info = it.next();
             if (info.getDeviceId().equals(deviceId)) {
+                log.info("Remove one RoutingInfo , ip : " + info.getIp() + "for device " + deviceId);
                 it.remove();
             }
         }
+    }
+
+    public void clearMacChecks(DeviceId deviceId) {
+
+        Iterator<MacCheck> it = macChecks.listIterator();
+
+        while(it.hasNext()) {
+            MacCheck mc = it.next();
+            if(mc.getDeviceId().equals(deviceId)){
+                log.info("Remove one MacCheck , ip : " + mc.getIp() + "for device " + deviceId);
+                it.remove();
+            }
+        }
+
     }
 
     public MacAddress getMac(Ip4Address ip) {
@@ -421,6 +436,10 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
         public Ip4Address getIp() {
             return ip;
+        }
+
+        public DeviceId getDeviceId() {
+            return deviceId;
         }
 
         public void setArpRequest(OutboundPacket arpRequest) {

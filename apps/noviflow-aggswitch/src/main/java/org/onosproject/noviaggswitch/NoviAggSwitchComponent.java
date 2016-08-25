@@ -414,6 +414,8 @@ public class NoviAggSwitchComponent {
             }
         }
 
+        checkNeedForMacCheck(deviceId);
+
     }
 
     public void removeAllTunnels() {
@@ -460,6 +462,26 @@ public class NoviAggSwitchComponent {
 
         }
         log.info("Tunnels for device " + deviceId + " have been removed");
+
+        checkNeedForMacCheck(deviceId);
+    }
+
+    public void checkNeedForMacCheck(DeviceId deviceId) {
+
+        List<VxLanTunnel> tunnels = getTunnels(deviceId);
+        boolean needToRemove = true;
+
+        for(VxLanTunnel tunnel : tunnels) {
+            if(tunnel.isValid()) {
+                needToRemove = false;
+            }
+        }
+
+        if(needToRemove) {
+            log.info("Removing MacChecks for device " + deviceId);
+            processor.clearMacChecks(deviceId);
+        }
+
     }
 
     public List<VxLanTunnel> getTunnels(DeviceId deviceId) {
