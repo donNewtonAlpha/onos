@@ -463,11 +463,16 @@ public class NoviAggSwitchComponent {
         }
         log.info("Tunnels for device " + deviceId + " have been removed");
 
-        checkNeedForMacCheck(deviceId);
+        processor.clearMacChecks(deviceId);
     }
 
     public void checkNeedForMacCheck(DeviceId deviceId) {
 
+        try {
+            Thread.sleep(100);
+        } catch (Exception e){
+
+        }
         List<VxLanTunnel> tunnels = getTunnels(deviceId);
         boolean needToRemove = true;
 

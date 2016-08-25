@@ -27,9 +27,9 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
     private PacketService packetService;
 
 
-    private List<MacRequest> macRequests = new LinkedList<>();
+    private volatile List<MacRequest> macRequests = new LinkedList<>();
     private List<RoutingInfo> routingInfos = new LinkedList<>();
-    private List<MacCheck> macChecks = new LinkedList<>();
+    private volatile List<MacCheck> macChecks = new LinkedList<>();
 
 
     public NoviAggSwitchPacketProcessor(PacketService packetService) {
@@ -113,10 +113,10 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
 
                     if (ping.getIcmpType() == ICMP.TYPE_ECHO_REQUEST) {
-                        log.info("ICMP request");
+                        log.info("ICMP request received");
                         handlePingRequest(deviceId, inPort, ethPkt);
                     } else if (ping.getIcmpType() == ICMP.TYPE_ECHO_REPLY) {
-                            log.info("ICMP reply");
+                            log.info("ICMP reply received");
                         //TODO
                     }
                 } else if (ipPayload instanceof IGMP) {
@@ -153,7 +153,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
     private void handleArpReply(DeviceId deviceId, PortNumber inPort, Ethernet ethPkt) {
         ARP arpReply = (ARP) ethPkt.getPayload();
-        log.info("ARP reply");
+        log.info("ARP reply received");
 
 
         // ARP reply for router. Process all pending IP packets.
@@ -195,7 +195,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
         for(RoutingInfo info : routingInfos) {
 
             if(info.getDeviceId().equals(deviceId) && info.getPort().equals(inPort) && pingedIpAddress.equals(info.getIp())){
-                log.info("This ping request is for this switch");
+                log.debug("This ping request is for this switch");
                 sendICMPreply(ethPkt, info.getMac(), info.getDeviceId(), inPort);
             }
 
@@ -456,7 +456,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
                 if (arpRequest != null) {
 
                     packetService.emit(arpRequest);
-                    log.info("ARP request check for : " + ip.toString());
+                    log.info("ARP request check for " + ip.toString() + "sent");
 
                 } else {
                     log.warn("No ARP request assigned");
@@ -551,7 +551,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
                 if(arpRequest != null){
 
                     packetService.emit(arpRequest);
-                    log.info("ARP request for : " + ip.toString());
+                    log.info("ARP request for " + ip.toString() + "sent");
 
                 } else {
                     log.warn("No ARP request assigned");
