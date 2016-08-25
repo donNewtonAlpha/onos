@@ -15,7 +15,6 @@
  */
 package org.onosproject.store.trivial;
 
-import static org.apache.commons.lang3.concurrent.ConcurrentUtils.createIfAbsentUnchecked;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import java.util.ArrayList;
@@ -24,7 +23,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,7 +33,6 @@ import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
 import org.apache.felix.scr.annotations.Service;
-import org.onlab.util.NewConcurrentHashMap;
 import org.onosproject.core.DefaultGroupId;
 import org.onosproject.core.GroupId;
 import org.onosproject.net.DeviceId;
@@ -100,26 +97,6 @@ public class SimpleGroupStore
         log.info("Stopped");
     }
 
-    private static NewConcurrentHashMap<GroupKey, StoredGroupEntry>
-                        lazyEmptyGroupKeyTable() {
-        return NewConcurrentHashMap.<GroupKey, StoredGroupEntry>ifNeeded();
-    }
-
-    private static NewConcurrentHashMap<GroupId, StoredGroupEntry>
-                        lazyEmptyGroupIdTable() {
-        return NewConcurrentHashMap.<GroupId, StoredGroupEntry>ifNeeded();
-    }
-
-    private static NewConcurrentHashMap<GroupKey, StoredGroupEntry>
-                        lazyEmptyPendingGroupKeyTable() {
-        return NewConcurrentHashMap.<GroupKey, StoredGroupEntry>ifNeeded();
-    }
-
-    private static NewConcurrentHashMap<GroupId, Group>
-                        lazyEmptyExtraneousGroupIdTable() {
-        return NewConcurrentHashMap.<GroupId, Group>ifNeeded();
-    }
-
     /**
      * Returns the group key table for specified device.
      *
@@ -127,8 +104,7 @@ public class SimpleGroupStore
      * @return Map representing group key table of given device.
      */
     private ConcurrentMap<GroupKey, StoredGroupEntry> getGroupKeyTable(DeviceId deviceId) {
-        return createIfAbsentUnchecked(groupEntriesByKey,
-                                       deviceId, lazyEmptyGroupKeyTable());
+        return groupEntriesByKey.computeIfAbsent(deviceId, k -> new ConcurrentHashMap<>());
     }
 
     /**
@@ -138,8 +114,7 @@ public class SimpleGroupStore
      * @return Map representing group key table of given device.
      */
     private ConcurrentMap<GroupId, StoredGroupEntry> getGroupIdTable(DeviceId deviceId) {
-        return createIfAbsentUnchecked(groupEntriesById,
-                                       deviceId, lazyEmptyGroupIdTable());
+        return groupEntriesById.computeIfAbsent(deviceId, k -> new ConcurrentHashMap<>());
     }
 
     /**
@@ -150,8 +125,7 @@ public class SimpleGroupStore
      */
     private ConcurrentMap<GroupKey, StoredGroupEntry>
                     getPendingGroupKeyTable(DeviceId deviceId) {
-        return createIfAbsentUnchecked(pendingGroupEntriesByKey,
-                                       deviceId, lazyEmptyPendingGroupKeyTable());
+        return pendingGroupEntriesByKey.computeIfAbsent(deviceId, k -> new ConcurrentHashMap<>());
     }
 
     /**
@@ -162,9 +136,7 @@ public class SimpleGroupStore
      */
     private ConcurrentMap<GroupId, Group>
                 getExtraneousGroupIdTable(DeviceId deviceId) {
-        return createIfAbsentUnchecked(extraneousGroupEntriesById,
-                                       deviceId,
-                                       lazyEmptyExtraneousGroupIdTable());
+        return extraneousGroupEntriesById.computeIfAbsent(deviceId, k -> new ConcurrentHashMap<>());
     }
 
     /**
@@ -603,22 +575,21 @@ public class SimpleGroupStore
         Set<Group> extraneousStoredEntries =
                 Sets.newHashSet(getExtraneousGroups(deviceId));
 
-        log.trace("pushGroupMetrics: Displaying all ({}) "
-                + "southboundGroupEntries for device {}",
-                  southboundGroupEntries.size(),
-                  deviceId);
-        for (Iterator<Group> it = southboundGroupEntries.iterator(); it.hasNext();) {
-            Group group = it.next();
-            log.trace("Group {} in device {}", group, deviceId);
-        }
+        if (log.isTraceEnabled()) {
+            log.trace("pushGroupMetrics: Displaying all ({}) "
+                            + "southboundGroupEntries for device {}",
+                    southboundGroupEntries.size(),
+                    deviceId);
+            for (Group group : southboundGroupEntries) {
+                log.trace("Group {} in device {}", group, deviceId);
+            }
 
-        log.trace("Displaying all ({}) stored group entries for device {}",
-                  storedGroupEntries.size(),
-                  deviceId);
-        for (Iterator<Group> it1 = storedGroupEntries.iterator();
-                it1.hasNext();) {
-            Group group = it1.next();
-            log.trace("Stored Group {} for device {}", group, deviceId);
+            log.trace("Displaying all ({}) stored group entries for device {}",
+                    storedGroupEntries.size(),
+                    deviceId);
+            for (Group group : storedGroupEntries) {
+                log.trace("Stored Group {} for device {}", group, deviceId);
+            }
         }
 
         for (Iterator<Group> it2 = southboundGroupEntries.iterator(); it2.hasNext();) {
@@ -673,6 +644,17 @@ public class SimpleGroupStore
                     + "AUDIT completed", deviceId);
             deviceInitialAuditCompleted(deviceId, true);
         }
+    }
+
+    @Override
+    public void notifyOfFailovers(Collection<Group> failoverGroups) {
+        List<GroupEvent> failoverEvents = new ArrayList<>();
+        failoverGroups.forEach(group -> {
+            if (group.type() == Group.Type.FAILOVER) {
+                failoverEvents.add(new GroupEvent(GroupEvent.Type.GROUP_BUCKET_FAILOVER, group));
+            }
+        });
+        notifyDelegate(failoverEvents);
     }
 
     private void groupMissing(Group group) {

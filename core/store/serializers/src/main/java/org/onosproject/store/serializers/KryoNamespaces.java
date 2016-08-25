@@ -195,6 +195,9 @@ import org.onosproject.net.packet.DefaultOutboundPacket;
 import org.onosproject.net.packet.DefaultPacketRequest;
 import org.onosproject.net.packet.PacketPriority;
 import org.onosproject.net.provider.ProviderId;
+import org.onosproject.net.region.DefaultRegion;
+import org.onosproject.net.region.Region;
+import org.onosproject.net.region.RegionId;
 import org.onosproject.net.resource.ContinuousResource;
 import org.onosproject.net.resource.ContinuousResourceId;
 import org.onosproject.net.resource.DiscreteResource;
@@ -231,6 +234,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public final class KryoNamespaces {
 
+    public static final int BASIC_MAX_SIZE = 50;
     public static final KryoNamespace BASIC = KryoNamespace.newBuilder()
             .nextId(KryoNamespace.FLOATING_ID)
             .register(byte[].class)
@@ -281,6 +285,7 @@ public final class KryoNamespaces {
     /**
      * KryoNamespace which can serialize ON.lab misc classes.
      */
+    public static final int MISC_MAX_SIZE = 30;
     public static final KryoNamespace MISC = KryoNamespace.newBuilder()
             .nextId(KryoNamespace.FLOATING_ID)
             .register(new IpPrefixSerializer(), IpPrefix.class)
@@ -299,20 +304,15 @@ public final class KryoNamespaces {
             .build("MISC");
 
     /**
-     * Kryo registration Id for user custom registration.
-     */
-    public static final int BEGIN_USER_CUSTOM_ID = 500;
-
-    // TODO: Populate other classes
-    /**
      * KryoNamespace which can serialize API bundle classes.
      */
+    public static final int API_MAX_SIZE = 499;
     public static final KryoNamespace API = KryoNamespace.newBuilder()
             .nextId(KryoNamespace.INITIAL_ID)
             .register(BASIC)
-            .nextId(KryoNamespace.INITIAL_ID + 50)
+            .nextId(KryoNamespace.INITIAL_ID + BASIC_MAX_SIZE)
             .register(MISC)
-            .nextId(KryoNamespace.INITIAL_ID + 50 + 30)
+            .nextId(KryoNamespace.INITIAL_ID + BASIC_MAX_SIZE + MISC_MAX_SIZE)
             .register(
                     Instructions.MeterInstruction.class,
                     MeterId.class,
@@ -504,6 +504,10 @@ public final class KryoNamespaces {
             .register(new AnnotationsSerializer(), DefaultAnnotations.class)
             .register(new ExtensionInstructionSerializer(), Instructions.ExtensionInstructionWrapper.class)
             .register(new ExtensionCriterionSerializer(), ExtensionCriterion.class)
+            .register(Region.class)
+            .register(Region.Type.class)
+            .register(RegionId.class)
+            .register(DefaultRegion.class)
             .register(ExtensionSelectorType.class)
             .register(ExtensionTreatmentType.class)
             .register(TransactionId.class)
@@ -543,8 +547,13 @@ public final class KryoNamespaces {
             .register(ClosedOpenRange.class)
             .register(DiscreteResourceCodec.class)
             .register(new ImmutableByteSequenceSerializer(), ImmutableByteSequence.class)
+            .register(PathIntent.ProtectionType.class)
             .build("API");
 
+    /**
+     * Kryo registration Id for user custom registration.
+     */
+    public static final int BEGIN_USER_CUSTOM_ID = API_MAX_SIZE + 1;
 
     // not to be instantiated
     private KryoNamespaces() {

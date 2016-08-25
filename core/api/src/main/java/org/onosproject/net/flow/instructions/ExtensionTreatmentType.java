@@ -63,7 +63,8 @@ public final class ExtensionTreatmentType {
         NICIRA_ENCAP_ETH_TYPE(123),
         BMV2_ACTION(128),
         NOVIFLOW_SET_VXLAN(150),
-        NOVIFLOW_POP_VXLAN(151);
+        NOVIFLOW_POP_VXLAN(151),
+        OPLINK_ATTENUATION(130);
 
         private ExtensionTreatmentType type;
 

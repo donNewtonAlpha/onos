@@ -16,13 +16,14 @@ package org.onosproject.kafkaintegration.api.dto;
 
 import org.onosproject.event.AbstractEvent;
 
-import com.google.protobuf.GeneratedMessage;
+import com.google.protobuf.GeneratedMessageV3;
 
 /**
- * Represents the converted Onos Event data into GPB format.
+ * Represents the converted Onos Event data into protobuf format.
  *
  */
-public class OnosEvent extends AbstractEvent<OnosEvent.Type, GeneratedMessage> {
+// FIXME lack of abstraction in subject type is biting us
+public class OnosEvent extends AbstractEvent<OnosEvent.Type, GeneratedMessageV3> {
 
     /**
      * Creates a new Onos Event.
@@ -30,7 +31,7 @@ public class OnosEvent extends AbstractEvent<OnosEvent.Type, GeneratedMessage> {
      * @param type The Type of Onos Event
      * @param subject Protobuf message corresponding to the Onos Event
      */
-    public OnosEvent(Type type, GeneratedMessage subject) {
+    public OnosEvent(Type type, GeneratedMessageV3 subject) {
         super(type, subject);
     }
 
@@ -38,6 +39,14 @@ public class OnosEvent extends AbstractEvent<OnosEvent.Type, GeneratedMessage> {
      * List of Event Types supported.
      */
     public enum Type {
-        DEVICE, LINK;
+        /**
+         * Signifies Device events.
+         */
+        DEVICE,
+
+        /**
+         * Signifies Link events.
+         */
+        LINK;
     }
 }

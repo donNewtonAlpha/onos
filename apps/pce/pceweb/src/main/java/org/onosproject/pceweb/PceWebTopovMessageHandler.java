@@ -197,9 +197,19 @@ public class PceWebTopovMessageHandler extends UiMessageHandler {
             String lspType = string(payload, LSPTYPE);
             String tunnelName = string(payload, TUNNEL_NAME);
 
-            if (tunnelName.equals(STRING_NULL)) {
+            if (tunnelName == null || tunnelName.equals(STRING_NULL)) {
                 log.error("tunnel name should not be empty");
                 return;
+            }
+            //Validating tunnel name, duplicated tunnel names not allowed
+            Collection<Tunnel> existingTunnels = tunnelService.queryTunnel(Tunnel.Type.MPLS);
+            if (existingTunnels != null) {
+                for (Tunnel t : existingTunnels) {
+                    if (t.tunnelName().toString().equals(tunnelName)) {
+                        log.error("Path creation failed, Tunnel name already exists");
+                        return;
+                    }
+                }
             }
 
             if (pceService == null) {
@@ -207,8 +217,8 @@ public class PceWebTopovMessageHandler extends UiMessageHandler {
                 return;
             }
 
-            if (lspType == null) {
-                log.error("PCE setup path is failed.");
+            if (lspType == null || lspType.equals(STRING_NULL)) {
+                log.error("PCE setup path is failed as LSP type is mandatory");
             }
 
             if ((src != null) && (dst != null)) {

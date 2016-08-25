@@ -50,7 +50,7 @@ public class VoltGetPonLinksCommand extends AbstractShellCommand {
         if (reply != null) {
             print("%s", reply);
         } else {
-            print("No replay from %s", deviceId.toString());
+            print("No reply from %s", deviceId.toString());
         }
     }
 

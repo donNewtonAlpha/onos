@@ -107,6 +107,7 @@ public class HostMonitor implements TimerTask {
      */
     void addMonitoringFor(IpAddress ip) {
         monitoredAddresses.add(ip);
+        probe(ip);
     }
 
     /**
@@ -151,25 +152,27 @@ public class HostMonitor implements TimerTask {
 
     @Override
     public void run(Timeout timeout) throws Exception {
-        for (IpAddress ip : monitoredAddresses) {
-            Set<Host> hosts = hostManager.getHostsByIp(ip);
-
-            if (hosts.isEmpty()) {
-                sendRequest(ip);
-            } else {
-                for (Host host : hosts) {
-                    HostProvider provider = hostProviders.get(host.providerId());
-                    if (provider == null) {
-                        hostProviders.remove(host.providerId(), null);
-                    } else {
-                        provider.triggerProbe(host);
-                    }
-                }
-            }
-        }
+        monitoredAddresses.forEach(this::probe);
 
         synchronized (this) {
             this.timeout = Timer.getTimer().newTimeout(this, probeRate, TimeUnit.MILLISECONDS);
+        }
+    }
+
+    private void probe(IpAddress ip) {
+        Set<Host> hosts = hostManager.getHostsByIp(ip);
+
+        if (hosts.isEmpty()) {
+            sendRequest(ip);
+        } else {
+            for (Host host : hosts) {
+                HostProvider provider = hostProviders.get(host.providerId());
+                if (provider == null) {
+                    hostProviders.remove(host.providerId(), null);
+                } else {
+                    provider.triggerProbe(host);
+                }
+            }
         }
     }
 
@@ -190,7 +193,7 @@ public class HostMonitor implements TimerTask {
             return;
         }
 
-        for (InterfaceIpAddress ia : intf.ipAddresses()) {
+        for (InterfaceIpAddress ia : intf.ipAddressesList()) {
             if (ia.subnetAddress().contains(targetIp)) {
                 sendProbe(intf.connectPoint(), targetIp, ia.ipAddress(),
                         intf.mac(), intf.vlan());

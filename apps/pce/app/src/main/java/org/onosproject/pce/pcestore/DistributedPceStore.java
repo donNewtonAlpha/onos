@@ -44,6 +44,7 @@ import org.onosproject.pce.pceservice.constraint.CapabilityConstraint;
 import org.onosproject.pce.pceservice.constraint.CostConstraint;
 import org.onosproject.pce.pceservice.TunnelConsumerId;
 import org.onosproject.pce.pceservice.LspType;
+import org.onosproject.pce.pceservice.constraint.SharedBandwidthConstraint;
 import org.onosproject.pce.pcestore.api.LspLocalLabelInfo;
 import org.onosproject.pce.pcestore.api.PceStore;
 import org.onosproject.store.serializers.KryoNamespaces;
@@ -97,6 +98,17 @@ public class DistributedPceStore implements PceStore {
     // List of PCC LSR ids whose BGP device information was not available to perform
     // label db sync.
     private HashSet<DeviceId> pendinglabelDbSyncPccMap = new HashSet();
+    private static final Serializer SERIALIZER = Serializer
+            .using(new KryoNamespace.Builder().register(KryoNamespaces.API)
+                    .register(PcePathInfo.class)
+                    .register(CostConstraint.class)
+                    .register(CostConstraint.Type.class)
+                    .register(BandwidthConstraint.class)
+                    .register(SharedBandwidthConstraint.class)
+                    .register(CapabilityConstraint.class)
+                    .register(CapabilityConstraint.CapabilityType.class)
+                    .register(LspType.class)
+                    .build());
 
     @Activate
     protected void activate() {
@@ -135,18 +147,7 @@ public class DistributedPceStore implements PceStore {
 
         failedPathSet = storageService.<PcePathInfo>setBuilder()
                 .withName("failed-path-info")
-                .withSerializer(Serializer.using(
-                        new KryoNamespace.Builder()
-                                .register(KryoNamespaces.API)
-                                .register(PcePathInfo.class,
-                                          CostConstraint.class,
-                                          CostConstraint.Type.class,
-                                          BandwidthConstraint.class,
-                                          CapabilityConstraint.class,
-                                          CapabilityConstraint.CapabilityType.class,
-                                          LspType.class)
-                                .build()))
-
+                .withSerializer(SERIALIZER)
                 .build()
                 .asDistributedSet();
 

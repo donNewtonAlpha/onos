@@ -30,16 +30,25 @@ public class DefaultDistributedWorkQueue<E> implements WorkQueue<E> {
     }
 
     @Override
+    public String name() {
+        return backingQueue.name();
+    }
+
+    @Override
     public CompletableFuture<Void> addMultiple(Collection<E> items) {
         return backingQueue.addMultiple(items.stream()
                                              .map(serializer::encode)
                                              .collect(Collectors.toCollection(ArrayList::new)));
     }
 
+    private Collection<Task<E>> decodeCollection(Collection<Task<byte[]>> tasks) {
+        return Collections2.transform(tasks, task -> task.map(serializer::decode));
+    }
+
     @Override
     public CompletableFuture<Collection<Task<E>>> take(int maxTasks) {
         return backingQueue.take(maxTasks)
-                           .thenApply(tasks -> Collections2.transform(tasks, task -> task.<E>map(serializer::decode)));
+                           .thenApply(this::decodeCollection);
     }
 
     @Override

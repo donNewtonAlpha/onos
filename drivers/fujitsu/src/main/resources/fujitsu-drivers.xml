@@ -30,5 +30,11 @@
                    impl="org.onosproject.drivers.fujitsu.FujitsuVoltOnuConfig"/>
         <behaviour api="org.onosproject.drivers.fujitsu.behaviour.VoltOnuOperConfig"
                    impl="org.onosproject.drivers.fujitsu.FujitsuVoltOnuOperConfig"/>
+        <behaviour api="org.onosproject.drivers.fujitsu.behaviour.VoltAlertConfig"
+                   impl="org.onosproject.drivers.fujitsu.FujitsuVoltAlertConfig"/>
+        <behaviour api="org.onosproject.drivers.fujitsu.behaviour.VoltFwdlConfig"
+                   impl="org.onosproject.drivers.fujitsu.FujitsuVoltFwdlConfig"/>
+        <behaviour api="org.onosproject.drivers.fujitsu.behaviour.VoltNeConfig"
+                   impl="org.onosproject.drivers.fujitsu.FujitsuVoltNeConfig"/>
     </driver>
 </drivers>
