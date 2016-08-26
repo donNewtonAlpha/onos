@@ -519,7 +519,7 @@ public class NoviAggSwitchComponent {
                             log.info("Extension treatment : " + extension.toString());
 
                             if (extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_SET_VXLAN.type())) {
-                                log.info("set vxlan extension found");
+                                log.debug("set vxlan extension found");
 
                                 NoviflowSetVxLan noviflowVxlan = (NoviflowSetVxLan) extension;
                                 Criterion criterion = flow.selector().getCriterion(Criterion.Type.IN_PORT);
@@ -551,7 +551,7 @@ public class NoviAggSwitchComponent {
 
 
                             } else if (extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_POP_VXLAN.type())) {
-                                log.info("pop vxlan extension found");
+                                log.debug("pop vxlan extension found");
 
                                 //look in the selector for the IP
 
@@ -583,6 +583,19 @@ public class NoviAggSwitchComponent {
             }
 
         }
+
+        int valid = 0;
+        int invalid = 0;
+
+        for(VxLanTunnel tunnel : tunnels) {
+            if(tunnel.isValid()) {
+                valid++;
+            } else {
+                invalid++;
+            }
+        }
+
+        log.info(valid + " valid tunnels found and " + invalid + " invalid ones");
 
         return tunnels;
 

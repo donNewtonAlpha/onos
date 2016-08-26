@@ -92,7 +92,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
                 ARP arp = (ARP) payload;
 
                 if (arp.getOpCode() == ARP.OP_REQUEST) {
-                    log.info("It is an ARP request");
+                    log.debug("It is an ARP request");
                     handleArpRequest(deviceId, inPort, ethPkt);
                 } else {
                     log.debug("It is an ARP reply");
@@ -140,13 +140,19 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
                 arpRequest.getTargetProtocolAddress());
         log.info("ARP request for " + targetProtocolAddress + " on port " + inPort.toString());
         // Check if this is an ARP for the switch
+        boolean matchingInfoFound = false;
         for(RoutingInfo info : routingInfos) {
 
             if(info.getDeviceId().equals(deviceId) && info.getPort().equals(inPort) && targetProtocolAddress.equals(info.getIp())){
-                log.info("handleArpRequest, matching routing info found");
+
+                matchingInfoFound = true;
                 sendArpResponse(ethPkt, arpRequest, info.getMac(), info.getDeviceId(), inPort);
             }
 
+        }
+
+        if(!matchingInfoFound) {
+            log.error("handleArpRequest, matching routing info was NOT FOUND");
         }
 
     }
