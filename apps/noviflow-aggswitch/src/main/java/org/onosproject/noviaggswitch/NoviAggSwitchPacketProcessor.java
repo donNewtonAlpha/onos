@@ -455,7 +455,6 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
         public synchronized void execute(){
 
             delay++;
-            failedAttempt ++;
 
             if(delay > CYCLE) {
                 //need to ARP
@@ -467,6 +466,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
                 } else {
                     log.warn("No ARP request assigned");
                 }
+                failedAttempt ++;
             }
             if(failedAttempt > LOSS_BEFORE_FAILURE) {
                 NoviAggSwitchComponent.getComponent().notifyFailure(deviceId, port);
