@@ -132,6 +132,7 @@ public class NoviAggSwitchComponent {
         //Packet processor
         processor = new NoviAggSwitchPacketProcessor(packetService);
         packetService.addProcessor(processor, 1);
+        processor.startARPingThread();
 
         linkFailureDetection = new LinkFailureDetection(flowRuleService, new LinkedList<>());
         //deviceService.addListener(linkFailureDetection);

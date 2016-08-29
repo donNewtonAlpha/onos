@@ -34,6 +34,9 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
     public NoviAggSwitchPacketProcessor(PacketService packetService) {
         this.packetService = packetService;
+    }
+
+    public void startARPingThread() {
 
         //Create thread that periodically make ARP request
         Runnable r = new Runnable() {
@@ -65,7 +68,6 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
         Thread t = new Thread(r);
         t.setDaemon(true);
         t.start();
-
     }
 
 
@@ -438,6 +440,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
             this.port = port;
             this.ip = ip;
             this.mac = mac;
+            delay = 0;
         }
 
         public Ip4Address getIp() {
@@ -461,7 +464,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
                 if (arpRequest != null) {
 
                     packetService.emit(arpRequest);
-                    log.info("ARP request check for " + ip.toString() + "sent");
+                    log.info("ARP request check for " + ip.toString() + " sent");
 
                 } else {
                     log.warn("No ARP request assigned");
@@ -557,7 +560,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
                 if(arpRequest != null){
 
                     packetService.emit(arpRequest);
-                    log.info("ARP request for " + ip.toString() + "sent");
+                    log.info("ARP request for " + ip.toString() + " sent");
 
                 } else {
                     log.warn("No ARP request assigned");
