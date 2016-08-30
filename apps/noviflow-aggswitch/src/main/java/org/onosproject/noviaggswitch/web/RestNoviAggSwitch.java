@@ -289,8 +289,24 @@ public class RestNoviAggSwitch extends AbstractWebResource {
 
 
             try{
-                AggDeviceConfig newConfig = new AggDeviceConfig(DeviceId.deviceId(deviceUri), Ip4Address.valueOf(loopbackIp), Ip4Prefix.valueOf(primaryLinkSubnet),
-                        Ip4Prefix.valueOf(secondaryLinkSubnet), MacAddress.valueOf(primaryLinkMac), MacAddress.valueOf(secondaryLinkMac), PortNumber.portNumber(primaryPort), PortNumber.portNumber(secondaryPort));
+
+                final String[] partsPrimary = primaryLinkSubnet.split("/");
+                final String[] partsSecondary = secondaryLinkSubnet.split("/");
+                if (partsPrimary.length != 2 || partsSecondary.length != 2) {
+                    String msg = "Malformed IPv4 prefix string: " + primaryLinkSubnet + " or " + secondaryLinkSubnet + ". " +
+                            "Address must take form \"x.x.x.x/y\"";
+                    throw new IllegalArgumentException(msg);
+                }
+
+                Ip4Address primaryIp = Ip4Address.valueOf(partsPrimary[0]);
+                int primaryPrefixLength = Integer.parseInt(partsPrimary[1]);
+
+                Ip4Address secondaryIp = Ip4Address.valueOf(partsSecondary[0]);
+                int secondaryPrefixLength = Integer.parseInt(partsSecondary[1]);
+
+
+                AggDeviceConfig newConfig = new AggDeviceConfig(DeviceId.deviceId(deviceUri), Ip4Address.valueOf(loopbackIp), primaryIp, primaryPrefixLength,
+                        secondaryIp, secondaryPrefixLength, MacAddress.valueOf(primaryLinkMac), MacAddress.valueOf(secondaryLinkMac), PortNumber.portNumber(primaryPort), PortNumber.portNumber(secondaryPort));
 
                 //TODO : check validity of config
 

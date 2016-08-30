@@ -30,6 +30,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
     private volatile List<MacRequest> macRequests = new LinkedList<>();
     private List<RoutingInfo> routingInfos = new LinkedList<>();
     private volatile List<MacCheck> macChecks = new LinkedList<>();
+    private volatile boolean arpThreadActive;
 
 
     public NoviAggSwitchPacketProcessor(PacketService packetService) {
@@ -38,29 +39,34 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
     public void startARPingThread() {
 
+        arpThreadActive = true;
+
         //Create thread that periodically make ARP request
         Runnable r = new Runnable() {
             @Override
             public void run() {
 
-                if(macRequests.size() > 0) {
+                while(arpThreadActive) {
 
-                    for(MacRequest request: macRequests) {
-                        request.execute();
+                    if (macRequests.size() > 0) {
+
+                        for (MacRequest request : macRequests) {
+                            request.execute();
+                        }
                     }
-                }
 
-                if(macChecks.size() > 0) {
+                    if (macChecks.size() > 0) {
 
-                    for(MacCheck mc : macChecks){
-                        mc.execute();
+                        for (MacCheck mc : macChecks) {
+                            mc.execute();
+                        }
                     }
-                }
 
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
                 }
             }
         };
@@ -68,6 +74,10 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
         Thread t = new Thread(r);
         t.setDaemon(true);
         t.start();
+    }
+
+    public void stopARPingThread(){
+        arpThreadActive = false;
     }
 
 
@@ -343,7 +353,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
         while(it.hasNext()) {
             RoutingInfo info = it.next();
             if (info.getDeviceId().equals(deviceId)) {
-                log.info("Remove one RoutingInfo , ip : " + info.getIp() + "for device " + deviceId);
+                log.info("Remove one RoutingInfo , ip : " + info.getIp() + " for device " + deviceId);
                 it.remove();
             }
         }

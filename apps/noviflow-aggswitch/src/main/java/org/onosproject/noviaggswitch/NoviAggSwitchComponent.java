@@ -198,6 +198,7 @@ public class NoviAggSwitchComponent {
     protected void deactivate() {
 
         packetService.removeProcessor(processor);
+        processor.stopARPingThread();
 
 
         flowRuleService.removeFlowRulesById(appId);
@@ -773,13 +774,13 @@ public class NoviAggSwitchComponent {
         //New Knowledge
 
         //IPs the agg switch is responding to ARP
-        arpIntercept(config.getPrimaryLinkSubnet().address(), deviceId);
-        arpIntercept(config.getSecondaryLinkSubnet().address(), deviceId);
+        arpIntercept(config.getPrimaryLinkIp(), deviceId);
+        arpIntercept(config.getSecondaryLinkIp(), deviceId);
 
         //IPs the agg switch is responding to ping
         icmpIntercept(config.getLoopbackIP(), deviceId);
-        icmpIntercept(config.getPrimaryLinkSubnet().address(), deviceId);
-        icmpIntercept(config.getSecondaryLinkSubnet().address(), deviceId);
+        icmpIntercept(config.getPrimaryLinkIp(), deviceId);
+        icmpIntercept(config.getSecondaryLinkIp(), deviceId);
 
         log.info("New intercepts set up");
 
@@ -787,8 +788,8 @@ public class NoviAggSwitchComponent {
         processor.addRoutingInfo(deviceId, config.getPrimaryLinkPort(), Ip4Prefix.valueOf(config.getLoopbackIP(), 24), config.getLoopbackIP(), MacAddress.valueOf("00:00:00:00:00:00"));
         processor.addRoutingInfo(deviceId, config.getSecondaryLinkPort(), Ip4Prefix.valueOf(config.getLoopbackIP(), 24), config.getLoopbackIP(), MacAddress.valueOf("00:00:00:00:00:00"));
         //Uplinks
-        processor.addRoutingInfo(deviceId, config.getPrimaryLinkPort(), config.getPrimaryLinkSubnet(), config.getPrimaryLinkSubnet().address(), config.getPrimaryLinkMac());
-        processor.addRoutingInfo(deviceId, config.getSecondaryLinkPort(), config.getSecondaryLinkSubnet(), config.getSecondaryLinkSubnet().address(), config.getSecondaryLinkMac());
+        processor.addRoutingInfo(deviceId, config.getPrimaryLinkPort(), config.getPrimaryLinkSubnet(), config.getPrimaryLinkIp(), config.getPrimaryLinkMac());
+        processor.addRoutingInfo(deviceId, config.getSecondaryLinkPort(), config.getSecondaryLinkSubnet(), config.getSecondaryLinkIp(), config.getSecondaryLinkMac());
 
         log.info("Routing infos added");
 
