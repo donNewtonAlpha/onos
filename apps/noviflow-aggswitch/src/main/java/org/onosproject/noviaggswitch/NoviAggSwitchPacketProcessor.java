@@ -553,6 +553,8 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
     private class MacRequest {
 
+        private static final int TTL = 600;
+
         private DeviceId deviceId;
         private Ip4Address ip;
         private Semaphore lock;
@@ -561,9 +563,12 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
         private boolean needToARP = false;
         private OutboundPacket arpRequest = null;
 
+        private int attempt;
+
         MacRequest(DeviceId deviceId, Ip4Address ip) {
             this.deviceId = deviceId;
             this.ip = ip;
+            this.attempt = 0;
             lock = new Semaphore(-1);
         }
 
@@ -606,11 +611,15 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
                 if(arpRequest != null){
 
                     packetService.emit(arpRequest);
+                    attempt++;
                     log.info("ARP request for " + ip.toString() + " sent");
 
                 } else {
                     log.warn("No ARP request assigned");
                 }
+            }
+            if(attempt > TTL) {
+                needToARP = false;
             }
         }
 

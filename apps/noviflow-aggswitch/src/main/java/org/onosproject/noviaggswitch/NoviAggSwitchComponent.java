@@ -486,8 +486,9 @@ public class NoviAggSwitchComponent {
         }
 
         if(needToRemove) {
-            log.info("Removing MacChecks for device " + deviceId);
+            log.info("Removing MacChecks and MacRequests for device " + deviceId);
             processor.clearMacChecks(deviceId);
+            processor.clearMacRequests(deviceId);
         }
 
     }
