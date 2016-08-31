@@ -67,9 +67,6 @@ public class MulticastHandler {
 
         lock = new ReentrantLock();
 
-        thread = new MulticastGroupCleaningThread(this, groupService);
-        thread.setDaemon(true);
-        thread.start();
 
     }
 
@@ -400,6 +397,9 @@ public class MulticastHandler {
 
     }
 
+    public void setThread(MulticastGroupCleaningThread t) {
+        thread = t;
+    }
 
     public DeviceId getDeviceId() {
         return deviceId;

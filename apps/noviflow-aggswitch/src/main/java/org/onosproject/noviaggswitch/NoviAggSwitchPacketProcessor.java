@@ -375,8 +375,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
     public MacAddress getMac(Ip4Address ip) {
 
-        MacRequest request = new MacRequest(ip);
-        macRequests.add(request);
+
         //Find matching routing info
         RoutingInfo matchingInfo = null;
         for(RoutingInfo info : routingInfos) {
@@ -386,6 +385,9 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
         }
 
         if(matchingInfo != null) {
+
+            MacRequest request = new MacRequest(matchingInfo.getDeviceId(), ip);
+            macRequests.add(request);
 
             OutboundPacket arpRequest = getArpRequest(ip, matchingInfo.getIp(), matchingInfo.getMac(), matchingInfo.getDeviceId(), matchingInfo.getPort(), VlanId.NONE);
 
@@ -427,6 +429,20 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
         macRequests.clear();
     }
 
+    public void clearMacRequests(DeviceId deviceId) {
+
+        Iterator<MacRequest> it = macRequests.listIterator();
+
+        while(it.hasNext()) {
+            MacRequest request = it.next();
+            if(request.getDeviceId().equals(deviceId)) {
+                request.unlock();
+                it.remove();
+            }
+
+        }
+    }
+
     private class MacCheck {
 
         private static final int LOSS_BEFORE_FAILURE = 5;
@@ -443,6 +459,8 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
         private OutboundPacket arpRequest;
 
+        private boolean failureState;
+
 
 
         public MacCheck(DeviceId deviceId, PortNumber port, Ip4Address ip, MacAddress mac) {
@@ -451,6 +469,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
             this.ip = ip;
             this.mac = mac;
             delay = 0;
+            failureState = false;
         }
 
         public Ip4Address getIp() {
@@ -482,7 +501,16 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
                 failedAttempt ++;
             }
             if(failedAttempt > LOSS_BEFORE_FAILURE) {
-                NoviAggSwitchComponent.getComponent().notifyFailure(deviceId, port);
+                if(!failureState) {
+                    //Now in failure
+                    NoviAggSwitchComponent.getComponent().notifyFailure(deviceId, port, mac);
+                    failureState = true;
+                } else {
+                    //Still in failure
+                    if(failedAttempt % CYCLE == 0) {
+                        log.warn(ip + " still not reachable on device " + deviceId + " on port " + port);
+                    }
+                }
             }
 
         }
@@ -493,16 +521,18 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
                 //Recovery situation
                 if(responseMac.equals(mac)) {
                     //Same mac
-                    NoviAggSwitchComponent.getComponent().notifyRecovery(deviceId, port);
+                    NoviAggSwitchComponent.getComponent().notifyRecovery(deviceId, port, mac);
                 } else {
                     //change of mac after recovery
-                    NoviAggSwitchComponent.getComponent().notifyRecovery(deviceId, port, responseMac);
+                    NoviAggSwitchComponent.getComponent().notifyRecovery(deviceId, port, mac, responseMac);
+                    mac = responseMac;
                 }
             } else{
                 // Normal situation, chack if mac has changed
                 if(!responseMac.equals(mac)) {
+
+                    NoviAggSwitchComponent.getComponent().notifyMacChange(deviceId, port, mac, responseMac);
                     mac = responseMac;
-                    NoviAggSwitchComponent.getComponent().notifyMacChange(deviceId, port, responseMac);
                 }
             }
 
@@ -523,6 +553,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
     private class MacRequest {
 
+        private DeviceId deviceId;
         private Ip4Address ip;
         private Semaphore lock;
         private MacAddress matchingMac = null;
@@ -530,7 +561,8 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
         private boolean needToARP = false;
         private OutboundPacket arpRequest = null;
 
-        MacRequest(Ip4Address ip) {
+        MacRequest(DeviceId deviceId, Ip4Address ip) {
+            this.deviceId = deviceId;
             this.ip = ip;
             lock = new Semaphore(-1);
         }
@@ -558,6 +590,10 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
         public Ip4Address getIp() {
             return ip;
+        }
+
+        public DeviceId getDeviceId() {
+            return deviceId;
         }
 
         public void setArpRequest(OutboundPacket request) {

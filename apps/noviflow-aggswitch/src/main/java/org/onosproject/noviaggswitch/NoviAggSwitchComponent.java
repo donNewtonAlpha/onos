@@ -66,11 +66,11 @@ public class NoviAggSwitchComponent {
     protected PacketService packetService;
 
 
-    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+/*    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected NetworkConfigRegistry cfgService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected DeviceService deviceService;
+    protected DeviceService deviceService;*/
 
 
     private static final int ARP_INTERCEPT_PRIORITY = 15000;
@@ -205,8 +205,8 @@ public class NoviAggSwitchComponent {
 
         try {
 
-            cfgService.unregisterConfigFactory(cfgListener.getCfgAppFactory());
-            cfgService.removeListener(cfgListener);
+           /* cfgService.unregisterConfigFactory(cfgListener.getCfgAppFactory());
+            cfgService.removeListener(cfgListener);*/
 
             //NoviAggSwitchConfig config = (NoviAggSwitchConfig) cfgService.getConfig(appId, NoviAggSwitchConfig.class);
 
@@ -466,6 +466,7 @@ public class NoviAggSwitchComponent {
         log.info("Tunnels for device " + deviceId + " have been removed");
 
         processor.clearMacChecks(deviceId);
+        processor.clearMacRequests(deviceId);
     }
 
     public void checkNeedForMacCheck(DeviceId deviceId) {
@@ -689,6 +690,12 @@ public class NoviAggSwitchComponent {
 
         MulticastHandler multicastHandler = new MulticastHandler(deviceId, flowRuleService, groupService, appId);
 
+        MulticastGroupCleaningThread thread = new MulticastGroupCleaningThread(multicastHandler, groupService);
+        multicastHandler.setThread(thread);
+
+        thread.setDaemon(true);
+        thread.start();
+
         multicastHandlers.put(deviceId, multicastHandler);
 
     }
@@ -836,21 +843,21 @@ public class NoviAggSwitchComponent {
 
     }
 
-    public void notifyFailure(DeviceId deviceId, PortNumber port) {
-        linkFailureDetection.event(new ConnectPoint(deviceId, port), true, false, null);
+    public void notifyFailure(DeviceId deviceId, PortNumber port, MacAddress oldMac) {
+        linkFailureDetection.event(deviceId, port,true, false, oldMac, null);
     }
 
-    public void notifyRecovery(DeviceId deviceId, PortNumber port, MacAddress newDstMac) {
-        linkFailureDetection.event(new ConnectPoint(deviceId, port), false, true, newDstMac);
+    public void notifyRecovery(DeviceId deviceId, PortNumber port, MacAddress oldMac, MacAddress newDstMac) {
+        linkFailureDetection.event(deviceId, port, false, true, oldMac, newDstMac);
     }
 
-    public void notifyRecovery(DeviceId deviceId, PortNumber port) {
-        linkFailureDetection.event(new ConnectPoint(deviceId, port), false, false, null);
+    public void notifyRecovery(DeviceId deviceId, PortNumber port, MacAddress oldMac) {
+        linkFailureDetection.event(deviceId, port, false, false, oldMac, null);
     }
 
-    public void notifyMacChange(DeviceId deviceId, PortNumber port, MacAddress newDstMac) {
-        notifyFailure(deviceId, port);
-        notifyRecovery(deviceId, port, newDstMac);
+    public void notifyMacChange(DeviceId deviceId, PortNumber port, MacAddress oldMac, MacAddress newDstMac) {
+        notifyFailure(deviceId, port, oldMac);
+        notifyRecovery(deviceId, port, oldMac, newDstMac);
     }
 
     /*public void newConfig(NoviAggSwitchConfig config, NoviAggSwitchConfig oldConfig) {

@@ -72,19 +72,16 @@ public class LinkFailureDetection {
     }
 
 
-    public void event(ConnectPoint eventPort, boolean failure, boolean newMac, MacAddress newDstMac) {
+    public void event(DeviceId affectedDevice, PortNumber affectedPort, boolean failure, boolean newMac, MacAddress oldMac, MacAddress newDstMac) {
 
 
 
-        PortNumber affectedPort = eventPort.port();
-        DeviceId affectedDevice = eventPort.deviceId();
 
-
-        for (ConnectPoint cp : redundancyPorts) {
+        /*for (ConnectPoint cp : redundancyPorts) {
 
 
             if (cp.port().equals(affectedPort) && cp.deviceId().equals(affectedDevice)) {
-                //this port is affected
+                //this port is affected*/
 
                 log.info(" Port " + affectedPort.toString() + " from device " + affectedDevice.toString() + " affected");
 
@@ -98,21 +95,26 @@ public class LinkFailureDetection {
 
                     Iterable<FlowRule> flows = flowRuleService.getFlowRulesById(NoviAggSwitchComponent.appId);
                     List<FlowRule> flowsToWithdraw = new LinkedList<>();
-                    Instruction outputToDeadLink = DefaultTrafficTreatment.builder().setOutput(cp.port()).build().immediate().get(0);
+                    Instruction outputToDeadLink = DefaultTrafficTreatment.builder().setOutput(affectedPort).build().immediate().get(0);
 
                     for (FlowRule flow : flows) {
-                        if (flow.deviceId().equals(cp.deviceId())) {
+                        if (flow.deviceId().equals(affectedDevice)) {
                             if (flow.treatment().immediate().contains(outputToDeadLink)) {
-                                //flow affected
-                                flowsToWithdraw.add(flow);
-                                flowRuleService.removeFlowRules(flow);
+
+                                //Check for old mac
+
+                                if (checkDstMac(flow, oldMac)) {
+                                    //flow affected
+                                    flowsToWithdraw.add(flow);
+                                    flowRuleService.removeFlowRules(flow);
+                                }
                             }
                         }
                     }
 
                     log.warn("Port down : " + affectedPort.toString() + " on device " + affectedDevice.toString() + ", " + flowsToWithdraw.size() + " flows withdrawn. Maintenance requested");
 
-                    withdrawnFlows.add(new WithdrawnFlows(flowsToWithdraw, System.currentTimeMillis(), cp));
+                    withdrawnFlows.add(new WithdrawnFlows(flowsToWithdraw, System.currentTimeMillis(), new ConnectPoint(affectedDevice, affectedPort), oldMac));
 
                 } else {
                     // Port back up, reinstate the flows
@@ -122,13 +124,13 @@ public class LinkFailureDetection {
                         //Reinstate as is
                         while (it.hasNext()) {
                             WithdrawnFlows wFlows = it.next();
-                            if (wFlows.getPort().equals(cp)) {
+                            if (wFlows.getPort().equals(new ConnectPoint(affectedDevice, affectedPort)) && wFlows.getDstMac().equals(oldMac)) {
                                 //Previous flows are reinstanted
                                 for (FlowRule flow : wFlows.getFlows()) {
                                     flowRuleService.applyFlowRules(flow);
                                 }
 
-                                log.warn("Port up : " + affectedPort.toString() + " on " + affectedDevice.toString() + ", " + wFlows.getFlows().size() + " flows reinstanted.");
+                                log.warn("Link back up, port : " + affectedPort.toString() + " on " + affectedDevice.toString() + ", " + wFlows.getFlows().size() + " flows reinstanted.");
                                 it.remove();
                             }
                         }
@@ -137,7 +139,7 @@ public class LinkFailureDetection {
 
                         while(it.hasNext()) {
                             WithdrawnFlows wFlows = it.next();
-                            if (wFlows.getPort().equals(cp)) {
+                            if (wFlows.getPort().equals(new ConnectPoint(affectedDevice, affectedPort)) && wFlows.getDstMac().equals(oldMac)) {
 
                                 List<FlowRule> flows = wFlows.getFlows();
                                 for(FlowRule flow : flows) {
@@ -153,8 +155,8 @@ public class LinkFailureDetection {
 
                 }
 
-            }
-        }
+        /*    }
+        }*/
 
 
     }
@@ -190,18 +192,48 @@ public class LinkFailureDetection {
         flowRuleService.applyFlowRules(flow);
     }
 
+    private boolean checkDstMac(FlowRule flow, MacAddress expectedDstMac) {
+
+        List<Instruction> instructions = flow.treatment().immediate();
+        for (Instruction instruction : instructions) {
+
+            if (instruction.type() == Instruction.Type.EXTENSION) {
+
+                try {
+                    Instructions.ExtensionInstructionWrapper extensionInstruction = (Instructions.ExtensionInstructionWrapper) instruction;
+                    ExtensionTreatment extension = extensionInstruction.extensionInstruction();
+
+                    if (extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_SET_VXLAN.type())) {
+
+                        log.debug("Extension treatment : " + extension.toString());
+
+                        NoviflowSetVxLan noviflowVxlan = (NoviflowSetVxLan) extension;
+
+                        return noviflowVxlan.getDstMac().equals(expectedDstMac);
+
+                    }
+                } catch (Exception e) {
+                    log.error("Exception", e);
+                }
+            }
+        }
+        return false;
+    }
+
     private class WithdrawnFlows {
 
         private List<FlowRule> flows;
         private long timestamp;
         private ConnectPoint port;
+        private MacAddress dstMac;
 
 
-        public WithdrawnFlows(List<FlowRule> flows, long timestamp,ConnectPoint port) {
+        public WithdrawnFlows(List<FlowRule> flows, long timestamp,ConnectPoint port, MacAddress mac) {
 
             this.flows = flows;
             this.timestamp = timestamp;
             this.port = port;
+            this.dstMac = mac;
         }
 
         public long getTimestamp(){
@@ -214,6 +246,10 @@ public class LinkFailureDetection {
 
         public ConnectPoint getPort() {
             return port;
+        }
+
+        public MacAddress getDstMac() {
+            return dstMac;
         }
 
         public boolean equals( Object other) {
