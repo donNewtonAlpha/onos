@@ -869,8 +869,8 @@ public class NoviAggSwitchComponent {
 
     private void awsCloudShitHook(DeviceId deviceId) {
 
-        PortNumber rgServer = PortNumber.portNumber(30);
-        PortNumber awsUplink = PortNumber.portNumber(31);
+        PortNumber rgServer = PortNumber.portNumber(27);
+        PortNumber awsUplink = PortNumber.portNumber(28);
 
 
         Ip4Address vxlanLoopback = Ip4Address.valueOf("10.64.11.20");
