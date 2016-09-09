@@ -887,6 +887,9 @@ public class NoviAggSwitchComponent {
         arpIntercept(vxlanLoopback, deviceId);
         icmpIntercept(vxlanLoopback, deviceId);
 
+        processor.addRoutingInfo(deviceId, awsUplink, Ip4Prefix.valueOf(vxlanLoopback, 24), vxlanLoopback, switchMac);
+
+
         //RG server to AWS
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchInPort(rgServer);
