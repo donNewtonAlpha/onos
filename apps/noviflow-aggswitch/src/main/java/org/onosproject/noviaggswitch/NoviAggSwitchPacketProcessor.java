@@ -150,7 +150,8 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
         ARP arpRequest = (ARP) ethPkt.getPayload();
         Ip4Address targetProtocolAddress = Ip4Address.valueOf(
                 arpRequest.getTargetProtocolAddress());
-        log.info("ARP request for " + targetProtocolAddress + " on port " + inPort.toString());
+        log.info("ARP request for " + targetProtocolAddress + " on port " + inPort.toString() + " from " + Ip4Address.valueOf(
+                arpRequest.getSenderProtocolAddress()));
         // Check if this is an ARP for the switch
         boolean matchingInfoFound = false;
         for(RoutingInfo info : routingInfos) {

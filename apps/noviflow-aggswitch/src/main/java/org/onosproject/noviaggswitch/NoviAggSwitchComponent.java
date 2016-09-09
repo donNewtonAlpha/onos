@@ -876,7 +876,7 @@ public class NoviAggSwitchComponent {
 
 
         Ip4Address vxlanLoopback = Ip4Address.valueOf("10.64.11.20");
-        MacAddress switchMac = MacAddress.valueOf("21:34:21:34:21:34");
+        MacAddress switchMac = MacAddress.valueOf("68:05:11:11:11:11");
 
         Ip4Address vxlanDstIp = Ip4Address.valueOf("52.44.91.34");
         int vni = 5050;
