@@ -170,13 +170,14 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
     }
 
     private void handleArpReply(DeviceId deviceId, PortNumber inPort, Ethernet ethPkt) {
-        ARP arpReply = (ARP) ethPkt.getPayload();
-        log.info("ARP reply received");
 
+        ARP arpReply = (ARP) ethPkt.getPayload();
 
         // ARP reply for router. Process all pending IP packets.
         Ip4Address hostIpAddress = Ip4Address.valueOf(arpReply.getSenderProtocolAddress());
         MacAddress mac = MacAddress.valueOf(arpReply.getSenderHardwareAddress());
+
+        log.debug("ARP reply received from " + hostIpAddress + " : " + mac);
 
         Iterator<MacRequest> it = macRequests.listIterator();
 
@@ -396,6 +397,10 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
             request.lock();
 
+            if(request.getMac() == null) {
+                return  null;
+            }
+
             log.info("MAC found : " + request.getMac() + " for " + ip);
 
             //Create a MacCheck
@@ -517,6 +522,8 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
         public synchronized void success(MacAddress responseMac) {
 
+            log.info("MacCheck success for " + ip);
+
             if(failedAttempt > LOSS_BEFORE_FAILURE) {
                 //Recovery situation
                 if(responseMac.equals(mac)) {
@@ -538,6 +545,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
             failedAttempt = 0;
             delay = 0;
+            failureState = false;
         }
 
         public boolean equals (Object otherObject) {

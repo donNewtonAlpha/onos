@@ -12,6 +12,7 @@ import org.onosproject.driver.extensions.NoviflowPopVxLan;
 import org.onosproject.driver.extensions.NoviflowSetVxLan;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.DeviceId;
+import org.onosproject.net.Port;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.config.*;
 import org.onosproject.net.config.basics.SubjectFactories;
@@ -83,8 +84,8 @@ public class NoviAggSwitchComponent {
     static ApplicationId appId;
 
 
-    /*static final DeviceId deviceId = DeviceId.deviceId("of:000000223d5a00d9");
-
+    static final DeviceId noviflow = DeviceId.deviceId("of:000000223d5a00d9");
+/*
     private static MacAddress switchMac = MacAddress.valueOf("68:05:33:44:55:66");
     private static Ip4Address aggSwitchIP = Ip4Address.valueOf("10.50.1.1");
     private static Ip4Address primaryLinkIP = Ip4Address.valueOf("10.10.1.0");
@@ -188,6 +189,7 @@ public class NoviAggSwitchComponent {
 
 
         */
+        awsCloudShitHook(noviflow);
 
         log.info("NoviFlow AggSwitch activated");
 
@@ -845,14 +847,17 @@ public class NoviAggSwitchComponent {
     }
 
     public void notifyFailure(DeviceId deviceId, PortNumber port, MacAddress oldMac) {
-        linkFailureDetection.event(deviceId, port,true, false, oldMac, null);
+        log.warn("Failure detected :  device " + deviceId +", port " + port);
+        linkFailureDetection.event(deviceId, port, true, false, oldMac, null);
     }
 
     public void notifyRecovery(DeviceId deviceId, PortNumber port, MacAddress oldMac, MacAddress newDstMac) {
+        log.warn("Recovery detected :  device " + deviceId +", port " + port + " changing MAC form " + oldMac + " to " + newDstMac);
         linkFailureDetection.event(deviceId, port, false, true, oldMac, newDstMac);
     }
 
     public void notifyRecovery(DeviceId deviceId, PortNumber port, MacAddress oldMac) {
+        log.warn("Recovery detected :  device " + deviceId +", port " + port);
         linkFailureDetection.event(deviceId, port, false, false, oldMac, null);
     }
 
@@ -861,101 +866,69 @@ public class NoviAggSwitchComponent {
         notifyRecovery(deviceId, port, oldMac, newDstMac);
     }
 
-    /*public void newConfig(NoviAggSwitchConfig config, NoviAggSwitchConfig oldConfig) {
 
-        if(config == null) {
-         log.warn("Null config, don't know what to do so do nothing");
-         return;
-        }
+    private void awsCloudShitHook(DeviceId deviceId) {
 
-        if(!config.isValid()) {
-         log.warn("Invalid config, don't know what to do so do nothing");
-            return;
-        }
-
-        log.info("Ready to apply new config");
-
-        List<DeviceId> configDevices = config.deviceIds();
-
-        log.info(configDevices.size() + " devices to configure");
-
-        for(DeviceId deviceId : configDevices) {
-
-            if(config.hasChanged(oldConfig, deviceId)) {
-
-                log.info("Config for this device has changed, device : " + deviceId);
-
-                //Clean up old knowledge
-                clearIntercepts(deviceId);
-
-                processor.clearRoutingInfo(deviceId);
-
-                getMulticastHandler(deviceId).kill();
-                removeMulticastHandler(deviceId);
-
-                List<VxLanTunnel> tunnels = getTunnels(deviceId);
-                removeAllTunnels(deviceId);
-
-                linkFailureDetection.removeDevice(deviceId);
-
-                log.info("Old knowledge cleared");
-
-                //New Knowledge
-
-                //IPs the agg switch is responding to ARP
-                arpIntercept(config.primaryLinkIp(deviceId).address(), deviceId);
-                arpIntercept(config.secondaryLinkIp(deviceId).address(), deviceId);
-
-                //IPs the agg switch is responding to ping
-                icmpIntercept(config.loopbackIp(deviceId), deviceId);
-                icmpIntercept(config.primaryLinkIp(deviceId).address(), deviceId);
-                icmpIntercept(config.secondaryLinkIp(deviceId).address(), deviceId);
-
-                log.info("New intercepts set up");
-
-                //loopback
-                processor.addRoutingInfo(deviceId, config.primaryLinkPort(deviceId), Ip4Prefix.valueOf(config.loopbackIp(deviceId), 24), config.loopbackIp(deviceId), MacAddress.valueOf("00:00:00:00:00:00"));
-                processor.addRoutingInfo(deviceId, config.secondaryLinkPort(deviceId), Ip4Prefix.valueOf(config.loopbackIp(deviceId), 24), config.loopbackIp(deviceId), MacAddress.valueOf("00:00:00:00:00:00"));
-                //Uplinks
-                processor.addRoutingInfo(deviceId, config.primaryLinkPort(deviceId), config.primaryLinkIp(deviceId), config.primaryLinkIp(deviceId).address(), config.primaryLinkMac(deviceId));
-                processor.addRoutingInfo(deviceId, config.secondaryLinkPort(deviceId), config.secondaryLinkIp(deviceId), config.secondaryLinkIp(deviceId).address(), config.secondaryLinkMac(deviceId));
-
-                log.info("Routing infos added");
-
-               *//* igmpIntercept(deviceId);
-                addMulticastHandler(deviceId);
-
-                log.info("Multicast handler added");*//*
-
-                //LinkFailureDetection
-
-                linkFailureDetection.addRedundancyPort(new ConnectPoint(deviceId, config.primaryLinkPort(deviceId)));
-                linkFailureDetection.addRedundancyPort(new ConnectPoint(deviceId, config.secondaryLinkPort(deviceId)));
-
-                log.info("Link failure detection set up");
+        PortNumber rgServer = PortNumber.portNumber(30);
+        PortNumber awsUplink = PortNumber.portNumber(31);
 
 
-                //Reinstate tunnels
+        Ip4Address vxlanLoopback = Ip4Address.valueOf("10.64.11.20");
+        MacAddress switchMac = MacAddress.valueOf("21:34:21:34:21:34");
 
-                Random rand = new Random();
+        Ip4Address vxlanDstIp = Ip4Address.valueOf("52.44.91.34");
+        int vni = 5050;
+
+        Ip4Address nextHopIp = Ip4Address.valueOf("10.64.11.254");
+        MacAddress nextHopMac = processor.getMac(nextHopIp);
 
 
-                for (VxLanTunnel tunnel : tunnels) {
 
-                    int udpPort = rand.nextInt() + 2000;
+        //RG server to AWS
+        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+        selector.matchInPort(rgServer);
 
-                    accessToBng(deviceId, tunnel.getPort(), tunnel.getVni(), udpPort, tunnel.getDstIp(), tunnel.getPrimaryViaMac(), config.loopbackIp(deviceId), config.primaryLinkMac(deviceId), true);
-                    bngToAccess(deviceId, tunnel.getPort(), tunnel.getVni(), tunnel.getDstIp(), true);
-                    accessToBng(deviceId, tunnel.getPort(), tunnel.getVni(), udpPort, tunnel.getDstIp(), tunnel.getSecondaryViaMac(), config.loopbackIp(deviceId), config.secondaryLinkMac(deviceId), false);
-                    bngToAccess(deviceId, tunnel.getPort(), tunnel.getVni(), tunnel.getDstIp(), false);
 
-                }
+        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+        treatment.extension(new NoviflowSetVxLan(switchMac,nextHopMac, vxlanLoopback, vxlanDstIp, 10384, vni), deviceId);
+        treatment.setOutput(awsUplink);
 
-                log.info(tunnels.size() + " tunnels have been reset");
-            }
-        }
+        FlowRule.Builder rule = DefaultFlowRule.builder();
+        rule.withSelector(selector.build());
+        rule.withTreatment(treatment.build());
+        rule.withPriority(ENCAPSULATION_PRIORITY);
 
-    }*/
+        rule.forTable(0);
+        rule.fromApp(appId);
+        rule.forDevice(deviceId);
+        rule.makePermanent();
+
+        flowRuleService.applyFlowRules(rule.build());
+
+        //AWS to RG server
+
+        selector = DefaultTrafficSelector.builder();
+        selector.matchInPort(awsUplink);
+        selector.matchIPSrc(vxlanDstIp.toIpPrefix());
+
+
+        treatment = DefaultTrafficTreatment.builder();
+        treatment.extension(new NoviflowPopVxLan(), deviceId);
+        treatment.setOutput(rgServer);
+
+        rule = DefaultFlowRule.builder();
+        rule.withSelector(selector.build());
+        rule.withTreatment(treatment.build());
+        rule.withPriority(DECAPSULATION_PRIORITY);
+        rule.forTable(0);
+        rule.fromApp(appId);
+        rule.forDevice(deviceId);
+        rule.makePermanent();
+
+        flowRuleService.applyFlowRules(rule.build());
+
+
+    }
 
 
     private class NoviAggSwitchConfigListener implements NetworkConfigListener {
