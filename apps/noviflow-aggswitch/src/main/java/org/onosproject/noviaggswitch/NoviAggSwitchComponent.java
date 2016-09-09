@@ -869,6 +869,8 @@ public class NoviAggSwitchComponent {
 
     private void awsCloudShitHook(DeviceId deviceId) {
 
+        log.info("Cloud shithook preparation");
+
         PortNumber rgServer = PortNumber.portNumber(27);
         PortNumber awsUplink = PortNumber.portNumber(28);
 
@@ -882,7 +884,8 @@ public class NoviAggSwitchComponent {
         Ip4Address nextHopIp = Ip4Address.valueOf("10.64.11.254");
         MacAddress nextHopMac = processor.getMac(nextHopIp);
 
-
+        arpIntercept(vxlanLoopback, deviceId);
+        icmpIntercept(vxlanLoopback, deviceId);
 
         //RG server to AWS
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
@@ -926,6 +929,8 @@ public class NoviAggSwitchComponent {
         rule.makePermanent();
 
         flowRuleService.applyFlowRules(rule.build());
+
+        log.info("Cloud shithook applied");
 
 
     }
