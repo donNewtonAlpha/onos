@@ -869,7 +869,7 @@ public class NoviAggSwitchComponent {
 
     private void awsCloudShitHook(DeviceId deviceId) {
 
-        log.info("Cloud shithook preparation ...");
+        log.info("Cloud shithook preparation ....");
 
         PortNumber rgServer = PortNumber.portNumber(27);
         PortNumber awsUplink = PortNumber.portNumber(28);
