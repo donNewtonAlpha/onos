@@ -869,7 +869,7 @@ public class NoviAggSwitchComponent {
 
     private void awsCloudShitHook(DeviceId deviceId) {
 
-        log.info("Cloud shithook preparation");
+        log.info("Cloud shithook preparation ...");
 
         PortNumber rgServer = PortNumber.portNumber(27);
         PortNumber awsUplink = PortNumber.portNumber(28);
@@ -881,13 +881,15 @@ public class NoviAggSwitchComponent {
         Ip4Address vxlanDstIp = Ip4Address.valueOf("52.44.91.34");
         int vni = 5050;
 
+        processor.addRoutingInfo(deviceId, awsUplink, Ip4Prefix.valueOf(vxlanLoopback, 24), vxlanLoopback, switchMac);
+
         Ip4Address nextHopIp = Ip4Address.valueOf("10.64.11.254");
         MacAddress nextHopMac = processor.getMac(nextHopIp);
 
         arpIntercept(vxlanLoopback, deviceId);
         icmpIntercept(vxlanLoopback, deviceId);
 
-        processor.addRoutingInfo(deviceId, awsUplink, Ip4Prefix.valueOf(vxlanLoopback, 24), vxlanLoopback, switchMac);
+
 
 
         //RG server to AWS
