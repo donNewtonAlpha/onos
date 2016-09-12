@@ -189,7 +189,7 @@ public class NoviAggSwitchComponent {
 
 
         */
-        awsCloudShitHook(noviflow);
+        //awsCloudShitHook(noviflow);
 
         log.info("NoviFlow AggSwitch activated");
 
@@ -867,7 +867,7 @@ public class NoviAggSwitchComponent {
     }
 
 
-    private void awsCloudShitHook(DeviceId deviceId) {
+    public void awsCloudShitHook(DeviceId deviceId) {
 
         log.info("Cloud shithook preparation ....");
 

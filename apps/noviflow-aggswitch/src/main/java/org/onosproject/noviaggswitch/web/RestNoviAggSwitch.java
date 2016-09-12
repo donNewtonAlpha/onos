@@ -96,6 +96,36 @@ public class RestNoviAggSwitch extends AbstractWebResource {
         return Response.status(406).build();
     }
 
+    @POST
+    @Path("awsTunnel")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response createAwsTunnel(InputStream stream) {
+
+        try {
+
+            ObjectNode jsonTree = (ObjectNode) mapper().readTree(stream);
+            String deviceUri = jsonTree.findValue("deviceId").asText();
+
+
+            try{
+
+                DeviceId deviceId = DeviceId.deviceId(deviceUri);
+                NoviAggSwitchComponent.getComponent().awsCloudShitHook(deviceId);
+            } catch(IllegalArgumentException e) {
+                log.error("REST API create tunnel error", e);
+                return Response.status(406).build();
+            }
+
+            return Response.ok().build();
+
+        } catch (IOException e) {
+            log.error("REST error", e);
+        }
+
+        return Response.status(406).build();
+    }
+
 
     @POST
     @Path("removeTunnel")
