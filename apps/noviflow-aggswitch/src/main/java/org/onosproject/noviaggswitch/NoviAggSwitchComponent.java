@@ -878,7 +878,7 @@ public class NoviAggSwitchComponent {
         Ip4Address vxlanLoopback = Ip4Address.valueOf("10.64.11.20");
         MacAddress switchMac = MacAddress.valueOf("68:05:11:11:11:11");
 
-        Ip4Address vxlanDstIp = Ip4Address.valueOf("52.44.91.34");
+        Ip4Address vxlanDstIp = Ip4Address.valueOf("52.44.253.136");
         int vni = 5050;
 
         processor.addRoutingInfo(deviceId, awsUplink, Ip4Prefix.valueOf(vxlanLoopback, 24), vxlanLoopback, switchMac);
