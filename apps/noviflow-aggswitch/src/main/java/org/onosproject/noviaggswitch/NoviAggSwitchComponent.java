@@ -882,13 +882,12 @@ public class NoviAggSwitchComponent {
         int vni = 5050;
 
         processor.addRoutingInfo(deviceId, awsUplink, Ip4Prefix.valueOf(vxlanLoopback, 24), vxlanLoopback, switchMac);
-
-        Ip4Address nextHopIp = Ip4Address.valueOf("10.64.11.254");
-        MacAddress nextHopMac = processor.getMac(nextHopIp);
-
         arpIntercept(vxlanLoopback, deviceId);
         icmpIntercept(vxlanLoopback, deviceId);
 
+
+        Ip4Address nextHopIp = Ip4Address.valueOf("10.64.11.254");
+        MacAddress nextHopMac = processor.getMac(nextHopIp);
 
 
 
