@@ -68,7 +68,7 @@ public interface LispMapNotify extends LispMessage {
      *
      * @return record count value
      */
-    byte getRecordCount();
+    int getRecordCount();
 
     /**
      * Obtains key identifier.
@@ -76,6 +76,13 @@ public interface LispMapNotify extends LispMessage {
      * @return key identifier
      */
     short getKeyId();
+
+    /**
+     * Obtains authentication data length.
+     *
+     * @return authentication data length
+     */
+    short getAuthDataLength();
 
     /**
      * Obtains authentication data.
@@ -89,7 +96,7 @@ public interface LispMapNotify extends LispMessage {
      *
      * @return a collection of records
      */
-    List<LispMapRecord> getLispRecords();
+    List<LispMapRecord> getMapRecords();
 
     /**
      * A builder of LISP map notify message.
@@ -105,20 +112,20 @@ public interface LispMapNotify extends LispMessage {
         NotifyBuilder withNonce(long nonce);
 
         /**
-         * Sets record count.
-         *
-         * @param recordCount record count
-         * @return NotifyBuilder object
-         */
-        NotifyBuilder withRecordCount(byte recordCount);
-
-        /**
          * Sets key identitifer.
          *
          * @param keyId key identifier
          * @return NotifyBuilder object
          */
         NotifyBuilder withKeyId(short keyId);
+
+        /**
+         * Sets authentication data length.
+         *
+         * @param authDataLength authentication data length
+         * @return NotifyBuilder object
+         */
+        NotifyBuilder withAuthDataLength(short authDataLength);
 
         /**
          * Sets authentication data.

@@ -22,10 +22,13 @@ import io.netty.buffer.ByteBuf;
 import org.onlab.util.ImmutableByteSequence;
 import org.onosproject.lisp.msg.exceptions.LispParseError;
 import org.onosproject.lisp.msg.exceptions.LispReaderException;
+import org.onosproject.lisp.msg.exceptions.LispWriterException;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
+import static org.onosproject.lisp.msg.protocols.DefaultLispMapRecord.MapRecordWriter;
 
 /**
  * Default LISP map notify message class.
@@ -34,8 +37,8 @@ public final class DefaultLispMapNotify implements LispMapNotify {
 
     private final long nonce;
     private final short keyId;
+    private final short authDataLength;
     private final byte[] authenticationData;
-    private final byte recordCount;
     private final List<LispMapRecord> mapRecords;
 
     /**
@@ -44,15 +47,14 @@ public final class DefaultLispMapNotify implements LispMapNotify {
      * @param nonce              nonce
      * @param keyId              key identifier
      * @param authenticationData authentication data
-     * @param recordCount        record count number
      * @param mapRecords         a collection of map records
      */
-    private DefaultLispMapNotify(long nonce, short keyId, byte[] authenticationData,
-                                 byte recordCount, List<LispMapRecord> mapRecords) {
+    private DefaultLispMapNotify(long nonce, short keyId, short authDataLength,
+                                 byte[] authenticationData, List<LispMapRecord> mapRecords) {
         this.nonce = nonce;
         this.keyId = keyId;
+        this.authDataLength = authDataLength;
         this.authenticationData = authenticationData;
-        this.recordCount = recordCount;
         this.mapRecords = mapRecords;
     }
 
@@ -73,26 +75,35 @@ public final class DefaultLispMapNotify implements LispMapNotify {
 
     @Override
     public long getNonce() {
-        return this.nonce;
+        return nonce;
     }
 
     @Override
-    public byte getRecordCount() {
-        return this.recordCount;
+    public int getRecordCount() {
+        return mapRecords.size();
     }
 
     @Override
     public short getKeyId() {
-        return this.keyId;
+        return keyId;
+    }
+
+    @Override
+    public short getAuthDataLength() {
+        return authDataLength;
     }
 
     @Override
     public byte[] getAuthenticationData() {
-        return ImmutableByteSequence.copyFrom(this.authenticationData).asArray();
+        if (authenticationData != null && authenticationData.length != 0) {
+            return ImmutableByteSequence.copyFrom(authenticationData).asArray();
+        } else {
+            return new byte[0];
+        }
     }
 
     @Override
-    public List<LispMapRecord> getLispRecords() {
+    public List<LispMapRecord> getMapRecords() {
         return ImmutableList.copyOf(mapRecords);
     }
 
@@ -101,8 +112,9 @@ public final class DefaultLispMapNotify implements LispMapNotify {
         return toStringHelper(this)
                 .add("type", getType())
                 .add("nonce", nonce)
-                .add("recordCount", recordCount)
                 .add("keyId", keyId)
+                .add("authentication data length", authDataLength)
+                .add("authentication data", authenticationData)
                 .add("mapRecords", mapRecords).toString();
     }
 
@@ -116,23 +128,24 @@ public final class DefaultLispMapNotify implements LispMapNotify {
         }
         DefaultLispMapNotify that = (DefaultLispMapNotify) o;
         return Objects.equal(nonce, that.nonce) &&
-                Objects.equal(recordCount, that.recordCount) &&
                 Objects.equal(keyId, that.keyId) &&
-                Objects.equal(authenticationData, that.authenticationData);
+                Objects.equal(authDataLength, that.authDataLength) &&
+                Arrays.equals(authenticationData, that.authenticationData);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(nonce, recordCount, keyId, authenticationData);
+        return Objects.hashCode(nonce, keyId, authDataLength) +
+                Arrays.hashCode(authenticationData);
     }
 
     public static final class DefaultNotifyBuilder implements NotifyBuilder {
 
         private long nonce;
         private short keyId;
+        private short authDataLength;
         private byte[] authenticationData;
-        private byte recordCount;
-        private List<LispMapRecord> mapRecords;
+        private List<LispMapRecord> mapRecords = Lists.newArrayList();
 
         @Override
         public LispType getType() {
@@ -146,40 +159,51 @@ public final class DefaultLispMapNotify implements LispMapNotify {
         }
 
         @Override
-        public NotifyBuilder withRecordCount(byte recordCount) {
-            this.recordCount = recordCount;
-            return this;
-        }
-
-        @Override
         public NotifyBuilder withKeyId(short keyId) {
             this.keyId = keyId;
             return this;
         }
 
         @Override
+        public NotifyBuilder withAuthDataLength(short authDataLength) {
+            this.authDataLength = authDataLength;
+            return this;
+        }
+
+        @Override
         public NotifyBuilder withAuthenticationData(byte[] authenticationData) {
-            this.authenticationData = authenticationData;
+            if (authenticationData != null) {
+                this.authenticationData = authenticationData;
+            } else {
+                this.authenticationData = new byte[0];
+            }
             return this;
         }
 
         @Override
         public NotifyBuilder withMapRecords(List<LispMapRecord> mapRecords) {
-            this.mapRecords = ImmutableList.copyOf(mapRecords);
+            if (mapRecords != null) {
+                this.mapRecords = ImmutableList.copyOf(mapRecords);
+            }
             return this;
         }
 
         @Override
         public LispMapNotify build() {
-            return new DefaultLispMapNotify(nonce, keyId, authenticationData,
-                    recordCount, mapRecords);
+
+            if (authenticationData == null) {
+                authenticationData = new byte[0];
+            }
+
+            return new DefaultLispMapNotify(nonce, keyId, authDataLength,
+                    authenticationData, mapRecords);
         }
     }
 
     /**
-     * A private LISP message reader for MapNotify message.
+     * A LISP message reader for MapNotify message.
      */
-    private static class NotifyReader implements LispMessageReader<LispMapNotify> {
+    public static final class NotifyReader implements LispMessageReader<LispMapNotify> {
 
         private static final int RESERVED_SKIP_LENGTH = 3;
 
@@ -215,12 +239,66 @@ public final class DefaultLispMapNotify implements LispMapNotify {
             }
 
             return new DefaultNotifyBuilder()
-                        .withRecordCount(recordCount)
                         .withNonce(nonce)
                         .withKeyId(keyId)
+                        .withAuthDataLength(authLength)
                         .withAuthenticationData(authData)
                         .withMapRecords(mapRecords)
                         .build();
+        }
+    }
+
+    /**
+     * A LISP message reader for MapNotify message.
+     */
+    public static final class NotifyWriter implements LispMessageWriter<LispMapNotify> {
+
+        private static final int NOTIFY_MSG_TYPE = 4;
+        private static final int NOTIFY_SHIFT_BIT = 4;
+
+        private static final int UNUSED_ZERO = 0;
+
+        @Override
+        public void writeTo(ByteBuf byteBuf, LispMapNotify message) throws LispWriterException {
+
+            // specify LISP message type
+            byte msgType = (byte) (NOTIFY_MSG_TYPE << NOTIFY_SHIFT_BIT);
+            byteBuf.writeByte(msgType);
+
+            // reserved field
+            byteBuf.writeShort((short) UNUSED_ZERO);
+
+            // record count
+            byteBuf.writeByte(message.getMapRecords().size());
+
+            // nonce
+            byteBuf.writeLong(message.getNonce());
+
+            // keyId
+            byteBuf.writeShort(message.getKeyId());
+
+            // authentication data length in octet
+            byteBuf.writeShort(message.getAuthDataLength());
+
+            // authentication data
+            byte[] data = message.getAuthenticationData();
+            byte[] clone;
+            if (data != null) {
+                clone = data.clone();
+                Arrays.fill(clone, (byte) UNUSED_ZERO);
+            }
+
+            byteBuf.writeBytes(data);
+
+            // TODO: need to implement MAC authentication mechanism
+
+            // serialize map records
+            MapRecordWriter writer = new MapRecordWriter();
+            List<LispMapRecord> records = message.getMapRecords();
+
+            for (int i = 0; i < records.size(); i++) {
+                writer.writeTo(byteBuf, records.get(i));
+            }
         }
     }
 }

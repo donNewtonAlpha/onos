@@ -24,11 +24,11 @@ import org.onosproject.lisp.msg.exceptions.LispWriterException;
 public interface LispAddressWriter<T> {
 
     /**
-     * Writes from LISP address object and serialize to byte buffer.
+     * Serializes LISP address object and writes to byte buffer.
      *
      * @param byteBuf byte buffer
      * @param address LISP address type instance
-     * @throws LispWriterException Lisp writer exception
+     * @throws LispWriterException LISP writer exception
      */
     void writeTo(ByteBuf byteBuf, T address) throws LispWriterException;
 

@@ -32,6 +32,11 @@
             'TopoTrafficService', 'DialogService',
 
         function ($log, $scope, tbs, ns, tts, ds) {
+            $scope.briefTip = 'Switch to brief view';
+            $scope.detailTip = 'Switch to detailed view';
+            $scope.brief = true;
+            $scope.intentState = 'NA';
+            $scope.fired = false;
 
             function selCb($event, row) {
                 $log.debug('Got a click on:', row);
@@ -44,12 +49,24 @@
                     appName: name,
                     key: row.key
                 } : null;
+
+                $scope.intentState = row.state;
+            }
+
+            function respCb() {
+                if ($scope.fired) {
+                    if ($scope.changedData) {
+                        $scope.intentState = $scope.changedData.state;
+                    }
+                    $scope.fired = false;
+                }
             }
 
             tbs.buildTable({
                 scope: $scope,
                 tag: 'intent',
                 selCb: selCb,
+                respCb: respCb,
                 idKey: 'key'
             });
 
@@ -61,6 +78,10 @@
                 d && ns.navTo('topo', d);
             };
 
+            $scope.isIntentInstalled = function () {
+                return $scope.intentState === 'Installed';
+            };
+
             $scope.deactivateIntent = function () {
                 var content = ds.createDiv();
 
@@ -70,6 +91,7 @@
                 function dOk() {
                     var d = $scope.intentData;
                     d && tts.removeIntent(d);
+                    $scope.fired = true;
                 }
 
                 function dCancel() {
@@ -83,6 +105,10 @@
                     .addOk(dOk)
                     .addCancel(dCancel)
                     .bindKeys();
+            };
+
+            $scope.briefToggle = function () {
+                $scope.brief = !$scope.brief;
             };
 
             $scope.$on('$destroy', function () {

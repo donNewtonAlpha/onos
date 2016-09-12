@@ -25,7 +25,7 @@ import org.onosproject.net.intent.Constraint;
 import org.onosproject.net.intent.Intent;
 import org.onosproject.net.intent.IntentService;
 import org.onosproject.net.intent.PointToPointIntent;
-import org.onosproject.net.intent.constraint.ProtectionConstraint;
+import static org.onosproject.net.intent.constraint.ProtectionConstraint.protection;
 
 import java.util.List;
 
@@ -46,7 +46,8 @@ public class AddPointToPointIntentCommand extends ConnectivityIntentCommand {
               required = true, multiValued = false)
     String egressDeviceString = null;
 
-    @Option(name = "-p", aliases = "--protect",
+    // -p already defined in ConnectivityIntentCommand
+    @Option(name = "-r", aliases = "--protect",
             description = "Utilize path protection",
             required = false, multiValued = false)
     private boolean backup = false;
@@ -64,7 +65,7 @@ public class AddPointToPointIntentCommand extends ConnectivityIntentCommand {
 
         List<Constraint> constraints = buildConstraints();
         if (backup) {
-            constraints.add(new ProtectionConstraint());
+            constraints.add(protection());
         }
 
         Intent intent = PointToPointIntent.builder()

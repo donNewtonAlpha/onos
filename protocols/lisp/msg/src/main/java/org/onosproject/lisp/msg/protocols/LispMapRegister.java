@@ -75,7 +75,7 @@ public interface LispMapRegister extends LispMessage {
      *
      * @return record count value
      */
-    byte getRecordCount();
+    int getRecordCount();
 
     /**
      * Obtains nonce value.
@@ -90,6 +90,13 @@ public interface LispMapRegister extends LispMessage {
      * @return key identifier
      */
     short getKeyId();
+
+    /**
+     * Obtains authentication data length.
+     *
+     * @return authentication data length
+     */
+    short getAuthDataLength();
 
     /**
      * Obtains authentication data.
@@ -127,20 +134,20 @@ public interface LispMapRegister extends LispMessage {
         RegisterBuilder withIsWantMapNotify(boolean isWantMapNotify);
 
         /**
-         * Sets record count.
-         *
-         * @param recordCount record count
-         * @return RegisterBuilder object
-         */
-        RegisterBuilder withRecordCount(byte recordCount);
-
-        /**
          * Sets nonce value.
          *
          * @param nonce nonce value
          * @return RegisterBuilder object
          */
         RegisterBuilder withNonce(long nonce);
+
+        /**
+         * Sets authentication data length.
+         *
+         * @param authDataLength authentication data length
+         * @return RegisterBuilder object
+         */
+        RegisterBuilder withAuthDataLength(short authDataLength);
 
         /**
          * Sets key identifier.

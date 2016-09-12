@@ -23,6 +23,7 @@ import org.onosproject.lisp.msg.exceptions.LispWriterException;
 import java.util.Objects;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Instance ID type LCAF address class.
@@ -181,6 +182,9 @@ public final class LispSegmentLcafAddress extends LispLcafAddress {
          * @return LispSegmentLcafAddress instance
          */
         public LispSegmentLcafAddress build() {
+
+            checkNotNull(address, "Must specify an address");
+
             return new LispSegmentLcafAddress(reserved1, idMaskLength, flag,
                                               length, instanceId, address);
         }
@@ -227,7 +231,8 @@ public final class LispSegmentLcafAddress extends LispLcafAddress {
             LispLcafAddress.serializeCommon(byteBuf, address);
 
             byteBuf.writeInt(address.getInstanceId());
-            new LispIpAddress.IpAddressWriter().writeTo(byteBuf, (LispIpAddress) address.getAddress());
+
+            new LispAfiAddress.AfiAddressWriter().writeTo(byteBuf, address.getAddress());
         }
     }
 }

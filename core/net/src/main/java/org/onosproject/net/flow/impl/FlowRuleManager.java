@@ -16,6 +16,7 @@
 package org.onosproject.net.flow.impl;
 
 import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -52,7 +53,6 @@ import org.onosproject.net.flow.FlowRuleEvent;
 import org.onosproject.net.flow.FlowRuleListener;
 import org.onosproject.net.flow.FlowRuleOperation;
 import org.onosproject.net.flow.FlowRuleOperations;
-import org.onosproject.net.flow.FlowRuleOperationsContext;
 import org.onosproject.net.flow.FlowRuleProvider;
 import org.onosproject.net.flow.FlowRuleProviderRegistry;
 import org.onosproject.net.flow.FlowRuleProviderService;
@@ -67,13 +67,13 @@ import org.slf4j.Logger;
 
 import java.util.Collections;
 import java.util.Dictionary;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
@@ -129,8 +129,7 @@ public class FlowRuleManager
 
     private IdGenerator idGenerator;
 
-    private Map<Long, FlowOperationsProcessor> pendingFlowOperations
-            = new ConcurrentHashMap<>();
+    private final Map<Long, FlowOperationsProcessor> pendingFlowOperations = new ConcurrentHashMap<>();
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected FlowRuleStore store;
@@ -313,7 +312,9 @@ public class FlowRuleManager
             extends AbstractProviderService<FlowRuleProvider>
             implements FlowRuleProviderService {
 
+        final Map<FlowEntry, Long> firstSeen = Maps.newConcurrentMap();
         final Map<FlowEntry, Long> lastSeen = Maps.newConcurrentMap();
+
 
         protected InternalFlowRuleProviderService(FlowRuleProvider provider) {
             super(provider);
@@ -324,10 +325,14 @@ public class FlowRuleManager
             checkNotNull(flowEntry, FLOW_RULE_NULL);
             checkValidity();
             lastSeen.remove(flowEntry);
+            firstSeen.remove(flowEntry);
             FlowEntry stored = store.getFlowEntry(flowEntry);
             if (stored == null) {
                 log.debug("Rule already evicted from store: {}", flowEntry);
                 return;
+            }
+            if (flowEntry.reason() == FlowEntry.FlowRemoveReason.HARD_TIMEOUT) {
+                ((DefaultFlowEntry) stored).setState(FlowEntry.FlowEntryState.REMOVED);
             }
             Device device = deviceService.getDevice(flowEntry.deviceId());
             FlowRuleProvider frp = getProvider(device.providerId());
@@ -422,6 +427,21 @@ public class FlowRuleManager
 
             final long timeout = storedRule.timeout() * 1000;
             final long currentTime = System.currentTimeMillis();
+
+            // Checking flow with hardTimeout
+            if (storedRule.hardTimeout() != 0) {
+                if (!firstSeen.containsKey(storedRule)) {
+                    // First time rule adding
+                    firstSeen.put(storedRule, currentTime);
+                } else {
+                    Long first = firstSeen.get(storedRule);
+                    final long hardTimeout = storedRule.hardTimeout() * 1000;
+                    if ((currentTime - first) > hardTimeout) {
+                        return false;
+                    }
+                }
+            }
+
             if (storedRule.packets() != swRule.packets()) {
                 lastSeen.put(storedRule, currentTime);
                 return true;
@@ -521,14 +541,11 @@ public class FlowRuleManager
                 request.ops().forEach(
                         op -> {
                             switch (op.operator()) {
-
                                 case ADD:
-                                    post(new FlowRuleEvent(RULE_ADD_REQUESTED,
-                                                           op.target()));
+                                    post(new FlowRuleEvent(RULE_ADD_REQUESTED, op.target()));
                                     break;
                                 case REMOVE:
-                                    post(new FlowRuleEvent(RULE_REMOVE_REQUESTED,
-                                                           op.target()));
+                                    post(new FlowRuleEvent(RULE_REMOVE_REQUESTED, op.target()));
                                     break;
                                 case MODIFY:
                                     //TODO: do something here when the time comes.
@@ -540,10 +557,7 @@ public class FlowRuleManager
                 );
 
                 DeviceId deviceId = event.deviceId();
-
-                FlowRuleBatchOperation batchOperation =
-                        request.asBatchOperation(deviceId);
-
+                FlowRuleBatchOperation batchOperation = request.asBatchOperation(deviceId);
                 FlowRuleProvider flowRuleProvider = getProvider(deviceId);
                 if (flowRuleProvider != null) {
                     flowRuleProvider.executeBatch(batchOperation);
@@ -574,93 +588,91 @@ public class FlowRuleManager
         }
     }
 
+    private static FlowRuleBatchEntry.FlowRuleOperation mapOperationType(FlowRuleOperation.Type input) {
+        switch (input) {
+            case ADD:
+                return FlowRuleBatchEntry.FlowRuleOperation.ADD;
+            case MODIFY:
+                return FlowRuleBatchEntry.FlowRuleOperation.MODIFY;
+            case REMOVE:
+                return FlowRuleBatchEntry.FlowRuleOperation.REMOVE;
+            default:
+                throw new UnsupportedOperationException("Unknown flow rule type " + input);
+        }
+    }
+
     private class FlowOperationsProcessor implements Runnable {
-
-        private final List<Set<FlowRuleOperation>> stages;
-        private final FlowRuleOperationsContext context;
+        // Immutable
         private final FlowRuleOperations fops;
-        private final AtomicBoolean hasFailed = new AtomicBoolean(false);
+        private final ImmutableSet<DeviceId> pendingDevices;
 
-        private Set<DeviceId> pendingDevices;
+        // Mutable
+        private final List<Set<FlowRuleOperation>> stages;
+        private boolean hasFailed = false;
 
-        public FlowOperationsProcessor(FlowRuleOperations ops) {
+        FlowOperationsProcessor(FlowRuleOperations ops) {
             this.stages = Lists.newArrayList(ops.stages());
-            this.context = ops.callback();
             this.fops = ops;
-            pendingDevices = Sets.newConcurrentHashSet();
+            this.pendingDevices = ImmutableSet.of();
+        }
+
+        FlowOperationsProcessor(FlowOperationsProcessor src, boolean hasFailed, Set<DeviceId> pendingDevices) {
+            this.fops = src.fops;
+            this.stages = Lists.newArrayList(src.stages);
+            this.pendingDevices = ImmutableSet.copyOf(pendingDevices);
+            this.hasFailed = hasFailed;
         }
 
         @Override
-        public void run() {
+        public synchronized void run() {
             if (stages.size() > 0) {
                 process(stages.remove(0));
-            } else if (!hasFailed.get() && context != null) {
-                context.onSuccess(fops);
+            } else if (!hasFailed) {
+                fops.callback().onSuccess(fops);
             }
         }
 
         private void process(Set<FlowRuleOperation> ops) {
-            Multimap<DeviceId, FlowRuleBatchEntry> perDeviceBatches =
-                    ArrayListMultimap.create();
+            Multimap<DeviceId, FlowRuleBatchEntry> perDeviceBatches = ArrayListMultimap.create();
 
-            FlowRuleBatchEntry fbe;
-            for (FlowRuleOperation flowRuleOperation : ops) {
-                switch (flowRuleOperation.type()) {
-                    // FIXME: Brian needs imagination when creating class names.
-                    case ADD:
-                        fbe = new FlowRuleBatchEntry(
-                                FlowRuleBatchEntry.FlowRuleOperation.ADD, flowRuleOperation.rule());
-                        break;
-                    case MODIFY:
-                        fbe = new FlowRuleBatchEntry(
-                                FlowRuleBatchEntry.FlowRuleOperation.MODIFY, flowRuleOperation.rule());
-                        break;
-                    case REMOVE:
-                        fbe = new FlowRuleBatchEntry(
-                                FlowRuleBatchEntry.FlowRuleOperation.REMOVE, flowRuleOperation.rule());
-                        break;
-                    default:
-                        throw new UnsupportedOperationException("Unknown flow rule type " + flowRuleOperation.type());
-                }
-                pendingDevices.add(flowRuleOperation.rule().deviceId());
-                perDeviceBatches.put(flowRuleOperation.rule().deviceId(), fbe);
+            for (FlowRuleOperation op : ops) {
+                perDeviceBatches.put(op.rule().deviceId(),
+                        new FlowRuleBatchEntry(mapOperationType(op.type()), op.rule()));
             }
-
+            ImmutableSet<DeviceId> newPendingDevices = ImmutableSet.<DeviceId>builder()
+                    .addAll(pendingDevices)
+                    .addAll(perDeviceBatches.keySet())
+                    .build();
 
             for (DeviceId deviceId : perDeviceBatches.keySet()) {
                 long id = idGenerator.getNewId();
                 final FlowRuleBatchOperation b = new FlowRuleBatchOperation(perDeviceBatches.get(deviceId),
                                                deviceId, id);
-                pendingFlowOperations.put(id, this);
+                pendingFlowOperations.put(id, new FlowOperationsProcessor(this, hasFailed, newPendingDevices));
                 deviceInstallers.execute(() -> store.storeBatch(b));
             }
         }
 
-        public void satisfy(DeviceId devId) {
-            pendingDevices.remove(devId);
-            if (pendingDevices.isEmpty()) {
-                operationsService.execute(this);
+        synchronized void satisfy(DeviceId devId) {
+            Set<DeviceId> newPendingDevices = new HashSet<>(pendingDevices);
+            newPendingDevices.remove(devId);
+            if (newPendingDevices.isEmpty()) {
+                operationsService.execute(new FlowOperationsProcessor(this, hasFailed, newPendingDevices));
             }
         }
 
-
-
-        public void fail(DeviceId devId, Set<? extends FlowRule> failures) {
-            hasFailed.set(true);
-            pendingDevices.remove(devId);
-            if (pendingDevices.isEmpty()) {
-                operationsService.execute(this);
+        synchronized void fail(DeviceId devId, Set<? extends FlowRule> failures) {
+            Set<DeviceId> newPendingDevices = new HashSet<>(pendingDevices);
+            newPendingDevices.remove(devId);
+            if (newPendingDevices.isEmpty()) {
+                operationsService.execute(new FlowOperationsProcessor(this, true, newPendingDevices));
             }
 
-            if (context != null) {
-                final FlowRuleOperations.Builder failedOpsBuilder =
-                    FlowRuleOperations.builder();
-                failures.forEach(failedOpsBuilder::add);
+            FlowRuleOperations.Builder failedOpsBuilder = FlowRuleOperations.builder();
+            failures.forEach(failedOpsBuilder::add);
 
-                context.onError(failedOpsBuilder.build());
-            }
+            fops.callback().onError(failedOpsBuilder.build());
         }
-
     }
 
     @Override
