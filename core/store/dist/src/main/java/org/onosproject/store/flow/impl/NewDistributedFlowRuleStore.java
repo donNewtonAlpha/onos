@@ -924,6 +924,8 @@ public class NewDistributedFlowRuleStore
         return ImmutableList.copyOf(tableStats);
     }
 
+    public void purgeFlowRules(){}
+
     private class InternalTableStatsListener
         implements EventuallyConsistentMapListener<DeviceId, List<TableStatisticsEntry>> {
         @Override
