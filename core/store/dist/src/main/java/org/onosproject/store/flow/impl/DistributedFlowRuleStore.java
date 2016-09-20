@@ -1,5 +1,5 @@
  /*
- * Copyright 2015-present Open Networking Laboratory
+ * Copyright 2014-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -624,6 +624,11 @@ public class DistributedFlowRuleStore
     }
 
     @Override
+    public void purgeFlowRules() {
+        flowTable.purgeFlowRules();
+    }
+
+    @Override
     public void batchOperationComplete(FlowRuleBatchEvent event) {
         //FIXME: need a per device pending response
         NodeId nodeId = pendingResponses.remove(event.subject().batchId());
@@ -870,6 +875,10 @@ public class DistributedFlowRuleStore
 
         public void purgeFlowRule(DeviceId deviceId) {
             flowEntries.remove(deviceId);
+        }
+
+        public void purgeFlowRules() {
+            flowEntries.clear();
         }
 
         private List<NodeId> getBackupNodes(DeviceId deviceId) {

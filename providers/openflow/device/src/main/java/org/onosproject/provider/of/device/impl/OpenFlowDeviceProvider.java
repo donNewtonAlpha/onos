@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-present Open Networking Laboratory
+ * Copyright 2014-present Open Networking Laboratory
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ import java.util.Dictionary;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
 import java.util.Timer;
 
@@ -179,6 +180,8 @@ public class OpenFlowDeviceProvider extends AbstractProvider implements DevicePr
         controller.addListener(listener);
         controller.addEventListener(listener);
 
+        modified(context);
+
         connectInitialDevices();
         LOG.info("Started");
     }
@@ -197,7 +200,7 @@ public class OpenFlowDeviceProvider extends AbstractProvider implements DevicePr
 
     @Modified
     public void modified(ComponentContext context) {
-        Dictionary<?, ?> properties = context.getProperties();
+        Dictionary<?, ?> properties = context != null ? context.getProperties() : new Properties();
         int newPortStatsPollFrequency;
         try {
             String s = get(properties, POLL_PROP_NAME);
