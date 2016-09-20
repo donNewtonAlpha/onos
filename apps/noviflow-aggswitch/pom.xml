@@ -30,7 +30,7 @@
 
 
     <properties>
-        <onos.version>1.7.0-SNAPSHOT</onos.version>
+        <onos.version>1.8.0-SNAPSHOT</onos.version>
         <onos.app.name>org.onosproject.noviaggswitch</onos.app.name>
         <onos.app.origin>SDN Arena, Inc.</onos.app.origin>
         <checkstyle.skip>true</checkstyle.skip>

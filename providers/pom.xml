@@ -45,7 +45,7 @@
         <module>lldpcommon</module>
         <module>lldp</module>
         <module>netcfglinks</module>
-        <module>qualifiedhost</module>
+        <!--<module>qualifiedhost</module>-->
         <module>bmv2</module>
         <module>isis</module>
         <module>lisp</module>
