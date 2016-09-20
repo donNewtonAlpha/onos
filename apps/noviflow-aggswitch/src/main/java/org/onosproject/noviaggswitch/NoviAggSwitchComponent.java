@@ -272,8 +272,18 @@ public class NoviAggSwitchComponent {
             public void run() {
                 Ip4Address bngVxLanIP = Ip4Address.valueOf(bngVxlanIp);
 
+
+                List<VxLanTunnel> tunnels = getTunnels(deviceId);
+                for(VxLanTunnel tunnel : tunnels) {
+                    if (tunnel.match(bngVxLanIP, vni)) {
+                        log.warn("Tunnel already exists !");
+                    }
+                }
+
+                VxlanTunnelId tunnelId = new VxlanTunnelId(deviceId, bngVxLanIP, vni);
+
                 //PrimaryPath
-                MacAddress bngVxLanPrimaryMac = processor.getMac(Ip4Address.valueOf(viaPrimaryIP));
+                MacAddress bngVxLanPrimaryMac = processor.getMac(Ip4Address.valueOf(viaPrimaryIP), tunnelId);
                 if(bngVxLanPrimaryMac != null) {
                     log.info("MAC found, ready to add flows");
 
@@ -289,7 +299,7 @@ public class NoviAggSwitchComponent {
 
                     if (!viaSecondaryIP.equals(viaPrimaryIP)) {
 
-                        MacAddress bngVxLanSecondaryMac = processor.getMac(Ip4Address.valueOf(viaSecondaryIP));
+                        MacAddress bngVxLanSecondaryMac = processor.getMac(Ip4Address.valueOf(viaSecondaryIP), tunnelId);
                         if(bngVxLanSecondaryMac != null) {
                             log.info("MAC found, ready to add flows");
 
@@ -372,9 +382,7 @@ public class NoviAggSwitchComponent {
             secondaryPort = devicesConfig.get(deviceId).getSecondaryLinkPort();
         } catch (Exception e) {
             log.warn("Config unavailable");
-            return;/*
-            primaryPort = bngPort;
-            secondaryPort = secondaryBngPort;*/
+            return;
         }
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
@@ -418,7 +426,7 @@ public class NoviAggSwitchComponent {
             }
         }
 
-        checkNeedForMacCheck(deviceId);
+        checkNeedForMacCheck(deviceId, vxlanIP, vni);
 
     }
 
@@ -467,18 +475,18 @@ public class NoviAggSwitchComponent {
         }
         log.info("Tunnels for device " + deviceId + " have been removed");
 
-        processor.clearMacChecks(deviceId);
+        //processor.clearMacChecks(deviceId);
         processor.clearMacRequests(deviceId);
     }
 
-    public void checkNeedForMacCheck(DeviceId deviceId) {
+    public void checkNeedForMacCheck(DeviceId deviceId, Ip4Address vxlanIp, int vni) {
 
         try {
             Thread.sleep(100);
         } catch (Exception e){
 
         }
-        List<VxLanTunnel> tunnels = getTunnels(deviceId);
+       /* List<VxLanTunnel> tunnels = getTunnels(deviceId);
         boolean needToRemove = true;
 
         for(VxLanTunnel tunnel : tunnels) {
@@ -491,8 +499,9 @@ public class NoviAggSwitchComponent {
             log.info("Removing MacChecks and MacRequests for device " + deviceId);
             processor.clearMacChecks(deviceId);
             processor.clearMacRequests(deviceId);
-        }
-
+        }*/
+       VxlanTunnelId tunnelId = new VxlanTunnelId(deviceId, vxlanIp, vni);
+       processor.removeRequestingTunnel(tunnelId);
     }
 
     public List<VxLanTunnel> getTunnels(DeviceId deviceId) {
@@ -503,7 +512,7 @@ public class NoviAggSwitchComponent {
 
     public List<VxLanTunnel> getTunnels(DeviceId deviceId, Iterable<FlowRule> flows) {
 
-        log.info("get tunnel fonction");
+        log.debug("get tunnel fonction");
 
         List<VxLanTunnel> tunnels = new LinkedList<>();
 
@@ -522,7 +531,7 @@ public class NoviAggSwitchComponent {
                             Instructions.ExtensionInstructionWrapper extensionInstruction = (Instructions.ExtensionInstructionWrapper) instruction;
                             ExtensionTreatment extension = extensionInstruction.extensionInstruction();
 
-                            log.info("Extension treatment : " + extension.toString());
+                            log.debug("Extension treatment : " + extension.toString());
 
                             if (extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_SET_VXLAN.type())) {
                                 log.debug("set vxlan extension found");
@@ -886,8 +895,9 @@ public class NoviAggSwitchComponent {
         icmpIntercept(vxlanLoopback, deviceId);
 
 
+        VxlanTunnelId tunnelId = new VxlanTunnelId(deviceId, vxlanDstIp, vni);
         Ip4Address nextHopIp = Ip4Address.valueOf("10.64.11.254");
-        MacAddress nextHopMac = processor.getMac(nextHopIp);
+        MacAddress nextHopMac = processor.getMac(nextHopIp, tunnelId);
 
 
 

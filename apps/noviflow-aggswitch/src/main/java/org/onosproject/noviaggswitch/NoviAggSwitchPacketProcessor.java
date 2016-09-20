@@ -29,7 +29,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
     private volatile List<MacRequest> macRequests = new LinkedList<>();
     private List<RoutingInfo> routingInfos = new LinkedList<>();
-    private volatile List<MacCheck> macChecks = new LinkedList<>();
+    //private volatile List<MacCheck> macChecks = new LinkedList<>();
     private volatile boolean arpThreadActive;
 
 
@@ -51,17 +51,17 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
                     if (macRequests.size() > 0) {
 
                         for (MacRequest request : macRequests) {
-                            request.execute();
+                            request.execute(packetService);
                         }
                     }
 
-                    if (macChecks.size() > 0) {
+                  /*  if (macChecks.size() > 0) {
 
                         for (MacCheck mc : macChecks) {
                             mc.execute();
                         }
                     }
-
+*/
                     try {
                         Thread.sleep(1000);
                     } catch (InterruptedException e) {
@@ -182,7 +182,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
         Iterator<MacRequest> it = macRequests.listIterator();
 
-        while(it.hasNext()) {
+       /* while(it.hasNext()) {
 
             MacRequest request = it.next();
 
@@ -202,7 +202,13 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
                 macCheck.success(mac);
             }
 
-        }
+        }*/
+
+       for(MacRequest request : macRequests) {
+           if(request.getIp().equals(hostIpAddress)) {
+               request.success(mac);
+           }
+       }
 
     }
 
@@ -361,7 +367,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
         }
     }
 
-    public void clearMacChecks(DeviceId deviceId) {
+   /* public void clearMacChecks(DeviceId deviceId) {
 
         Iterator<MacCheck> it = macChecks.listIterator();
 
@@ -373,9 +379,34 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
             }
         }
 
-    }
+    }*/
 
-    public MacAddress getMac(Ip4Address ip) {
+    public MacAddress getMac(Ip4Address ip, VxlanTunnelId tunnelId) {
+
+        //Check if we already have some MacRequest for this Ip
+
+        for(MacRequest request : macRequests) {
+
+            if(request.getIp().equals(ip)) {
+                //A request already exist, add this tunnelId to the requesting tunnels
+                request.addTunnelId(tunnelId);
+                if(request.getMac() != null) {
+                    return request.getMac();
+                } else {
+                    //This request is already trying to get the Mac address for this Ip, waiting for result
+                    request.lock();
+
+                    if(request.getMac() == null) {
+                        return  null;
+                    }
+
+                    log.info("MAC found : " + request.getMac() + " for " + ip);
+                    return request.getMac();
+
+                }
+            }
+
+        }
 
 
         //Find matching routing info
@@ -388,13 +419,14 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
         if(matchingInfo != null) {
 
-            MacRequest request = new MacRequest(matchingInfo.getDeviceId(), ip);
+            MacRequest request = new MacRequest(matchingInfo.getDeviceId(), matchingInfo.getPort(), ip);
+            request.addTunnelId(tunnelId);
             macRequests.add(request);
 
             OutboundPacket arpRequest = getArpRequest(ip, matchingInfo.getIp(), matchingInfo.getMac(), matchingInfo.getDeviceId(), matchingInfo.getPort(), VlanId.NONE);
 
             request.setArpRequest(arpRequest);
-            request.execute();
+            request.execute(packetService);
 
             request.lock();
 
@@ -404,7 +436,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
             log.info("MAC found : " + request.getMac() + " for " + ip);
 
-            //Create a MacCheck
+           /* //Create a MacCheck
             MacCheck macCheck = new MacCheck(matchingInfo.deviceId, matchingInfo.getPort(), ip, request.getMac());
             //Look if one already exist
             boolean needNew = true;
@@ -417,7 +449,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
             if(needNew) {
                 macCheck.setArpRequest(arpRequest);
                 macChecks.add(macCheck);
-            }
+            }*/
 
             return request.getMac();
         } else {
@@ -449,7 +481,26 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
         }
     }
 
-    private class MacCheck {
+    public void removeRequestingTunnel(VxlanTunnelId tunnelId) {
+
+        //Remove this tunnel from the "subscription" list in the mac requests
+        for(MacRequest request : macRequests) {
+            request.removeRequestingTunnel(tunnelId);
+        }
+
+        //Check if a Mac request needs to be removed (no more subscripting tunnels)
+        Iterator<MacRequest> it = macRequests.listIterator();
+        while(it.hasNext()) {
+            MacRequest request = it.next();
+            if(request.isToBeRemoved()) {
+                it.remove();
+            }
+        }
+
+
+    }
+
+    /*private class MacCheck {
 
         private static final int LOSS_BEFORE_FAILURE = 5;
         private static final int CYCLE = 15;
@@ -642,7 +693,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
         }
 
 
-    }
+    }*/
 
     private class RoutingInfo {
 
