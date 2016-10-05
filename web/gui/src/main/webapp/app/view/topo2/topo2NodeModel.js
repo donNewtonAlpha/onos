@@ -22,20 +22,40 @@
 (function () {
     'use strict';
 
-    var randomService;
+    var randomService, ps, sus, is, ts, t2mcs;
     var fn;
 
     // Internal state;
     var nearDist = 15;
 
     var devIconDim = 36,
-        labelPad = 10,
-        halfDevIcon = devIconDim / 2,
-        nodeLabelIndex = 1;
+        labelPad = 5,
+        textPad = 5,
+        halfDevIcon = devIconDim / 2;
+
+    // note: these are the device icon colors without affinity (no master)
+    var dColTheme = {
+        light: {
+            online: '#444444',
+            offline: '#cccccc'
+        },
+        dark: {
+            // TODO: theme
+            online: '#444444',
+            offline: '#cccccc'
+        }
+    };
+
+    function devGlyphColor(d) {
+        var o = this.get('online'),
+            id = this.get('master'),
+            otag = o ? 'online' : 'offline';
+        return o ? sus.cat7().getColor(id, 0, ts.theme()) :
+            dColTheme[ts.theme()][otag];
+    }
 
     function positionNode(node, forUpdate) {
-
-        var meta = node.metaUi,
+        var meta = node.get('metaUi'),
             x = meta && meta.x,
             y = meta && meta.y,
             dim = [800, 600],
@@ -82,50 +102,86 @@
         }
 
         function getDevice(cp) {
-            // console.log(cp);
-            // var d = lu[cp.device];
-            // return d || rand();
             return rand();
         }
 
         xy = (node.class === 'host') ? near(getDevice(node.cp)) : rand();
+
+        if (node.class === 'sub-region') {
+            xy = rand();
+            node.x = node.px = xy.x;
+            node.y = node.py = xy.y;
+        }
         angular.extend(node, xy);
     }
 
-    function setLongLat(node) {
-        var loc = node.location,
+    function setLongLat(el) {
+        var loc = el.get('location'),
             coord;
 
         if (loc && loc.type === 'lnglat') {
-            coord = [0, 0];
-            node.fixed = true;
-            node.px = node.x = coord[0];
-            node.py = node.y = coord[1];
+
+            if (loc.lat === 0 && loc.lng === 0) {
+                return false;
+            }
+
+            coord = coordFromLngLat(loc);
+            el.fixed = true;
+            el.x = el.px = coord[0];
+            el.y = el.py = coord[1];
+
             return true;
         }
     }
 
+    function coordFromLngLat(loc) {
+        var p = t2mcs.projection();
+        return p ? p([loc.lng, loc.lat]) : [0, 0];
+    }
+
     angular.module('ovTopo2')
     .factory('Topo2NodeModel',
-        ['Topo2Model', 'FnService', 'RandomService',
-        function (Model, _fn_, _RandomService_) {
+        ['Topo2Model', 'FnService', 'RandomService', 'Topo2PrefsService',
+        'SvgUtilService', 'IconService', 'ThemeService',
+        'Topo2MapConfigService',
+        function (Model, _fn_, _RandomService_, _ps_, _sus_, _is_, _ts_,
+            _t2mcs_) {
 
             randomService = _RandomService_;
+            ts = _ts_;
             fn = _fn_;
+            ps = _ps_;
+            sus = _sus_;
+            is = _is_;
+            t2mcs = _t2mcs_;
 
             return Model.extend({
                 initialize: function () {
+                    this.set('class', this.nodeType);
+                    this.set('svgClass', this.svgClassName());
                     this.node = this.createNode();
                 },
-                onEnter: function () {}, // To be overridden by sub-class
-                onExit: function () {}, // To be overridden by sub-class
+                createNode: function () {
+                    this.set('class', this.nodeType);
+                    this.set('svgClass', this.svgClassName());
+                    positionNode(this);
+                    return this;
+                },
+                setUpEvents: function () {
+                    var _this = this;
+                    angular.forEach(this.events, function (handler, key) {
+                        _this.el.on(key, _this[handler].bind(_this));
+                    });
+                },
+                icon: function () {
+                    return 'unknown';
+                },
                 label: function () {
-
                     var props = this.get('props'),
                         id = this.get('id'),
                         friendlyName = props ? props.name : id,
                         labels = ['', friendlyName, id],
-                        nli = nodeLabelIndex,
+                        nli = ps.get('dlbls'),
                         idx = (nli < labels.length) ? nli : 0;
 
                     return labels[idx];
@@ -140,14 +196,44 @@
                 },
                 addLabelElements: function (label) {
                     var rect = this.el.append('rect');
+                    var glythRect = this.el.append('rect')
+                        .attr('y', -halfDevIcon)
+                        .attr('x', -halfDevIcon)
+                        .attr('width', devIconDim)
+                        .attr('height', devIconDim)
+                        .style('fill', devGlyphColor.bind(this));
+
                     var text = this.el.append('text').text(label)
                         .attr('text-anchor', 'left')
                         .attr('y', '0.3em')
-                        .attr('x', halfDevIcon + labelPad);
+                        .attr('x', halfDevIcon + labelPad + textPad);
 
                     return {
                         rect: rect,
+                        glythRect: glythRect,
                         text: text
+                    };
+                },
+                labelBox: function (dim, labelWidth) {
+                    var _textPad = (textPad * 2) - labelPad;
+
+                    if (labelWidth === 0) {
+                        _textPad = 0;
+                    }
+
+                    return {
+                        x: -dim / 2 - labelPad,
+                        y: -dim / 2 - labelPad,
+                        width: dim + labelWidth + (labelPad * 2) + _textPad,
+                        height: dim + (labelPad * 2)
+                    };
+                },
+                iconBox: function (dim, labelWidth) {
+                    return {
+                        x: -dim / 2,
+                        y: -dim / 2,
+                        width: dim + labelWidth,
+                        height: dim
                     };
                 },
                 svgClassName: function () {
@@ -159,15 +245,50 @@
                         }
                     );
                 },
-                createNode: function () {
+                lngLatFromCoord: function (coord) {
+                    var p = t2mcs.projection();
+                    return p ? p.invert(coord) : [0, 0];
+                },
+                update: function () {
+                    this.updateLabel();
+                },
+                updateLabel: function () {
+                    var node = this.el,
+                        label = this.trimLabel(this.label()),
+                        labelWidth;
 
-                    var node = angular.extend({}, this.attributes);
+                    node.select('text').text(label);
+                    labelWidth = label ? this.computeLabelWidth(node) : 0;
 
-                    // Augment as needed...
-                    node.class = this.nodeType;
-                    node.svgClass = this.svgClassName();
-                    positionNode(node);
-                    return node;
+                    node.select('rect')
+                        .transition()
+                        .attr(this.labelBox(devIconDim, labelWidth));
+                },
+                onEnter: function (el) {
+                    this.el = d3.select(el);
+                    this.render();
+                },
+                render: function () {
+                    var node = this.el,
+                        glyphId = this.icon(this.get('type')),
+                        label = this.trimLabel(this.label()),
+                        glyph, labelWidth;
+
+                    // Label
+                    var labelElements = this.addLabelElements(label);
+                    labelWidth = label ? this.computeLabelWidth(node) : 0;
+                    labelElements.rect.attr(this.labelBox(devIconDim, labelWidth));
+
+                    // Icon
+                    glyph = is.addDeviceIcon(node, glyphId, devIconDim);
+                    glyph.attr(this.iconBox(devIconDim, 0));
+                    glyph.style('fill', 'white');
+
+                    node.attr('transform', sus.translate(-halfDevIcon, -halfDevIcon));
+
+                    if (this.events) {
+                        this.setUpEvents();
+                    }
                 }
             });
         }]

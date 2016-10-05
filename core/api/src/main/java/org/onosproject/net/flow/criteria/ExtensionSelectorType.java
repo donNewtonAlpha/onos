@@ -41,7 +41,9 @@ public class ExtensionSelectorType {
         NOVIFLOW_MATCH_UDP_PAYLOAD(63),
         NICIRA_MATCH_ENCAP_ETH_TYPE(6),
         OFDPA_MATCH_VLAN_VID(16),
-        BMV2_MATCH_PARAMS(128);
+        BMV2_MATCH_PARAMS(128),
+
+        UNRESOLVED_TYPE(200);
 
         private ExtensionSelectorType type;
 

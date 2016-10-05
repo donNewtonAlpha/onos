@@ -64,8 +64,11 @@ public final class ExtensionTreatmentType {
         BMV2_ACTION(128),
         NOVIFLOW_SET_VXLAN(150),
         NOVIFLOW_POP_VXLAN(151),
-        OPLINK_ATTENUATION(130);
 
+        OPLINK_ATTENUATION(130),
+
+        UNRESOLVED_TYPE(200);
+    
         private ExtensionTreatmentType type;
 
         /**

@@ -126,15 +126,15 @@ public class VplsNeighbourHandler {
                 case REQUEST:
                     interfaceService.getInterfacesByVlan(context.vlan())
                             .stream()
-                            .map(Interface::connectPoint)
-                            .forEach(context::proxy);
+                            .filter(intf -> !context.inPort().equals(intf.connectPoint()))
+                            .forEach(context::forward);
                     break;
                 case REPLY:
                     hostService.getHostsByMac(context.dstMac())
                             .stream()
                             .filter(host -> host.vlan().equals(context.vlan()))
                             .map(Host::location)
-                            .forEach(context::proxy);
+                            .forEach(context::forward);
                     break;
 
                 default:

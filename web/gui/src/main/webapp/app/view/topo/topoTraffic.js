@@ -75,8 +75,10 @@
         var hov = api.hovered();
 
         function hoverValid() {
-            return hoverMode === 'intents' &&
-                hov && (hov.class === 'host' || hov.class === 'device');
+            return hoverMode === 'intents' && hov && (
+            hov.class === 'host' ||
+            hov.class === 'device' ||
+            hov.class === 'link');
         }
 
         if (api.somethingSelected()) {
@@ -190,6 +192,19 @@
         flash.flash('Intent ' + txt);
     }
 
+    function resubmitIntent (d) {
+        $log.debug('Entering resubmitIntent');
+        wss.sendEvent('resubmitIntent', {
+            appId: d.appId,
+            appName: d.appName,
+            key: d.key,
+            purge: d.intentPurge
+        });
+        trafficMode = 'intents';
+        hoverMode = null;
+        flash.flash('Intent resubmitted');
+    }
+
     function addMultiSourceIntent () {
         var so = api.selectOrder();
         wss.sendEvent('addMultiSourceIntent', {
@@ -238,7 +253,8 @@
                 // invoked from buttons on detail (multi-select) panel
                 addHostIntent: addHostIntent,
                 addMultiSourceIntent: addMultiSourceIntent,
-                removeIntent: removeIntent
+                removeIntent: removeIntent,
+                resubmitIntent: resubmitIntent
             };
         }]);
 }());

@@ -42,6 +42,7 @@
         <module>snmp</module>
         <module>bmv2</module>
         <module>lisp</module>
+        <module>restconf</module>
     </modules>
 
     <dependencies>
