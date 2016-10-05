@@ -68,7 +68,6 @@ public final class ExtensionTreatmentType {
         OPLINK_ATTENUATION(130),
 
         UNRESOLVED_TYPE(200);
-    
         private ExtensionTreatmentType type;
 
         /**
