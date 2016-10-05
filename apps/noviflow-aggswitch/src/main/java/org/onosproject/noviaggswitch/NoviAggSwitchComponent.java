@@ -12,11 +12,9 @@ import org.onosproject.driver.extensions.NoviflowPopVxLan;
 import org.onosproject.driver.extensions.NoviflowSetVxLan;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.DeviceId;
-import org.onosproject.net.Port;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.config.*;
 import org.onosproject.net.config.basics.SubjectFactories;
-import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.flow.*;
 import org.onosproject.net.flow.DefaultFlowRule;
 import org.onosproject.net.flow.DefaultTrafficSelector;
@@ -33,6 +31,7 @@ import org.onosproject.net.group.*;
 import org.onosproject.net.flow.criteria.*;
 import org.onosproject.net.meter.*;
 import org.onosproject.net.packet.*;
+import org.onosproject.noviaggswitch.config.AggDeviceConfig;
 import org.onosproject.noviaggswitch.config.NoviAggSwitchConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -694,6 +693,54 @@ public class NoviAggSwitchComponent {
         rule.makePermanent();
 
         flowRuleService.applyFlowRules(rule.build());
+
+    }
+
+    private void ipBypass(DeviceId deviceId, Ip4Address ip, PortNumber srcPort, PortNumber dstPort) {
+
+        //To SrcPort
+
+        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+        selector.matchInPort(dstPort);
+        selector.matchIPDst(ip.toIpPrefix());
+
+
+        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+        treatment.setOutput(srcPort);
+
+        FlowRule.Builder rule = DefaultFlowRule.builder();
+        rule.withSelector(selector.build());
+        rule.withTreatment(treatment.build());
+        rule.withPriority(50000);
+        rule.forTable(0);
+        rule.fromApp(appId);
+        rule.forDevice(deviceId);
+        rule.makePermanent();
+
+        flowRuleService.applyFlowRules(rule.build());
+
+        //To DstPort
+
+        selector = DefaultTrafficSelector.builder();
+        selector.matchInPort(srcPort);
+        selector.matchIPDst(ip.toIpPrefix());
+
+
+        treatment = DefaultTrafficTreatment.builder();
+        treatment.setOutput(dstPort);
+
+
+        rule = DefaultFlowRule.builder();
+        rule.withSelector(selector.build());
+        rule.withTreatment(treatment.build());
+        rule.withPriority(50001);
+        rule.forTable(0);
+        rule.fromApp(appId);
+        rule.forDevice(deviceId);
+        rule.makePermanent();
+
+        flowRuleService.applyFlowRules(rule.build());
+
 
     }
 
