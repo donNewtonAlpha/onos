@@ -624,6 +624,7 @@ public class GossipDeviceStore
             if (!deviceEvents.isEmpty()) {
                 log.debug("Notifying peers of a ports update topology event for providerId: {} and deviceId: {}",
                          providerId, deviceId);
+                log.info("Event " + new InternalPortEvent(providerId, deviceId, merged));
                 notifyPeers(new InternalPortEvent(providerId, deviceId, merged));
             }
 

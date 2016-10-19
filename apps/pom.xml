@@ -78,8 +78,8 @@
         <module>noviflow-bng</module>
 -->
         <module>noviflow-aggswitch</module>
-        <module>olt</module>
-        <module>config</module>
+       <!-- <module>olt</module>
+        <module>config</module>-->
 
         <module>gangliametrics</module>
         <module>graphitemetrics</module>

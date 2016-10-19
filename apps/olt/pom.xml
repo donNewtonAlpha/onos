@@ -26,28 +26,26 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <groupId>org.opencord</groupId>
-    <artifactId>olt</artifactId>
-    <version>1.1.0-SNAPSHOT</version>
-    <packaging>pom</packaging>
+
+    <artifactId>onos-app-olt</artifactId>
+    <packaging>bundle</packaging>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <onos.version>1.8.0-SNAPSHOT</onos.version>
-        <onos.app.name>org.opencord.olt</onos.app.name>
+        <onos.app.name>org.onosproject.olt</onos.app.name>
         <onos.app.title>OLT Access Management</onos.app.title>
         <onos.app.origin>OpenCord</onos.app.origin>
-        <onos.app.category>default</onos.app.category>
-        <onos.app.url>http://opencord.org</onos.app.url>
+        <web.context>/onos/olt</web.context>
+        <api.version>1.0.0</api.version>
+        <api.title>ONOS OLT REST API</api.title>
+        <api.description>
+            APIs for interacting with the CORD OLT application.
+        </api.description>
+        <api.package>org.onosproject.olt.rest</api.package>
     </properties>
 
 
-
-
-    <modules>
-        <module>api</module>
-        <module>app</module>
-    </modules>
 
     
     <dependencies>
@@ -88,6 +86,116 @@
             <artifactId>onos-core-common</artifactId>
             <version>${onos.version}</version>
         </dependency>
+        <dependency>
+        <groupId>org.onosproject</groupId>
+        <artifactId>onlab-junit</artifactId>
+        <version>${onos.version}</version>
+        <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.onosproject</groupId>
+            <artifactId>onos-core-serializers</artifactId>
+            <version>${onos.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.onosproject</groupId>
+            <artifactId>onos-cli</artifactId>
+            <version>${onos.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.karaf.shell</groupId>
+            <artifactId>org.apache.karaf.shell.console</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.onosproject</groupId>
+            <artifactId>onos-rest</artifactId>
+            <version>${onos.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>javax.ws.rs</groupId>
+            <artifactId>javax.ws.rs-api</artifactId>
+            <version>2.0.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.glassfish.jersey.containers</groupId>
+            <artifactId>jersey-container-servlet</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.osgi</groupId>
+            <artifactId>org.osgi.compendium</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.osgi</groupId>
+            <artifactId>org.osgi.core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.felix</groupId>
+            <artifactId>org.apache.felix.scr.annotations</artifactId>
+        </dependency>
     </dependencies>
+
+
+
+
+<build>
+<plugins>
+    <plugin>
+        <groupId>org.onosproject</groupId>
+        <artifactId>onos-maven-plugin</artifactId>
+    </plugin>
+    <plugin>
+        <groupId>org.apache.felix</groupId>
+        <artifactId>maven-bundle-plugin</artifactId>
+        <extensions>true</extensions>
+        <configuration>
+            <instructions>
+                <_wab>src/main/webapp/</_wab>
+                <Include-Resource>
+                    WEB-INF/classes/apidoc/swagger.json=target/swagger.json,
+                    {maven-resources}
+                </Include-Resource>
+                <Bundle-SymbolicName>
+                    ${project.groupId}.${project.artifactId}
+                </Bundle-SymbolicName>
+                <Import-Package>
+                    *,org.glassfish.jersey.servlet
+                </Import-Package>
+                <Web-ContextPath>${web.context}</Web-ContextPath>
+            </instructions>
+        </configuration>
+    </plugin>
+    <plugin>
+        <groupId>org.apache.felix</groupId>
+        <artifactId>maven-scr-plugin</artifactId>
+        <version>1.21.0</version>
+        <executions>
+            <execution>
+                <id>generate-scr-srcdescriptor</id>
+                <goals>
+                    <goal>scr</goal>
+                </goals>
+            </execution>
+        </executions>
+        <configuration>
+            <supportedProjectTypes>
+                <supportedProjectType>bundle</supportedProjectType>
+                <supportedProjectType>war</supportedProjectType>
+            </supportedProjectTypes>
+        </configuration>
+    </plugin>
+</plugins>
+</build>
 	
 </project>
