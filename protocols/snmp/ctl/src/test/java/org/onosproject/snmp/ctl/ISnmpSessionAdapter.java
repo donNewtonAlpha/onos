@@ -62,7 +62,8 @@ public class ISnmpSessionAdapter implements ISnmpSession {
     }
 
     @Override
-    public WalkResponse getTableRowsForColumns(IVariableBindingHandler iVariableBindingHandler, Map<String, OID[]> map) {
+    public WalkResponse getTableRowsForColumns(IVariableBindingHandler iVariableBindingHandler,
+                                               Map<String, OID[]> map) {
         return null;
     }
 
