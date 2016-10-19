@@ -34,7 +34,8 @@
     function addRegion(data) {
 
         var RegionModel = Model.extend({
-            findNodeById: findNodeById
+            findNodeById: findNodeById,
+            nodes: regionNodes
         });
 
         region = new RegionModel({
@@ -80,6 +81,11 @@
         return [];
     }
 
+    function filterRegionNodes(predicate) {
+        var nodes = regionNodes();
+        return _.filter(nodes, predicate);
+    }
+
     function regionLinks() {
         return (region) ? region.get('links').models : [];
     }
@@ -105,6 +111,7 @@
                 addRegion: addRegion,
                 regionNodes: regionNodes,
                 regionLinks: regionLinks,
+                filterRegionNodes: filterRegionNodes,
 
                 getSubRegions: t2sr.getSubRegions
             };

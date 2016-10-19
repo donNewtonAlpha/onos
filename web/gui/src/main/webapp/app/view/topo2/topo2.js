@@ -24,8 +24,8 @@
     'use strict';
 
     // references to injected services
-    var $scope, $log, fs, mast, ks, zs,
-        gs, sus, ps, t2es, t2fs, t2is, t2bcs, t2kcs, t2ms, t2mcs;
+    var $scope, $log, fs, mast, ks,
+        gs, sus, ps, t2es, t2fs, t2is, t2bcs, t2kcs, t2ms, t2mcs, t2zs;
 
     // DOM elements
     var ovtopo2, svg, defs, zoomLayer, forceG;
@@ -63,14 +63,12 @@
             tr = zoomer.translate();
 
         ps.setPrefs('topo_zoom', { tx: tr[0], ty: tr[1], sc: sc });
-
-        // keep the map lines constant width while zooming
-        // mapG.style('stroke-width', (2.0 / sc) + 'px');
     }
 
     function setUpZoom() {
         zoomLayer = svg.append('g').attr('id', 'topo-zoomlayer');
-        zoomer = zs.createZoomer({
+
+        zoomer = t2zs.createZoomer({
             svg: svg,
             zoomLayer: zoomLayer,
             zoomEnabled: zoomEnabled,
@@ -83,19 +81,20 @@
     angular.module('ovTopo2', ['onosUtil', 'onosSvg', 'onosRemote'])
     .controller('OvTopo2Ctrl',
         ['$scope', '$log', '$location',
-        'FnService', 'MastService', 'KeyService', 'ZoomService',
+        'FnService', 'MastService', 'KeyService',
         'GlyphService', 'MapService', 'SvgUtilService', 'FlashService',
         'WebSocketService', 'PrefsService', 'ThemeService',
         'Topo2EventService', 'Topo2ForceService', 'Topo2InstanceService',
         'Topo2BreadcrumbService', 'Topo2KeyCommandService', 'Topo2MapService',
-        'Topo2MapConfigService', 'Topo2SummaryPanelService',
+        'Topo2MapConfigService', 'Topo2ZoomService',
+        'Topo2SummaryPanelService', 'Topo2DeviceDetailsPanel',
 
         function (_$scope_, _$log_, _$loc_,
-            _fs_, _mast_, _ks_, _zs_,
+            _fs_, _mast_, _ks_,
             _gs_, _ms_, _sus_, _flash_,
             _wss_, _ps_, _th_,
             _t2es_, _t2fs_, _t2is_, _t2bcs_, _t2kcs_, _t2ms_, _t2mcs_,
-            summaryPanel
+            _t2zs_, summaryPanel, detailsPanel
         ) {
 
             var params = _$loc_.search(),
@@ -117,7 +116,6 @@
             fs = _fs_;
             mast = _mast_;
             ks = _ks_;
-            zs = _zs_;
 
             gs = _gs_;
             sus = _sus_;
@@ -131,6 +129,7 @@
             t2kcs = _t2kcs_;
             t2ms = _t2ms_;
             t2mcs = _t2mcs_;
+            t2zs = _t2zs_;
 
             // capture selected intent parameters (if they are set in the
             //  query string) so that the traffic overlay can highlight
@@ -157,6 +156,8 @@
                 ks.unbindKeys();
                 t2fs.destroy();
                 t2is.destroy();
+                summaryPanel.destroy();
+                detailsPanel.destroy();
             });
 
             // svg layer and initialization of components
@@ -177,7 +178,7 @@
             t2es.bindHandlers();
 
             // Add the map SVG Group
-            t2ms.init(zoomLayer).then(
+            t2ms.init(zoomLayer, zoomer).then(
                 function (proj) {
                     var z = ps.getPrefs('topo_zoom', { tx: 0, ty: 0, sc: 1 });
                     zoomer.panZoom([z.tx, z.ty], z.sc);
@@ -189,7 +190,6 @@
                     // Now the map has load and we have a projection we can
                     // get the info from the server
                     t2es.start();
-
                 }
             );
 
@@ -221,6 +221,7 @@
             // $log.debug('registered overlays...', tov.list());
 
             summaryPanel.init();
+            detailsPanel.init();
 
             $log.log('OvTopo2Ctrl has been created');
         }]);

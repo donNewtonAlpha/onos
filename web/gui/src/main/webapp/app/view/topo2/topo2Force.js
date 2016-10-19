@@ -183,25 +183,53 @@
     function newDim(_dim_) {
         dim = _dim_;
         t2vs.newDim(dim);
-        // force.size(dim);
-        // tms.newDim(dim);
-        t2ls.setDimensions();
     }
 
     // ========================== Main Service Definition
 
+    function update(elements) {
+        angular.forEach(elements, function (el) {
+            el.update();
+        });
+    }
+
     function updateNodes() {
-        var allNodes = t2rs.regionNodes();
-        angular.forEach(allNodes, function (node) {
-            node.update();
-        })
+        update(t2rs.regionNodes());
+    }
+
+    function updateLinks() {
+        update(t2rs.regionLinks());
+    }
+
+    function resetAllLocations() {
+        var nodes = t2rs.regionNodes();
+
+        angular.forEach(nodes, function (node) {
+            node.resetPosition();
+        });
+
+        t2ls.update();
+        t2ls.tick();
+    }
+
+    function unpin() {
+        var hovered = t2rs.filterRegionNodes(function (model) {
+            return model.get('hovered');
+        });
+
+        angular.forEach(hovered, function (model) {
+            model.fixed = false;
+            model.el.classed('fixed', false);
+        });
     }
 
     angular.module('ovTopo2')
     .factory('Topo2ForceService',
-        ['$log', 'WebSocketService', 'Topo2InstanceService', 'Topo2RegionService',
-        'Topo2LayoutService', 'Topo2ViewService', 'Topo2BreadcrumbService',
-        function (_$log_, _wss_, _t2is_, _t2rs_, _t2ls_, _t2vs_, _t2bcs_) {
+        ['$log', 'WebSocketService', 'Topo2InstanceService',
+        'Topo2RegionService', 'Topo2LayoutService', 'Topo2ViewService',
+        'Topo2BreadcrumbService', 'Topo2ZoomService',
+        function (_$log_, _wss_, _t2is_, _t2rs_, _t2ls_,
+            _t2vs_, _t2bcs_, zoomService) {
 
             $log = _$log_;
             wss = _wss_;
@@ -210,6 +238,19 @@
             t2ls = _t2ls_;
             t2vs = _t2vs_;
             t2bcs = _t2bcs_;
+
+            var onZoom = function () {
+                var nodes = [].concat(
+                        t2rs.regionNodes(),
+                        t2rs.regionLinks()
+                    );
+
+                angular.forEach(nodes, function (node) {
+                    node.setScale();
+                });
+            };
+
+            zoomService.addZoomEventListener(onZoom);
 
             return {
 
@@ -225,7 +266,10 @@
                 showMastership: showMastership,
                 topo2PeerRegions: topo2PeerRegions,
 
-                updateNodes: updateNodes
+                updateNodes: updateNodes,
+                updateLinks: updateLinks,
+                resetAllLocations: resetAllLocations,
+                unpin: unpin
             };
         }]);
 })();
