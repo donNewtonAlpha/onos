@@ -19,8 +19,11 @@ package org.onosproject.ui.impl;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSet;
+import org.onosproject.core.ApplicationId;
+import org.onosproject.core.DefaultApplicationId;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.flow.FlowEntry;
+import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.flow.FlowRuleService;
 import org.onosproject.net.flow.criteria.Criterion;
 import org.onosproject.net.flow.instructions.Instruction;
@@ -47,7 +50,13 @@ public class FlowViewMessageHandler extends UiMessageHandler {
     private static final String FLOW_DATA_RESP = "flowDataResponse";
     private static final String FLOWS = "flows";
 
+    private static final String FLOW_DETAILS_REQ = "flowDetailsRequest";
+    private static final String FLOW_DETAILS_RESP = "flowDetailsResponse";
+    private static final String DETAILS = "details";
+    private static final String FLOW_PRIORITY = "priority";
+
     private static final String ID = "id";
+    private static final String FLOW_ID = "flowId";
     private static final String APP_ID = "appId";
     private static final String GROUP_ID = "groupId";
     private static final String TABLE_ID = "tableId";
@@ -61,6 +70,8 @@ public class FlowViewMessageHandler extends UiMessageHandler {
     private static final String BYTES = "bytes";
 
     private static final String COMMA = ", ";
+    private static final String OX = "0x";
+    private static final String EMPTY = "";
 
     private static final String[] COL_IDS = {
             ID, APP_ID, GROUP_ID, TABLE_ID, PRIORITY, SELECTOR,
@@ -69,7 +80,10 @@ public class FlowViewMessageHandler extends UiMessageHandler {
 
     @Override
     protected Collection<RequestHandler> createRequestHandlers() {
-        return ImmutableSet.of(new FlowDataRequest());
+        return ImmutableSet.of(
+                new FlowDataRequest(),
+                new DetailRequestHandler()
+        );
     }
 
     // handler for flow table requests
@@ -118,17 +132,17 @@ public class FlowViewMessageHandler extends UiMessageHandler {
 
         private void populateRow(TableModel.Row row, FlowEntry flow) {
             row.cell(ID, flow.id().value())
-                .cell(APP_ID, flow.appId())
-                .cell(GROUP_ID, flow.groupId().id())
-                .cell(TABLE_ID, flow.tableId())
-                .cell(PRIORITY, flow.priority())
-                .cell(TIMEOUT, flow.timeout())
-                .cell(PERMANENT, flow.isPermanent())
-                .cell(STATE, flow.state())
-                .cell(PACKETS, flow.packets())
-                .cell(BYTES, flow.bytes())
-                .cell(SELECTOR, flow)
-                .cell(TREATMENT, flow);
+                    .cell(APP_ID, flow.appId())
+                    .cell(GROUP_ID, flow.groupId().id())
+                    .cell(TABLE_ID, flow.tableId())
+                    .cell(PRIORITY, flow.priority())
+                    .cell(TIMEOUT, flow.timeout())
+                    .cell(PERMANENT, flow.isPermanent())
+                    .cell(STATE, flow.state())
+                    .cell(PACKETS, flow.packets())
+                    .cell(BYTES, flow.bytes())
+                    .cell(SELECTOR, flow)
+                    .cell(TREATMENT, flow);
         }
 
         private final class SelectorFormatter implements CellFormatter {
@@ -181,6 +195,95 @@ public class FlowViewMessageHandler extends UiMessageHandler {
             int pos = sb.lastIndexOf(COMMA);
             sb.delete(pos, sb.length());
             return sb;
+        }
+    }
+
+    private final class DetailRequestHandler extends RequestHandler {
+        private DetailRequestHandler() {
+            super(FLOW_DETAILS_REQ);
+        }
+
+        private FlowEntry findFlowById(String appIdText, String flowId) {
+            String strippedFlowId = flowId.replaceAll(OX, EMPTY);
+            FlowRuleService fs = get(FlowRuleService.class);
+            int appIdInt = Integer.parseInt(appIdText);
+            ApplicationId appId = new DefaultApplicationId(appIdInt, DETAILS);
+            Iterable<FlowEntry> entries = fs.getFlowEntriesById(appId);
+
+            for (FlowEntry entry : entries) {
+                if (entry.id().toString().equals(strippedFlowId)) {
+                    return entry;
+                }
+            }
+
+            return null;
+        }
+
+        private String decorateFlowId(FlowRule flow) {
+            return OX + flow.id();
+        }
+
+        private String decorateGroupId(FlowRule flow) {
+            return OX + flow.groupId().id();
+        }
+
+        private String getCriteriaString(FlowRule flow) {
+            Set<Criterion> criteria = flow.selector().criteria();
+            StringBuilder sb = new StringBuilder();
+            for (Criterion c : criteria) {
+                sb.append(c).append(COMMA);
+            }
+            int pos = sb.lastIndexOf(COMMA);
+            sb.delete(pos, sb.length());
+
+            return sb.toString();
+        }
+
+        private String getTreatmentString(FlowRule flow) {
+            List<Instruction> instructions = flow.treatment().allInstructions();
+            StringBuilder sb = new StringBuilder();
+            for (Instruction inst : instructions) {
+                sb.append(inst).append(COMMA);
+            }
+            if (flow.treatment().metered() != null) {
+                sb.append(flow.treatment().metered().toString()).append(COMMA);
+            }
+            if (flow.treatment().tableTransition() != null) {
+                sb.append(flow.treatment().tableTransition().toString()).append(COMMA);
+            }
+            int pos = sb.lastIndexOf(COMMA);
+            sb.delete(pos, sb.length());
+
+            return sb.toString();
+        }
+
+        @Override
+        public void process(ObjectNode payload) {
+
+            String flowId = string(payload, FLOW_ID);
+            String appId = string(payload, APP_ID);
+            FlowRule flow = findFlowById(appId, flowId);
+            if (flow != null) {
+                ObjectNode data = objectNode();
+
+
+                data.put(FLOW_ID, decorateFlowId(flow));
+                data.put(FLOW_PRIORITY, flow.priority());
+                data.put(GROUP_ID, decorateGroupId(flow));
+                data.put(APP_ID, flow.appId());
+                data.put(TABLE_ID, flow.tableId());
+                data.put(TIMEOUT, flow.hardTimeout());
+                data.put(PERMANENT, Boolean.toString(flow.isPermanent()));
+                data.put(SELECTOR, getCriteriaString(flow));
+                data.put(TREATMENT, getTreatmentString(flow));
+
+
+                //TODO put more detail info to data
+
+                ObjectNode rootNode = objectNode();
+                rootNode.set(DETAILS, data);
+                sendMessage(FLOW_DETAILS_RESP, rootNode);
+            }
         }
     }
 }

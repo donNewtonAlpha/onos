@@ -30,6 +30,7 @@ import org.onosproject.ui.UiMessageHandler;
 import org.onosproject.ui.UiMessageHandlerFactory;
 import org.onosproject.ui.UiTopoLayoutService;
 import org.onosproject.ui.UiTopoOverlayFactory;
+import org.onosproject.ui.impl.topo.Topo2Jsonifier;
 import org.onosproject.ui.impl.topo.UiTopoSession;
 import org.onosproject.ui.impl.topo.model.UiSharedTopologyModel;
 import org.onosproject.ui.model.topo.UiTopoLayout;
@@ -59,7 +60,7 @@ public class UiWebSocket
     private static final String USER = "user";
     private static final String BOOTSTRAP = "bootstrap";
 
-    public static final String TOPO = "topo";
+    private static final String TOPO = "topo";
 
     private static final long MAX_AGE_MS = 30_000;
 
@@ -90,9 +91,16 @@ public class UiWebSocket
     public UiWebSocket(ServiceDirectory directory, String userName) {
         this.directory = directory;
         this.userName = userName;
-        this.topoSession =
-                new UiTopoSession(this, directory.get(UiSharedTopologyModel.class),
-                        directory.get(UiTopoLayoutService.class));
+
+        Topo2Jsonifier t2json = new Topo2Jsonifier(directory);
+        UiSharedTopologyModel sharedModel = directory.get(UiSharedTopologyModel.class);
+        UiTopoLayoutService layoutService = directory.get(UiTopoLayoutService.class);
+
+        topoSession = new UiTopoSession(this, t2json, sharedModel, layoutService);
+
+        // FIXME: this is temporary to prevent unhandled events being set to GUI...
+        //         while Topo2 is still under development
+        topoSession.enableEvent(false);
     }
 
     @Override
@@ -226,12 +234,9 @@ public class UiWebSocket
     }
 
     @Override
-    public synchronized void sendMessage(String type, long sid, ObjectNode payload) {
+    public synchronized void sendMessage(String type, ObjectNode payload) {
         ObjectNode message = mapper.createObjectNode();
         message.put(EVENT, type);
-        if (sid > 0) {
-            message.put(SID, sid);
-        }
         message.set(PAYLOAD, payload != null ? payload : mapper.createObjectNode());
         sendMessage(message);
     }
@@ -252,6 +257,7 @@ public class UiWebSocket
                         handler.messageTypes().forEach(type -> handlers.put(type, handler));
 
                         // need to inject the overlay cache into topology message handler
+                        // TODO: code for Topo2ViewMessageHandler required here
                         if (handler instanceof TopologyViewMessageHandler) {
                             ((TopologyViewMessageHandler) handler).setOverlayCache(overlayCache);
                         }
@@ -301,7 +307,7 @@ public class UiWebSocket
         ObjectNode payload = mapper.createObjectNode();
         payload.set(CLUSTER_NODES, instances);
         payload.put(USER, userName);
-        sendMessage(BOOTSTRAP, 0, payload);
+        sendMessage(BOOTSTRAP, payload);
     }
 
 }

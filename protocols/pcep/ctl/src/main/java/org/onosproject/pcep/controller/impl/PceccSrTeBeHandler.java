@@ -108,6 +108,7 @@ public final class PceccSrTeBeHandler {
      *
      * @param labelRsrcAdminService label resource admin service
      * @param labelRsrcService label resource service
+     * @param clientController client controller
      * @param pceStore PCE label store
      * @param deviceService device service
      */
@@ -241,7 +242,7 @@ public final class PceccSrTeBeHandler {
                                         PcepLabelOp.ADD,
                                         false);
 
-                    pushGlobalNodeLabel(pcc, specificLabelId,
+                    pushGlobalNodeLabel(pcc, element.getValue(),
                                         IpAddress.valueOf(otherLsrId).getIp4Address().toInt(),
                                         PcepLabelOp.ADD,
                                         false);

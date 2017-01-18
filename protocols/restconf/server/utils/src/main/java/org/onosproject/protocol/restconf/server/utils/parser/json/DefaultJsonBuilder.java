@@ -90,9 +90,20 @@ public class DefaultJsonBuilder implements JsonBuilder {
             return;
         }
         appendField(fieldName);
+
+        // If the value is null, then it's a empty leaf-node
+        if (value == null) {
+            treeString.append(QUOTE)
+                    .append(QUOTE + COMMA);
+            return;
+        }
+
+        // If the value is empty, then it's a non-leaf node
         if (value.isEmpty()) {
             return;
         }
+
+        // It's a non-empty leaf node
         treeString.append(QUOTE)
                 .append(value)
                 .append(QUOTE + COMMA);
@@ -133,7 +144,7 @@ public class DefaultJsonBuilder implements JsonBuilder {
             case NUMBER:
             case POJO:
             case STRING:
-                log.debug("Unimplemented node type {}", nodeType);
+                log.trace("Unimplemented node type {}", nodeType);
                 break;
 
             default:
@@ -163,8 +174,8 @@ public class DefaultJsonBuilder implements JsonBuilder {
     private void appendField(String fieldName) {
         if (!isNullOrEmpty(fieldName)) {
             treeString.append(QUOTE)
-            .append(fieldName)
-            .append(QUOTE + COLON);
+                    .append(fieldName)
+                    .append(QUOTE + COLON);
         }
     }
 

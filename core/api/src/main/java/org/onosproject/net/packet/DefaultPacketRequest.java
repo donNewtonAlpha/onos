@@ -38,7 +38,7 @@ public final class DefaultPacketRequest implements PacketRequest {
 
     /**
      * Creates a new packet request.
-     *  @param selector  traffic selector
+     * @param selector  traffic selector
      * @param priority  intercept priority
      * @param appId     application id
      * @param nodeId    identifier of node where request originated

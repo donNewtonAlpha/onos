@@ -50,8 +50,6 @@ public class NetconfSessionImpl implements NetconfSession {
     private static final Logger log = LoggerFactory
             .getLogger(NetconfSessionImpl.class);
 
-
-    private static final int CONNECTION_TIMEOUT = 0;
     private static final String ENDPATTERN = "]]>]]>";
     private static final String MESSAGE_ID_STRING = "message-id";
     private static final String HELLO = "<hello";
@@ -111,8 +109,10 @@ public class NetconfSessionImpl implements NetconfSession {
     private void startConnection() throws NetconfException {
         if (!connectionActive) {
             netconfConnection = new Connection(deviceInfo.ip().toString(), deviceInfo.port());
+            int connectTimeout = NetconfControllerImpl.netconfConnectTimeout;
+
             try {
-                netconfConnection.connect(null, CONNECTION_TIMEOUT, 5000);
+                netconfConnection.connect(null, 1000 * connectTimeout, 1000 * connectTimeout);
             } catch (IOException e) {
                 throw new NetconfException("Cannot open a connection with device" + deviceInfo, e);
             }
@@ -129,8 +129,8 @@ public class NetconfSessionImpl implements NetconfSession {
                             deviceInfo.name(), deviceInfo.password());
                 }
             } catch (IOException e) {
-                log.error("Authentication connection to device {} failed: {} ",
-                          deviceInfo.getDeviceId(), e.getMessage());
+                log.error("Authentication connection to device {} failed",
+                          deviceInfo.getDeviceId(), e);
                 throw new NetconfException("Authentication connection to device " +
                                                    deviceInfo.getDeviceId() + " failed", e);
             }
@@ -154,7 +154,7 @@ public class NetconfSessionImpl implements NetconfSession {
             this.addDeviceOutputListener(new NetconfDeviceOutputEventListenerImpl(deviceInfo));
             sendHello();
         } catch (IOException e) {
-            log.error("Failed to create ch.ethz.ssh2.Session session." + e.getMessage());
+            log.error("Failed to create ch.ethz.ssh2.Session session.", e);
             throw new NetconfException("Failed to create ch.ethz.ssh2.Session session with device" +
                                                deviceInfo, e);
         }
@@ -246,7 +246,7 @@ public class NetconfSessionImpl implements NetconfSession {
             try {
                 startSshSession();
             } catch (IOException e) {
-                log.debug("The connection with {} had to be reopened", deviceInfo.getDeviceId());
+                log.debug("The connection with {} was reopened", deviceInfo.getDeviceId());
                 try {
                     startConnection();
                 } catch (IOException e2) {
@@ -436,18 +436,19 @@ public class NetconfSessionImpl implements NetconfSession {
     public boolean copyConfig(String targetConfiguration, String newConfiguration)
             throws NetconfException {
         newConfiguration = newConfiguration.trim();
-        if (!newConfiguration.startsWith("<configuration>")) {
-            newConfiguration = "<configuration>" + newConfiguration
-                    + "</configuration>";
+        if (!newConfiguration.startsWith("<config>")) {
+            newConfiguration = "<config>" + newConfiguration
+                    + "</config>";
         }
         StringBuilder rpc = new StringBuilder(XML_HEADER);
-        rpc.append("<rpc>");
+        rpc.append(RPC_OPEN);
+        rpc.append(NETCONF_BASE_NAMESPACE).append(">\n");
         rpc.append("<copy-config>");
         rpc.append("<target>");
         rpc.append("<").append(targetConfiguration).append("/>");
         rpc.append("</target>");
         rpc.append("<source>");
-        rpc.append("<").append(newConfiguration).append("/>");
+        rpc.append(newConfiguration);
         rpc.append("</source>");
         rpc.append("</copy-config>");
         rpc.append("</rpc>");

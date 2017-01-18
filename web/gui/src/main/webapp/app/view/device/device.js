@@ -46,6 +46,7 @@
         nameChangeReq = 'deviceNameChangeRequest',
         nameChangeResp = 'deviceNameChangeResponse',
 
+        propSplit = 4,
         propOrder = [
             'id', 'type', 'masterid', 'chassisid',
             'mfr', 'hw', 'sw', 'protocol', 'serial'
@@ -174,7 +175,7 @@
 
         propOrder.forEach(function (prop, i) {
             // properties are split into two tables
-            addProp(i < 4 ? leftTbl : rightTbl, i, details[prop]);
+            addProp(i < propSplit ? leftTbl : rightTbl, i, details[prop]);
         });
     }
 
@@ -216,23 +217,15 @@
         detailsPanel.width(tbWidth + ctnrPdg);
     }
 
-    function populateName(div, name) {
-        var lab = div.select('.label'),
-            val = div.select('.value');
-        lab.html('Friendly Name:');
-        val.html(name);
-    }
-
     function populateDetails(details) {
-        var nameDiv, topTbs, btmTbl, ports;
+        var topTbs, btmTbl, ports;
+
         setUpPanel();
 
-        nameDiv = top.select('.name-div');
         topTbs = top.select('.top-tables');
         btmTbl = bottom.select('table');
         ports = details.ports;
 
-        populateName(nameDiv, details.name);
         populateTop(topTbs, details);
         populateBottom(btmTbl, ports);
 
@@ -265,14 +258,29 @@
         detailsPanel.hide();
     }
 
+    // Sample functions for detail panel creation
+    function popTop(div) {
+        $log.debug('populateTop');
+        // TODO: real work
+        // div.append(.....);
+        // div.append(.....);
+        // div.append(.....);
+    }
+
+    function popMid(div) {
+        $log.debug('populateMiddle');
+        // TODO: real work
+    }
+
     angular.module('ovDevice', [])
     .controller('OvDeviceCtrl',
-        ['$log', '$scope', '$location', 'TableBuilderService', 'FnService',
+        ['$log', '$scope', '$location', 'TableBuilderService',
+            'TableDetailService', 'FnService',
             'MastService', 'PanelService', 'WebSocketService', 'IconService',
             'NavService', 'KeyService',
 
         function (_$log_, _$scope_, _$location_,
-                  tbs, _fs_, _mast_, _ps_, _wss_, _is_, _ns_, _ks_) {
+                  tbs, tds, _fs_, _mast_, _ps_, _wss_, _is_, _ns_, _ks_) {
             var params,
                 handlers = {};
 
@@ -320,6 +328,16 @@
                 tag: 'device',
                 selCb: selCb
             });
+
+
+            // ==================== for testing for now ===============
+            // TODO: more than just an example
+            tds.buildBasePanel({
+                popTop: popTop,
+                popMid: popMid
+            });
+            // ==================== for testing for now ===============
+
 
             $scope.nav = function (path) {
                 if ($scope.selId) {

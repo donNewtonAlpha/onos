@@ -115,7 +115,9 @@ public class IntentCleanupTestMock {
         expectLastCall().once();
         replay(service);
 
-        cleanup.run(); //FIXME broken?
+        synchronized (service) {
+            cleanup.run();
+        }
         verify(service);
         reset(service);
     }
@@ -141,7 +143,7 @@ public class IntentCleanupTestMock {
         IntentData data = new IntentData(intent, INSTALL_REQ, version);
         store.addPending(data);
 
-        service.submit(intent);
+        service.addPending(data);
         expectLastCall().once();
         replay(service);
 
@@ -174,7 +176,7 @@ public class IntentCleanupTestMock {
         IntentData data = new IntentData(intent, INSTALL_REQ, version);
         store.addPending(data);
 
-        service.submit(intent);
+        service.addPending(data);
         expectLastCall().once();
         replay(service);
 

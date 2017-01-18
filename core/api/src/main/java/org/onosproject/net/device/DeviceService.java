@@ -16,6 +16,7 @@
 package org.onosproject.net.device;
 
 import org.onosproject.event.ListenerService;
+import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.Device;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.MastershipRole;
@@ -144,6 +145,16 @@ public interface DeviceService
     Port getPort(DeviceId deviceId, PortNumber portNumber);
 
     /**
+     * Returns the port with the specified connect point.
+     *
+     * @param cp connect point
+     * @return device port
+     */
+    default Port getPort(ConnectPoint cp) {
+        return getPort(cp.deviceId(), cp.port());
+    }
+
+    /**
      * Indicates whether or not the device is presently online and available.
      * Availability, unlike reachability, denotes whether ANY node in the
      * cluster can discover that this device is in an operational state,
@@ -154,5 +165,15 @@ public interface DeviceService
      * @return true if the device is available
      */
     boolean isAvailable(DeviceId deviceId);
+
+    /**
+     * Indicates how long ago the device connected or disconnected from this
+     * controller instance.
+     *
+     * @param deviceId device identifier
+     * @return a human readable string indicating the time since the device
+     *          connected-to or disconnected-from this controller instance.
+     */
+    String localStatus(DeviceId deviceId);
 
 }

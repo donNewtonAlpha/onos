@@ -218,6 +218,7 @@ import org.onosproject.store.service.SetEvent;
 import org.onosproject.store.service.Task;
 import org.onosproject.store.service.Versioned;
 import org.onosproject.store.service.WorkQueueStats;
+import org.onosproject.ui.model.topo.UiTopoLayoutId;
 
 import java.net.URI;
 import java.time.Duration;
@@ -356,6 +357,7 @@ public final class KryoNamespaces {
                     DefaultPacketRequest.class,
                     PacketPriority.class,
                     FlowEntry.FlowEntryState.class,
+                    FlowEntry.FlowLiveType.class,
                     FlowId.class,
                     DefaultTrafficSelector.class,
                     PortCriterion.class,
@@ -409,8 +411,6 @@ public final class KryoNamespaces {
                     L2ModificationInstruction.class,
                     L2ModificationInstruction.L2SubType.class,
                     L2ModificationInstruction.ModEtherInstruction.class,
-                    L2ModificationInstruction.PushHeaderInstructions.class,
-                    L2ModificationInstruction.PopVlanInstruction.class,
                     L2ModificationInstruction.ModMplsHeaderInstruction.class,
                     L2ModificationInstruction.ModVlanIdInstruction.class,
                     L2ModificationInstruction.ModVlanPcpInstruction.class,
@@ -513,6 +513,7 @@ public final class KryoNamespaces {
             .register(Region.Type.class)
             .register(RegionId.class)
             .register(DefaultRegion.class)
+            .register(UiTopoLayoutId.class)
             .register(ExtensionSelectorType.class)
             .register(ExtensionTreatmentType.class)
             .register(TransactionId.class)

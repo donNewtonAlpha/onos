@@ -32,13 +32,7 @@
     function createDeviceCollection(data, region) {
 
         var DeviceCollection = Collection.extend({
-            model: Model,
-            comparator: function (a, b) {
-                // var order = region.get('layerOrder'),
-                //     aLayer = a.get('id'),
-                //     bLayer = b.get('layer');
-                // return order.indexOf(aLayer - order.indexOf(bLayer));
-            }
+            model: Model
         });
 
         var devices = [];
@@ -48,10 +42,7 @@
             });
         });
 
-        var deviceCollection = new DeviceCollection(devices);
-        deviceCollection.sort();
-
-        return deviceCollection;
+        return new DeviceCollection(devices);
     }
 
     angular.module('ovTopo2')
@@ -69,6 +60,13 @@
                     events: {
                         'click': 'onClick'
                     },
+                    onChange: function () {
+
+                        // Update class names when the model changes
+                        if (this.el) {
+                            this.el.attr('class', this.svgClassName());
+                        }
+                    },
                     nodeType: 'device',
                     icon: function () {
                         var type = this.get('type');
@@ -76,16 +74,22 @@
                     },
                     onClick: function () {
 
-                        if (this.get('selected')) {
-                            this.set('selected', false);
-                            detailsPanel.hide();
-                        } else {
-                            this.set('selected', true);
-                            detailsPanel.updateDetails(this.get('id'), this.get('nodeType'));
-                            detailsPanel.show();
-                        }
+                        var selected = this.select(d3.event);
 
-                        this.el.attr('class', this.svgClassName());
+                        if (_.isArray(selected) && selected.length > 0) {
+                            if (selected.length === 1) {
+                                var model = selected[0],
+                                    id = model.get('id'),
+                                    nodeType = model.get('nodeType');
+                                detailsPanel.updateDetails(id, nodeType);
+                                detailsPanel.show();
+                            } else {
+                                // Multi Panel
+                                detailsPanel.showMulti(selected);
+                            }
+                        } else {
+                            detailsPanel.hide();
+                        }
                     },
                     onExit: function () {
                         var node = this.el;

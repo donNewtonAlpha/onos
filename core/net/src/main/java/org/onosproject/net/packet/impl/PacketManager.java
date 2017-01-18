@@ -34,6 +34,7 @@ import org.onosproject.net.device.DeviceListener;
 import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.flow.DefaultTrafficTreatment;
 import org.onosproject.net.flow.TrafficSelector;
+import org.onosproject.net.flow.TrafficTreatment;
 import org.onosproject.net.flowobjective.DefaultForwardingObjective;
 import org.onosproject.net.flowobjective.FlowObjectiveService;
 import org.onosproject.net.flowobjective.ForwardingObjective;
@@ -321,12 +322,17 @@ public class PacketManager
     }
 
     private DefaultForwardingObjective.Builder createBuilder(PacketRequest request) {
+        TrafficTreatment treatment = DefaultTrafficTreatment.builder()
+                .punt()
+                .wipeDeferred()
+                .build();
+
         return DefaultForwardingObjective.builder()
                 .withPriority(request.priority().priorityValue())
                 .withSelector(request.selector())
                 .fromApp(appId)
                 .withFlag(ForwardingObjective.Flag.VERSATILE)
-                .withTreatment(DefaultTrafficTreatment.builder().punt().build())
+                .withTreatment(treatment)
                 .makePermanent();
     }
 

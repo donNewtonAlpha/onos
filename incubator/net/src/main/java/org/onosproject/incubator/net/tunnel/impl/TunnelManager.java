@@ -130,6 +130,12 @@ public class TunnelManager
     }
 
     @Override
+    public void updateTunnelState(Tunnel tunnel, State state) {
+        Tunnel storedTunnel = store.queryTunnel(tunnel.tunnelId());
+        store.createOrUpdateTunnel(storedTunnel, state);
+    }
+
+    @Override
     public void removeTunnels(TunnelEndPoint src, TunnelEndPoint dst,
                               ProviderId producerName) {
         Collection<Tunnel> setTunnels = store.queryTunnel(src, dst);
@@ -241,9 +247,10 @@ public class TunnelManager
         TunnelId tunnelId = store.createOrUpdateTunnel(tunnel, State.INIT);
         if (tunnelId != null) {
             Set<ProviderId> ids = getProviders();
+            Tunnel newT = queryTunnel(tunnelId);
             for (ProviderId providerId : ids) {
                 TunnelProvider provider = getProvider(providerId);
-                provider.setupTunnel(srcElementId, tunnel, path);
+                provider.setupTunnel(srcElementId, newT, path);
             }
         }
         return tunnelId;

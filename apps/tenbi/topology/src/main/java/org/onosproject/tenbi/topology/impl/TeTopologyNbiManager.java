@@ -15,8 +15,6 @@
  */
 package org.onosproject.tenbi.topology.impl;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
@@ -24,30 +22,34 @@ import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.apache.felix.scr.annotations.Service;
 import org.onosproject.event.AbstractListenerManager;
+import org.onosproject.tetopology.management.api.TeTopologyEvent;
+import org.onosproject.tetopology.management.api.TeTopologyListener;
 import org.onosproject.tetopology.management.api.TeTopologyService;
 import org.onosproject.teyang.api.OperationType;
 import org.onosproject.teyang.utils.topology.NetworkConverter;
 import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.network.rev20151208.IetfNetwork;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.network.rev20151208.IetfNetwork.OnosYangOpType;
 import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.network.rev20151208.IetfNetworkOpParam;
 import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.network.rev20151208.IetfNetworkService;
 import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.network.rev20151208.ietfnetwork.Networks;
 import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.network.rev20151208.ietfnetwork.NetworksState;
 import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.network.topology.rev20151208.IetfNetworkTopology;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.network.topology.rev20151208
-               .IetfNetworkTopologyOpParam;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.network.topology.rev20151208
-               .IetfNetworkTopologyService;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.network.topology
+        .rev20151208.IetfNetworkTopologyOpParam;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.network.topology
+        .rev20151208.IetfNetworkTopologyService;
 import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.IetfTeTopology;
 import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.IetfTeTopologyOpParam;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708
-               .IetfTeTopologyService;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708
-               .ietftetopology.IetfTeTopologyEvent;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708
-               .ietftetopology.IetfTeTopologyEventListener;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.IetfTeTopologyService;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology
+        .IetfTeTopologyEvent;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology
+        .IetfTeTopologyEventListener;
 import org.onosproject.yms.ymsm.YmsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * The IETF TE Topology NBI Manager implementation.
@@ -55,8 +57,8 @@ import org.slf4j.LoggerFactory;
 @Component(immediate = true)
 @Service
 public class TeTopologyNbiManager
-    extends  AbstractListenerManager<IetfTeTopologyEvent, IetfTeTopologyEventListener>
-    implements IetfNetworkService, IetfNetworkTopologyService, IetfTeTopologyService {
+        extends AbstractListenerManager<IetfTeTopologyEvent, IetfTeTopologyEventListener>
+        implements IetfNetworkService, IetfNetworkTopologyService, IetfTeTopologyService {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -66,48 +68,79 @@ public class TeTopologyNbiManager
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected YmsService ymsService;
 
+
+    /**
+     * Activation helper function.
+     */
+    private void activateBasics() {
+        eventDispatcher.addSink(IetfTeTopologyEvent.class, listenerRegistry);
+    }
+
+    /**
+     * Deactivation helper function.
+     */
+    private void deactivateBasics() {
+        eventDispatcher.removeSink(IetfTeTopologyEvent.class);
+    }
+
     @Activate
     protected void activate() {
+        activateBasics();
+
         // Register 3 services with YMS.
         ymsService.registerService(this, IetfNetworkService.class, null);
         ymsService.registerService(this, IetfNetworkTopologyService.class, null);
         ymsService.registerService(this, IetfTeTopologyService.class, null);
+
+        // Listens to TE Topology events
+        teTopologyService.addListener(new InternalTeTopologyListener());
 
         log.info("Started");
     }
 
     @Deactivate
     protected void deactivate() {
+        deactivateBasics();
+
         // Unregister 3 services.
         ymsService.unRegisterService(this, IetfNetworkService.class);
         ymsService.unRegisterService(this, IetfNetworkTopologyService.class);
         ymsService.unRegisterService(this, IetfTeTopologyService.class);
 
+        teTopologyService.removeListener(new InternalTeTopologyListener());
         log.info("Stopped");
     }
 
     @Override
     public IetfNetwork getIetfNetwork(IetfNetworkOpParam ietfNetwork) {
-        log.info("getIetfNetwork: input {}", ietfNetwork);
-
         checkNotNull(ietfNetwork, "getIetfNetwork: ietfNetwork cannot be null");
 
         // Get the entire data tree from TE Subsystem core.
-        org.onosproject.tetopology.management.api.Networks teNetworks = teTopologyService.getNetworks();
+        org.onosproject.tetopology.management.api.Networks teNetworks = teTopologyService.networks();
+
+        // Build the sample networks for RESTCONF/YMS integration test
+//        org.onosproject.tetopology.management.api.Networks teNetworks = new DefaultNetworks(DefaultBuilder
+//                .sampleDomain1Networks());
 
         // Convert the TE Subsystem core data into YANG Objects.
-        Networks networks = NetworkConverter.teSubsystem2YangNetworks(teNetworks, OperationType.QUERY);
+        Networks networks = NetworkConverter
+                .teSubsystem2YangNetworks(teNetworks, OperationType.QUERY,
+                                          teTopologyService);
         NetworksState networkStates = NetworkConverter.teSubsystem2YangNetworkStates(teNetworks, OperationType.QUERY);
 
-        IetfNetworkOpParam.IetfNetworkBuilder builder =  new IetfNetworkOpParam.IetfNetworkBuilder();
+        IetfNetworkOpParam.IetfNetworkBuilder builder = new IetfNetworkOpParam.IetfNetworkBuilder();
         IetfNetwork newNetwork = builder.networks(networks)
-                                        .networksState(networkStates)
-                                        .onosYangNodeOperationType(IetfNetworkOpParam.OnosYangNodeOperationType.NONE)
-                                        .build();
+                .networksState(networkStates)
+                .yangIetfNetworkOpType(OnosYangOpType.NONE)
+                .build();
 
         // processSubtreeFiltering() filters the entire data tree based on the
         // user's query and returns the filtered data.
-        return ietfNetwork.processSubtreeFiltering(newNetwork, false);
+        IetfNetwork result = ietfNetwork.processSubtreeFiltering(
+                (IetfNetworkOpParam) newNetwork,
+                false);
+        log.debug("result is: {}", result);
+        return result;
     }
 
     @Override
@@ -140,7 +173,7 @@ public class TeTopologyNbiManager
     @Override
     public IetfNetworkTopology getIetfNetworkTopology(IetfNetworkTopologyOpParam ietfNetworkTopology) {
         // unused methods.
-       return ietfNetworkTopology;
+        return ietfNetworkTopology;
     }
 
     @Override
@@ -159,4 +192,11 @@ public class TeTopologyNbiManager
         // unused methods.
     }
 
+    private class InternalTeTopologyListener implements TeTopologyListener {
+        @Override
+        public void event(TeTopologyEvent event) {
+            IetfTeTopologyEvent yangEvent = NetworkConverter.teTopoEvent2YangIetfTeTopoEvent(event);
+            post(yangEvent);
+        }
+    }
 }

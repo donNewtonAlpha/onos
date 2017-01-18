@@ -30,17 +30,17 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 /**
  * Network Address Translation (NAT) address class.
  * <p>
- * Instance ID type is defined in draft-ietf-lisp-lcaf-13
- * https://tools.ietf.org/html/draft-ietf-lisp-lcaf-13#page-12
- * <p>
+ * Instance ID type is defined in draft-ietf-lisp-lcaf-22
+ * https://tools.ietf.org/html/draft-ietf-lisp-lcaf-22#page-12
+ *
  * <pre>
  * {@literal
- *      0                   1                   2                   3
- * 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ *  0                   1                   2                   3
+ *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  * |           AFI = 16387         |     Rsvd1     |     Flags     |
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |   Type = 7    |     Rsvd2     |             4 + n             |
+ * |   Type = 7    |     Rsvd2     |             Length            |
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  * |       MS UDP Port Number      |      ETR UDP Port Number      |
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -162,7 +162,8 @@ public final class LispNatLcafAddress extends LispLcafAddress {
                     Objects.equals(this.etrUdpPortNumber, other.etrUdpPortNumber) &&
                     Objects.equals(this.globalEtrRlocAddress, other.globalEtrRlocAddress) &&
                     Objects.equals(this.msRlocAddress, other.msRlocAddress) &&
-                    Objects.equals(this.privateEtrRlocAddress, other.privateEtrRlocAddress);
+                    Objects.equals(this.privateEtrRlocAddress, other.privateEtrRlocAddress) &&
+                    Objects.equals(this.rtrRlocAddresses, other.rtrRlocAddresses);
         }
         return false;
     }
@@ -175,6 +176,7 @@ public final class LispNatLcafAddress extends LispLcafAddress {
                 .add("global ETR RLOC address", globalEtrRlocAddress)
                 .add("Map Server RLOC address", msRlocAddress)
                 .add("private ETR RLOC address", privateEtrRlocAddress)
+                .add("RTR RLOC addresses", rtrRlocAddresses)
                 .toString();
     }
 
@@ -275,31 +277,29 @@ public final class LispNatLcafAddress extends LispLcafAddress {
         public LispNatLcafAddress readFrom(ByteBuf byteBuf)
                 throws LispParseError, LispReaderException {
 
-            LispLcafAddress lcafAddress = LispLcafAddress.deserializeCommon(byteBuf);
+            LispLcafAddress lcafAddress = deserializeCommon(byteBuf);
 
             short msUdpPortNumber = (short) byteBuf.readUnsignedShort();
             short etrUdpPortNumber = (short) byteBuf.readUnsignedShort();
 
-            LispAfiAddress globalEtrRlocAddress = new LispAfiAddress.AfiAddressReader().readFrom(byteBuf);
-            LispAfiAddress msRlocAddress = new LispAfiAddress.AfiAddressReader().readFrom(byteBuf);
-            LispAfiAddress privateEtrRlocAddress = new LispAfiAddress.AfiAddressReader().readFrom(byteBuf);
+            LispAfiAddress globalEtrRlocAddress = new AfiAddressReader().readFrom(byteBuf);
+            LispAfiAddress msRlocAddress = new AfiAddressReader().readFrom(byteBuf);
+            LispAfiAddress privateEtrRlocAddress = new AfiAddressReader().readFrom(byteBuf);
 
             List<LispAfiAddress> rtrRlocAddresses = Lists.newArrayList();
-            for (int i = 0; i < lcafAddress.getLength(); i++) {
-                rtrRlocAddresses.add(new LispAfiAddress.AfiAddressReader().readFrom(byteBuf));
+
+            while (byteBuf.readerIndex() - COMMON_HEADER_SIZE < lcafAddress.getLength()) {
+                rtrRlocAddresses.add(new AfiAddressReader().readFrom(byteBuf));
             }
 
             return new NatAddressBuilder()
-                    .withReserved1(lcafAddress.getReserved1())
-                    .withReserved2(lcafAddress.getReserved2())
-                    .withFlag(lcafAddress.getFlag())
-                    .withLength(lcafAddress.getLength())
-                    .withMsUdpPortNumber(msUdpPortNumber)
-                    .withEtrUdpPortNumber(etrUdpPortNumber)
-                    .withGlobalEtrRlocAddress(globalEtrRlocAddress)
-                    .withMsRlocAddress(msRlocAddress)
-                    .withPrivateEtrRlocAddress(privateEtrRlocAddress)
-                    .withRtrRlocAddresses(rtrRlocAddresses).build();
+                            .withMsUdpPortNumber(msUdpPortNumber)
+                            .withEtrUdpPortNumber(etrUdpPortNumber)
+                            .withGlobalEtrRlocAddress(globalEtrRlocAddress)
+                            .withMsRlocAddress(msRlocAddress)
+                            .withPrivateEtrRlocAddress(privateEtrRlocAddress)
+                            .withRtrRlocAddresses(rtrRlocAddresses)
+                            .build();
         }
     }
 
@@ -313,7 +313,8 @@ public final class LispNatLcafAddress extends LispLcafAddress {
         public void writeTo(ByteBuf byteBuf, LispNatLcafAddress address)
                 throws LispWriterException {
 
-            LispLcafAddress.serializeCommon(byteBuf, address);
+            int lcafIndex = byteBuf.writerIndex();
+            serializeCommon(byteBuf, address);
 
             byteBuf.writeShort(address.getMsUdpPortNumber());
             byteBuf.writeShort(address.getEtrUdpPortNumber());
@@ -328,6 +329,8 @@ public final class LispNatLcafAddress extends LispLcafAddress {
             for (int i = 0; i < rtrRlocAddresses.size(); i++) {
                 writer.writeTo(byteBuf, rtrRlocAddresses.get(i));
             }
+
+            updateLength(lcafIndex, byteBuf);
         }
     }
 }

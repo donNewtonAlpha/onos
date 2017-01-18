@@ -15,7 +15,7 @@
  */
 package org.onosproject.teyang.utils.topology;
 
-import org.onosproject.tetopology.management.api.node.TeStatus;
+import org.onosproject.tetopology.management.api.TeStatus;
 import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.types.rev20160705.ietftetypes.TeAdminStatus;
 import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.types.rev20160705.ietftetypes.TeOperStatus;
 import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.types.rev20160705.ietftetypes.teadminstatus.TeAdminStatusEnum;
@@ -38,6 +38,10 @@ public final class EnumConverter {
      *         found
      */
     public static TeStatus yang2TeSubsystemOpStatus(TeOperStatus opStatus) {
+        if (opStatus == null) {
+            return null;
+        }
+
         switch (opStatus.enumeration()) {
         case DOWN:
             return TeStatus.DOWN;
@@ -64,6 +68,10 @@ public final class EnumConverter {
      *         found
      */
     public static TeStatus yang2TeSubsystemAdminStatus(TeAdminStatus adminStatus) {
+        if (adminStatus == null) {
+            return TeStatus.UNKNOWN;
+        }
+
         switch (adminStatus.enumeration()) {
         case DOWN:
             return TeStatus.DOWN;
@@ -87,6 +95,10 @@ public final class EnumConverter {
      * @return the equivalent Enum from YANG TeAdminStatus or null if not found
      */
     public static TeAdminStatus teSubsystem2YangAdminStatus(TeStatus adminStatus) {
+        if (adminStatus == null) {
+            return null;
+        }
+
         switch (adminStatus) {
         case DOWN:
             return TeAdminStatus.of(TeAdminStatusEnum.DOWN);
@@ -112,6 +124,10 @@ public final class EnumConverter {
      * @return the equivalent Enum from YANG TeOperStatus or null if not found
      */
     public static TeOperStatus teSubsystem2YangOperStatus(TeStatus opStatus) {
+        if (opStatus == null) {
+            return null;
+        }
+
         switch (opStatus) {
         case DOWN:
             return TeOperStatus.of(TeOperStatusEnum.DOWN);

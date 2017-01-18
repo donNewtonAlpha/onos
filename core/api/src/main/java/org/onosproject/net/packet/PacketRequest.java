@@ -28,28 +28,28 @@ import java.util.Optional;
 public interface PacketRequest {
 
     /**
-     * Obtain the traffic selector.
+     * Obtains the traffic selector.
      *
      * @return a traffic selector
      */
     TrafficSelector selector();
 
     /**
-     * Obtain the priority.
+     * Obtains the priority.
      *
      * @return a PacketPriority
      */
     PacketPriority priority();
 
     /**
-     * Obtain the application id.
+     * Obtains the application id.
      *
      * @return an application id
      */
     ApplicationId appId();
 
     /**
-     * Obtain the node id.
+     * Obtains the node id.
      *
      * @return an node id
      */

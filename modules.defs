@@ -49,6 +49,9 @@ CORE = UTILS + API + [
     '//protocols/isis/api:onos-protocols-isis-api',
     '//protocols/isis/ctl:onos-protocols-isis-ctl',
     '//protocols/isis/isisio:onos-protocols-isis-isisio',
+    '//protocols/lisp/api:onos-protocols-lisp-api',
+    '//protocols/lisp/ctl:onos-protocols-lisp-ctl',
+    '//protocols/lisp/msg:onos-protocols-lisp-msg',
 
     '//drivers/utilities:onos-drivers-utilities',
 
@@ -64,6 +67,7 @@ CORE = UTILS + API + [
     '//providers/snmp/device:onos-providers-snmp-device',
     '//providers/isis/cfg:onos-providers-isis-cfg',
     '//providers/isis/topology:onos-providers-isis-topology',
+    '//providers/lisp/device:onos-providers-lisp-device',
 
     '//web/api:onos-rest',
     '//web/gui:onos-gui',
@@ -73,7 +77,8 @@ ONOS_DRIVERS = [
     # Drivers
     '//drivers/default:onos-drivers-default-oar',
     '//drivers/arista:onos-drivers-arista-oar',
-    '//drivers/bti:onos-drivers-bti-oar',
+    # TODO ONOS-5554 excluding from the build
+    #'//drivers/bti:onos-drivers-bti-oar',
     '//drivers/ciena:onos-drivers-ciena-oar',
     '//drivers/cisco:onos-drivers-cisco-oar',
     '//drivers/corsa:onos-drivers-corsa-oar',
@@ -82,6 +87,7 @@ ONOS_DRIVERS = [
     '//drivers/netconf:onos-drivers-netconf-oar',
     '//drivers/optical:onos-drivers-optical-oar',
     '//drivers/ovsdb:onos-drivers-ovsdb-oar',
+    '//drivers/juniper:onos-drivers-juniper-oar',
 ]
 
 ONOS_PROVIDERS = [
@@ -104,6 +110,8 @@ ONOS_PROVIDERS = [
     '//providers/rest:onos-providers-rest-oar',
     '//providers/isis:onos-providers-isis-oar',
     '//providers/snmp:onos-providers-snmp-oar',
+    '//providers/link:onos-providers-link-oar',
+    '//providers/lisp:onos-providers-lisp-oar',
 ]
 
 ONOS_APPS = [
@@ -137,6 +145,7 @@ ONOS_APPS = [
     '//apps/pcep-api:onos-apps-pcep-api-oar',
     '//apps/pim:onos-apps-pim-oar',
     '//apps/reactive-routing:onos-apps-reactive-routing-oar',
+    '//apps/roadm:onos-apps-roadm-oar',
     '//apps/sdnip:onos-apps-sdnip-oar',
     '//apps/test/demo:onos-apps-test-demo-oar',
     '//apps/test/distributed-primitives:onos-apps-test-distributed-primitives-oar',
@@ -156,6 +165,8 @@ ONOS_APPS = [
     '//apps/xosclient:onos-apps-xosclient-oar',
     '//apps/scalablegateway:onos-apps-scalablegateway-oar',
     '//apps/patchpanel:onos-apps-patchpanel-oar',
+    '//apps/castor:onos-apps-castor-oar',
+    '//apps/yms:onos-apps-yms-oar',
 ]
 
 APP_JARS = [

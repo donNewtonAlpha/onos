@@ -20,7 +20,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import java.util.List;
 
 import org.onosproject.tetopology.management.api.KeyId;
-import org.onosproject.tetopology.management.api.node.TeTerminationPoint;
 import org.onosproject.tetopology.management.api.node.TerminationPointKey;
 import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.network.rev20151208.ietfnetwork.NetworkId;
 import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.network.rev20151208.ietfnetwork.NodeId;
@@ -36,29 +35,21 @@ import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.network.topo
 import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.network.topology.rev20151208
                .ietfnetworktopology.networks.network.node.augmentedndnode.terminationpoint
                        .SupportingTerminationPoint;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708
-               .ietftetopology.networks.network.node.terminationpoint.augmentedntterminationpoint.DefaultTe;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708
-               .ietftetopology.networks.network.node.terminationpoint.augmentedntterminationpoint.Te.TeBuilder;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708
-               .ietftetopology.networks.network.node.terminationpoint.augmentedntterminationpoint.te.Config;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708
-               .ietftetopology.networks.network.node.terminationpoint.augmentedntterminationpoint.te.DefaultConfig;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708
-               .ietftetopology.networks.network.node.terminationpoint.augmentedntterminationpoint.te.DefaultState;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708
-               .ietftetopology.networks.network.node.terminationpoint.augmentedntterminationpoint.te.State;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708
-               .ietftetopology.networks.network.node.terminationpoint.augmentedntterminationpoint
-                       .te.config.DefaultInterfaceSwitchingCapability;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708
-               .ietftetopology.networks.network.node.terminationpoint.augmentedntterminationpoint
-                       .te.config.InterfaceSwitchingCapability;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.types.rev20160705.ietftetypes.TeTpId;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology.interfaceswitchingcapabilitylist.DefaultInterfaceSwitchingCapability;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology.interfaceswitchingcapabilitylist.InterfaceSwitchingCapability;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology.interfaceswitchingcapabilitylist.interfaceswitchingcapability.DefaultMaxLspBandwidth;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology.interfaceswitchingcapabilitylist.interfaceswitchingcapability.MaxLspBandwidth;
 import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708
                .ietftetopology.networks.network.node.terminationpoint.AugmentedNtTerminationPoint;
 import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708
                .ietftetopology.networks.network.node.terminationpoint.DefaultAugmentedNtTerminationPoint;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology.teterminationpointaugment.DefaultTe;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology.teterminationpointaugment.DefaultTe.TeBuilder;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology.teterminationpointaugment.te.Config;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology.teterminationpointaugment.te.DefaultConfig;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology.teterminationpointaugment.te.DefaultState;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology.teterminationpointaugment.te.State;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.types.rev20160705.ietftetypes.TeTpId;
 
 import com.google.common.collect.Lists;
 
@@ -67,8 +58,10 @@ import com.google.common.collect.Lists;
  */
 public final class TerminationPointConverter {
 
-    private static final String E_NULL_TE_SUBSYSTEM_TP = "TeSubsystem terminationPoint object cannot be null";
-    private static final String E_NULL_YANG_TP = "YANG terminationPoint object cannot be null";
+    private static final String E_NULL_TE_SUBSYSTEM_TP =
+            "TeSubsystem terminationPoint object cannot be null";
+    private static final String E_NULL_YANG_TP =
+            "YANG terminationPoint object cannot be null";
 
     // no instantiation
     private TerminationPointConverter() {
@@ -77,22 +70,23 @@ public final class TerminationPointConverter {
     /**
      * TerminationPoint object translation from TE Topology subsystem to YANG.
      *
-     * @param teSubsystem TE Topology subsystem termination point object
-     * @return TerminationPoint YANG object
+     * @param teSubsystem TE Topology subsystem termination point
+     * @return Termination point in YANG Java data structure
      */
-    public static TerminationPoint teSubsystem2YangTerminationPoint(
-                                       org.onosproject.tetopology.management.api.node.TerminationPoint teSubsystem) {
+    public static TerminationPoint teSubsystem2YangTerminationPoint(org.onosproject.tetopology.management.api.node.
+                                                                    TerminationPoint teSubsystem) {
         checkNotNull(teSubsystem, E_NULL_TE_SUBSYSTEM_TP);
 
-        TpId tpId = TpId.fromString(teSubsystem.id().toString());
+        TpId tpId = TpId.fromString(teSubsystem.tpId().toString());
+//        TpId tpId = TpId.fromString("0");
         TerminationPoint.TerminationPointBuilder builder =
                 new DefaultTerminationPoint.TerminationPointBuilder().tpId(tpId);
 
-        if (teSubsystem.getSupportingTpIds() != null) {
+        if (teSubsystem.supportingTpIds() != null) {
             List<SupportingTerminationPoint> tps = Lists.newArrayList();
             SupportingTerminationPoint.SupportingTerminationPointBuilder
                     spTpBuilder = DefaultSupportingTerminationPoint.builder();
-            for (TerminationPointKey tpKey : teSubsystem.getSupportingTpIds()) {
+            for (TerminationPointKey tpKey : teSubsystem.supportingTpIds()) {
                 tps.add(spTpBuilder.networkRef(NetworkId.fromString(tpKey.networkId().toString()))
                                    .nodeRef(NodeId.fromString(tpKey.nodeId().toString()))
                                    .tpRef(TpId.fromString(tpKey.tpId().toString()))
@@ -101,22 +95,19 @@ public final class TerminationPointConverter {
             builder = builder.supportingTerminationPoint(tps);
         }
 
-        if (teSubsystem.getTe() != null) {
+        if (teSubsystem.teTpId() != null) {
             AugmentedNtTerminationPoint.AugmentedNtTerminationPointBuilder
                     tpAugmentBuilder = DefaultAugmentedNtTerminationPoint.builder();
 
-            TeTerminationPoint teSubsystemTe = teSubsystem.getTe();
             TeBuilder yangTeBuilder = DefaultTe.builder();
 
-            if (teSubsystemTe.teTpId() != null) {
-                yangTeBuilder = yangTeBuilder.teTpId(TeTpId.fromString(teSubsystemTe.teTpId().toString()));
-            }
+            yangTeBuilder = yangTeBuilder.teTpId(TeTpId.fromString((String.valueOf(teSubsystem.teTpId()))));
 
-            Config yConfig = teSubsystem2YangTeAugConfig(teSubsystemTe);
-            yangTeBuilder = yangTeBuilder.config(yConfig);
-
-            State yState = teSubsystem2YangTeAugState(teSubsystemTe);
-            yangTeBuilder = yangTeBuilder.state(yState);
+//            Config yConfig = teSubsystem2YangTeAugConfig(teSubsystem);
+//            yangTeBuilder = yangTeBuilder.config(yConfig);
+//
+//            State yState = teSubsystem2YangTeAugState(teSubsystem);
+//            yangTeBuilder = yangTeBuilder.state(yState);
 
             tpAugmentBuilder = tpAugmentBuilder.te(yangTeBuilder.build());
             builder.addYangAugmentedInfo(tpAugmentBuilder.build(), AugmentedNtTerminationPoint.class);
@@ -125,58 +116,54 @@ public final class TerminationPointConverter {
         return builder.build();
     }
 
-    private static State teSubsystem2YangTeAugState(TeTerminationPoint teSubsystemTe) {
+    private static State teSubsystem2YangTeAugState(org.onosproject.tetopology.management.api.node.
+            TerminationPoint teSubsystemTe) {
         State.StateBuilder yangStateBuilder = DefaultState.builder();
-        yangStateBuilder.interLayerLockId(teSubsystemTe.getInterLayerLockId());
+        // FIXME: interLayerLocks is a list in core but not in yang
+//        yangStateBuilder = yangStateBuilder.interLayerLockId(teLink.interLayerLocks().get(0));
 
-        if (teSubsystemTe.interfaceSwitchingCapabilities() != null) {
-            for (org.onosproject.tetopology.management.api.node.InterfaceSwitchingCapability teIsc :
-                    teSubsystemTe.interfaceSwitchingCapabilities()) {
-                org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708
-                    .ietftetopology.networks.network.node.terminationpoint.augmentedntterminationpoint
-                        .te.state.InterfaceSwitchingCapability.InterfaceSwitchingCapabilityBuilder
-                isc = org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology
-                          .rev20160708.ietftetopology.networks.network.node.terminationpoint
-                              .augmentedntterminationpoint.te.state.DefaultInterfaceSwitchingCapability.builder();
-                // FIXME: teIsc at this moment is empty, therefore we cannot
-                // really add its attributes to isc
-                yangStateBuilder.addToInterfaceSwitchingCapability(isc.build());
-            }
-        }
         return yangStateBuilder.build();
     }
 
-    private static Config teSubsystem2YangTeAugConfig(TeTerminationPoint teSubsystemTe) {
+    private static Config teSubsystem2YangTeAugConfig(org.onosproject.tetopology.management.api.node.
+                                                      TerminationPoint teSubsystemTe) {
         Config.ConfigBuilder yangConfigBuilder = DefaultConfig.builder();
-        yangConfigBuilder = yangConfigBuilder.interLayerLockId(teSubsystemTe.getInterLayerLockId());
-        if (teSubsystemTe.interfaceSwitchingCapabilities() != null) {
-            for (org.onosproject.tetopology.management.api.node.InterfaceSwitchingCapability teIsc :
-                    teSubsystemTe.interfaceSwitchingCapabilities()) {
-                InterfaceSwitchingCapability.InterfaceSwitchingCapabilityBuilder
-                    isc = DefaultInterfaceSwitchingCapability.builder();
-                // FIXME: teIsc at this moment is empty, therefore we cannot
-                // really add its attributes to isc
-                yangConfigBuilder = yangConfigBuilder.addToInterfaceSwitchingCapability(isc.build());
-            }
-        }
+        //FIXME: interLayerLocks is a list in core but not in yang
+        // yangConfigBuilder =
+        // yangConfigBuilder.interLayerLockId(teLink.interLayerLocks().get(0));
+
+        InterfaceSwitchingCapability.InterfaceSwitchingCapabilityBuilder isc =
+                DefaultInterfaceSwitchingCapability.builder();
+
+        MaxLspBandwidth.MaxLspBandwidthBuilder maxlspBW = DefaultMaxLspBandwidth
+                .builder();
+//        for (float f : teLink.maxAvialLspBandwidth()) {
+//            // is converting from float to long ok?
+//            maxlspBW = maxlspBW.bandwidth(BigDecimal.valueOf((long) f));
+//            isc = isc.addToMaxLspBandwidth(maxlspBW.build());
+//        }
+
+        yangConfigBuilder = yangConfigBuilder.addToInterfaceSwitchingCapability(isc.build());
+
         return yangConfigBuilder.build();
     }
 
     /**
      * TerminationPoint object translation from YANG to TE Topology subsystem.
      *
-     * @param yangTp TerminationPoint YANG object
-     * @return TerminationPoint TE Topology subsystem termination point object
+     * @param yangTp Termination point in YANG Java data structure
+     * @return TerminationPoint TE Topology subsystem termination point
      */
     public static org.onosproject.tetopology.management.api.node.TerminationPoint
                       yang2teSubsystemTerminationPoint(TerminationPoint yangTp) {
         checkNotNull(yangTp, E_NULL_YANG_TP);
 
-        org.onosproject.tetopology.management.api.node.DefaultTerminationPoint tp = new org.onosproject.tetopology
-                .management.api.node.DefaultTerminationPoint(KeyId.keyId(yangTp.tpId().uri().string()));
+        org.onosproject.tetopology.management.api.node.DefaultTerminationPoint tp = null;
+        List<org.onosproject.tetopology.management.api.node.TerminationPointKey> spTps = null;
+        KeyId teTpId = null;
 
         if (yangTp.supportingTerminationPoint() != null) {
-            List<org.onosproject.tetopology.management.api.node.TerminationPointKey> spTps = Lists.newArrayList();
+            spTps = Lists.newArrayList();
             for (SupportingTerminationPoint yangSptp : yangTp.supportingTerminationPoint()) {
                 org.onosproject.tetopology.management.api.node.TerminationPointKey tpKey =
                         new org.onosproject.tetopology.management.api.node.TerminationPointKey(
@@ -185,40 +172,21 @@ public final class TerminationPointConverter {
                                 KeyId.keyId(yangSptp.tpRef().uri().string()));
                 spTps.add(tpKey);
             }
-            tp.setSupportingTpIds(spTps);
         }
 
         if (yangTp.yangAugmentedInfoMap() != null && !yangTp.yangAugmentedInfoMap().isEmpty()) {
             AugmentedNtTerminationPoint yangTpAugment =
                     (AugmentedNtTerminationPoint) yangTp.yangAugmentedInfo(AugmentedNtTerminationPoint.class);
             if (yangTpAugment.te() != null && yangTpAugment.te().teTpId() != null) {
-                KeyId teTpId = KeyId.keyId(yangTpAugment.te().teTpId().toString());
-                if (yangTpAugment.te().config() != null) {
-                    long interLayerLockId = yangTpAugment.te().config().interLayerLockId();
-                    List<org.onosproject.tetopology.management.api.node.InterfaceSwitchingCapability>
-                            teIscList = Lists.newArrayList();
-                    // FIXME: the following line is for config. State also has
-                    // similar stuff, but Te Subsystem does not diffrentiate
-                    // between the two
-                    if (yangTpAugment.te().config().interfaceSwitchingCapability() != null) {
-                        for (InterfaceSwitchingCapability iscConfigYang :
-                                yangTpAugment.te().config().interfaceSwitchingCapability()) {
-                            org.onosproject.tetopology.management.api.node.InterfaceSwitchingCapability iscTe =
-                                    new org.onosproject.tetopology.management.api.node.InterfaceSwitchingCapability();
-                            // FIXME: at this moment, iscTe does not have any
-                            // attributes. Therefore, I cannot feed it with
-                            // attributes of iscConfigYang
-                            teIscList.add(iscTe);
-                        }
-                    }
-
-                    TeTerminationPoint teSubsystemTp = new TeTerminationPoint(teTpId,
-                                                                              teIscList,
-                                                                              interLayerLockId);
-                    tp.setTe(teSubsystemTp);
-                }
+                teTpId = KeyId.keyId(yangTpAugment.te().teTpId().toString());
             }
         }
+
+        tp = new org.onosproject.tetopology.management.api.node
+                .DefaultTerminationPoint(KeyId.keyId(yangTp.tpId().uri().string()),
+                                         spTps,
+                                         teTpId == null ? null : Long.valueOf(teTpId.toString()));
+
         return tp;
     }
 

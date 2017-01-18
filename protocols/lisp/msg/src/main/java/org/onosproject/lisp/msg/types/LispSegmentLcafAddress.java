@@ -19,6 +19,7 @@ import io.netty.buffer.ByteBuf;
 import org.onosproject.lisp.msg.exceptions.LispParseError;
 import org.onosproject.lisp.msg.exceptions.LispReaderException;
 import org.onosproject.lisp.msg.exceptions.LispWriterException;
+import org.onosproject.lisp.msg.types.LispAfiAddress.AfiAddressReader;
 
 import java.util.Objects;
 
@@ -28,8 +29,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Instance ID type LCAF address class.
  * <p>
- * Instance ID type is defined in draft-ietf-lisp-lcaf-13
- * https://tools.ietf.org/html/draft-ietf-lisp-lcaf-13#page-7
+ * Instance ID type is defined in draft-ietf-lisp-lcaf-22
+ * https://tools.ietf.org/html/draft-ietf-lisp-lcaf-22#page-7
  *
  * <pre>
  * {@literal
@@ -38,7 +39,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  * |           AFI = 16387         |     Rsvd1     |     Flags     |
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |   Type = 2    | IID mask-len  |             4 + n             |
+ * |   Type = 2    | IID mask-len  |            Length             |
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  * |                         Instance ID                           |
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -58,7 +59,8 @@ public final class LispSegmentLcafAddress extends LispLcafAddress {
      * @param instanceId   instance id
      * @param address      address
      */
-    private LispSegmentLcafAddress(byte idMaskLength, int instanceId, LispAfiAddress address) {
+    private LispSegmentLcafAddress(byte idMaskLength, int instanceId,
+                                   LispAfiAddress address) {
         super(LispCanonicalAddressFormatEnum.SEGMENT, idMaskLength);
         this.address = address;
         this.instanceId = instanceId;
@@ -74,9 +76,11 @@ public final class LispSegmentLcafAddress extends LispLcafAddress {
      * @param instanceId   instance id
      * @param address      address
      */
-    private LispSegmentLcafAddress(byte reserved1, byte idMaskLength, byte flag, short length,
-                                   int instanceId, LispAfiAddress address) {
-        super(LispCanonicalAddressFormatEnum.SEGMENT, reserved1, idMaskLength, flag, length);
+    private LispSegmentLcafAddress(byte reserved1, byte idMaskLength, byte flag,
+                                   short length, int instanceId,
+                                   LispAfiAddress address) {
+        super(LispCanonicalAddressFormatEnum.SEGMENT, reserved1,
+                                                    idMaskLength, flag, length);
         this.address = address;
         this.instanceId = instanceId;
     }
@@ -205,12 +209,9 @@ public final class LispSegmentLcafAddress extends LispLcafAddress {
             byte idMaskLength = lcafAddress.getReserved2();
 
             int instanceId = (int) byteBuf.readUnsignedInt();
-            LispAfiAddress address = new LispAfiAddress.AfiAddressReader().readFrom(byteBuf);
+            LispAfiAddress address = new AfiAddressReader().readFrom(byteBuf);
 
             return new SegmentAddressBuilder()
-                    .withReserved1(lcafAddress.getReserved1())
-                    .withFlag(lcafAddress.getFlag())
-                    .withLength(lcafAddress.getLength())
                     .withIdMaskLength(idMaskLength)
                     .withInstanceId(instanceId)
                     .withAddress(address)
@@ -228,11 +229,14 @@ public final class LispSegmentLcafAddress extends LispLcafAddress {
         public void writeTo(ByteBuf byteBuf, LispSegmentLcafAddress address)
                 throws LispWriterException {
 
+            int lcafIndex = byteBuf.writerIndex();
             LispLcafAddress.serializeCommon(byteBuf, address);
 
             byteBuf.writeInt(address.getInstanceId());
 
             new LispAfiAddress.AfiAddressWriter().writeTo(byteBuf, address.getAddress());
+
+            LispLcafAddress.updateLength(lcafIndex, byteBuf);
         }
     }
 }

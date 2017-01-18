@@ -30,8 +30,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Application data type LCAF address class.
  * <p>
- * Application data type is defined in draft-ietf-lisp-lcaf-13
- * https://tools.ietf.org/html/draft-ietf-lisp-lcaf-13#page-26
+ * Application data type is defined in draft-ietf-lisp-lcaf-22
+ * https://tools.ietf.org/html/draft-ietf-lisp-lcaf-22#page-27
  *
  * <pre>
  * {@literal
@@ -40,7 +40,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  * |           AFI = 16387         |     Rsvd1     |     Flags     |
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |   Type = 4    |     Rsvd2     |            12 + n             |
+ * |   Type = 4    |     Rsvd2     |            Length             |
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  * |       IP TOS, IPv6 TC, or Flow Label          |    Protocol   |
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -327,7 +327,7 @@ public final class LispAppDataLcafAddress extends LispLcafAddress {
         @Override
         public LispAppDataLcafAddress readFrom(ByteBuf byteBuf) throws LispParseError, LispReaderException {
 
-            LispLcafAddress lcafAddress = LispLcafAddress.deserializeCommon(byteBuf);
+            LispLcafAddress.deserializeCommon(byteBuf);
 
             byte[] ipTosByte = new byte[3];
             byteBuf.readBytes(ipTosByte);
@@ -342,10 +342,6 @@ public final class LispAppDataLcafAddress extends LispLcafAddress {
             LispAfiAddress address = new LispAfiAddress.AfiAddressReader().readFrom(byteBuf);
 
             return new AppDataAddressBuilder()
-                    .withReserved1(lcafAddress.getReserved1())
-                    .withReserved2(lcafAddress.getReserved2())
-                    .withFlag(lcafAddress.getFlag())
-                    .withLength(lcafAddress.getLength())
                     .withProtocol(protocol)
                     .withIpTos(ipTos)
                     .withLocalPortLow(localPortLow)
@@ -381,6 +377,7 @@ public final class LispAppDataLcafAddress extends LispLcafAddress {
         public void writeTo(ByteBuf byteBuf, LispAppDataLcafAddress address)
                 throws LispWriterException {
 
+            int lcafIndex = byteBuf.writerIndex();
             LispLcafAddress.serializeCommon(byteBuf, address);
 
             byte[] tos = getPartialByteArray(address.getIpTos());
@@ -393,6 +390,8 @@ public final class LispAppDataLcafAddress extends LispLcafAddress {
 
             AfiAddressWriter writer = new LispAfiAddress.AfiAddressWriter();
             writer.writeTo(byteBuf, address.getAddress());
+
+            LispLcafAddress.updateLength(lcafIndex, byteBuf);
         }
 
         /**

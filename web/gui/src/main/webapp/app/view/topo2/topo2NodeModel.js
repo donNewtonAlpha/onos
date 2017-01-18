@@ -76,6 +76,34 @@
                         'mouseout': 'mouseoutHandler'
                     };
                 },
+                select: function () {
+                    var ev = d3.event;
+
+                    // TODO: if single selection clear selected devices, hosts, sub-regions
+
+                    if (ev.shiftKey) {
+                        // TODO: Multi-Select Details Panel
+                        this.set('selected', true);
+                    } else {
+
+                        var s = Boolean(this.get('selected'));
+                        // Clear all selected Items
+                        _.each(this.collection.models, function (m) {
+                            m.set('selected', false);
+                        });
+
+                        this.set('selected', !s);
+                    }
+
+                    var selected = this.collection.filter(function (m) {
+                        return m.get('selected');
+                    });
+
+                    return selected;
+                },
+                deselect: function () {
+                    this.set('selected', false);
+                },
                 createNode: function () {
                     this.set('svgClass', this.svgClassName());
                     t2nps.positionNode(this);
@@ -97,12 +125,15 @@
                 icon: function () {
                     return 'unknown';
                 },
+                labelIndex: function () {
+                    return ps.get('dlbls');
+                },
                 label: function () {
                     var props = this.get('props'),
                         id = this.get('id'),
                         friendlyName = props && props.name ? props.name : id,
                         labels = ['', friendlyName || id, id],
-                        nli = ps.get('dlbls'),
+                        nli = this.labelIndex(),
                         idx = (nli < labels.length) ? nli : 0;
 
                     return labels[idx];
@@ -225,7 +256,8 @@
                     glyph.attr(this.iconBox(devIconDim, 0));
                     glyph.style('fill', 'white');
 
-                    node.attr('transform', sus.translate(-halfDevIcon, -halfDevIcon));
+                    node.attr('transform',
+                        sus.translate(-halfDevIcon, -halfDevIcon));
 
                     if (this.events) {
                         this.setUpEvents();

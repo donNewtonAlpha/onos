@@ -117,20 +117,24 @@
             minDist = proximity * 2;
 
             network.links.forEach(function (d) {
+                var line = d.position,
+                    point,
+                    hit,
+                    dist;
+
                 if (!api.showHosts() && d.type() === 'hostLink') {
                     return; // skip hidden host links
                 }
 
-                var line = d.position,
-                    point = pdrop(line, mouse),
-                    hit = lineHit(line, point, mouse),
-                    dist;
-
-                if (hit) {
-                    dist = mdist(point, mouse);
-                    if (dist < minDist) {
-                        minDist = dist;
-                        nearest = d;
+                if (line) {
+                    point = pdrop(line, mouse);
+                    hit = lineHit(line, point, mouse);
+                    if (hit) {
+                        dist = mdist(point, mouse);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            nearest = d;
+                        }
                     }
                 }
             });
@@ -195,9 +199,9 @@
         var offset = 32,
             pos = link.position,
             nearX = src ? pos.x1 : pos.x2,
-            nearY = src ? pos.y2 : pos.y1,
+            nearY = src ? pos.y1 : pos.y2,
             farX = src ? pos.x2 : pos.x1,
-            farY = src ? pos.y1 : pos.y2;
+            farY = src ? pos.y2 : pos.y1;
 
         function dist(x, y) { return Math.sqrt(x*x + y*y); }
 
@@ -222,13 +226,12 @@
 
          tss.deselectAll();
 
-         if (!ldata.el.classed('selected')) {
-            selLink(ldata);
-            return;
-         }
-
-         if (ldata.el.classed('selected')) {
-            unselLink(ldata);
+         if (ldata) {
+            if (ldata.el.classed('selected')) {
+                unselLink(ldata);
+            } else {
+                selLink(ldata);
+            }
          }
     }
 

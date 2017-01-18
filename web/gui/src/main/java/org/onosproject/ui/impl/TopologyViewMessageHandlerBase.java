@@ -44,14 +44,10 @@ import org.onosproject.net.Host;
 import org.onosproject.net.HostId;
 import org.onosproject.net.HostLocation;
 import org.onosproject.net.Link;
-import org.onosproject.net.PortNumber;
 import org.onosproject.net.device.DeviceEvent;
 import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.flow.FlowEntry;
 import org.onosproject.net.flow.FlowRuleService;
-import org.onosproject.net.flow.TrafficTreatment;
-import org.onosproject.net.flow.instructions.Instruction;
-import org.onosproject.net.flow.instructions.Instructions.OutputInstruction;
 import org.onosproject.net.host.HostEvent;
 import org.onosproject.net.host.HostService;
 import org.onosproject.net.intent.IntentService;
@@ -69,13 +65,9 @@ import org.onosproject.ui.topo.PropertyPanel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -83,7 +75,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
-import static org.onosproject.net.DefaultEdgeLink.createEdgeLink;
 import static org.onosproject.net.PortNumber.portNumber;
 import static org.onosproject.ui.topo.TopoConstants.CoreButtons;
 import static org.onosproject.ui.topo.TopoConstants.Properties;
@@ -253,9 +244,13 @@ public abstract class TopologyViewMessageHandlerBase extends UiMessageHandler {
     // Produces a device event message to the client.
     protected ObjectNode deviceMessage(DeviceEvent event) {
         Device device = event.subject();
+        String uiType = device.annotations().value(AnnotationKeys.UI_TYPE);
+        String devType = uiType != null ? uiType :
+                device.type().toString().toLowerCase();
+
         ObjectNode payload = objectNode()
                 .put("id", device.id().toString())
-                .put("type", device.type().toString().toLowerCase())
+                .put("type", devType)
                 .put("online", deviceService.isAvailable(device.id()))
                 .put("master", master(device.id()));
 
@@ -297,7 +292,7 @@ public abstract class TopologyViewMessageHandlerBase extends UiMessageHandler {
     protected ObjectNode hostMessage(HostEvent event) {
         Host host = event.subject();
         Host prevHost = event.prevSubject();
-        String hostType = host.annotations().value(AnnotationKeys.TYPE);
+        String hostType = host.annotations().value(AnnotationKeys.UI_TYPE);
 
         ObjectNode payload = objectNode()
                 .put("id", host.id().toString())
@@ -391,7 +386,7 @@ public abstract class TopologyViewMessageHandlerBase extends UiMessageHandler {
     // Create models of the data to return, that overlays can adjust / augment
 
     // Returns property panel model for summary response.
-    protected PropertyPanel summmaryMessage(long sid) {
+    protected PropertyPanel summmaryMessage() {
         Topology topology = topologyService.currentTopology();
 
         return new PropertyPanel("ONOS Summary", "node")
@@ -408,7 +403,7 @@ public abstract class TopologyViewMessageHandlerBase extends UiMessageHandler {
     }
 
     // Returns property panel model for device details response.
-    protected PropertyPanel deviceDetails(DeviceId deviceId, long sid) {
+    protected PropertyPanel deviceDetails(DeviceId deviceId) {
         Device device = deviceService.getDevice(deviceId);
         Annotations annot = device.annotations();
         String name = annot.value(AnnotationKeys.NAME);
@@ -479,49 +474,8 @@ public abstract class TopologyViewMessageHandlerBase extends UiMessageHandler {
         return count;
     }
 
-    // Counts all flow entries that egress on the links of the given device.
-    private Map<Link, Integer> getLinkFlowCounts(DeviceId deviceId) {
-        // get the flows for the device
-        List<FlowEntry> entries = new ArrayList<>();
-        for (FlowEntry flowEntry : flowService.getFlowEntries(deviceId)) {
-            entries.add(flowEntry);
-        }
-
-        // get egress links from device, and include edge links
-        Set<Link> links = new HashSet<>(linkService.getDeviceEgressLinks(deviceId));
-        Set<Host> hosts = hostService.getConnectedHosts(deviceId);
-        if (hosts != null) {
-            for (Host host : hosts) {
-                links.add(createEdgeLink(host, false));
-            }
-        }
-
-        // compile flow counts per link
-        Map<Link, Integer> counts = new HashMap<>();
-        for (Link link : links) {
-            counts.put(link, getEgressFlows(link, entries));
-        }
-        return counts;
-    }
-
-    // Counts all entries that egress on the link source port.
-    private int getEgressFlows(Link link, List<FlowEntry> entries) {
-        int count = 0;
-        PortNumber out = link.src().port();
-        for (FlowEntry entry : entries) {
-            TrafficTreatment treatment = entry.treatment();
-            for (Instruction instruction : treatment.allInstructions()) {
-                if (instruction.type() == Instruction.Type.OUTPUT &&
-                        ((OutputInstruction) instruction).port().equals(out)) {
-                    count++;
-                }
-            }
-        }
-        return count;
-    }
-
     // Returns host details response.
-    protected PropertyPanel hostDetails(HostId hostId, long sid) {
+    protected PropertyPanel hostDetails(HostId hostId) {
         Host host = hostService.getHost(hostId);
         Annotations annot = host.annotations();
         String type = annot.value(AnnotationKeys.TYPE);

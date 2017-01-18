@@ -27,21 +27,22 @@
         wss;
 
     var t2is, t2rs, t2ls, t2vs, t2bcs;
-    var svg, forceG, uplink, dim, opts;
+    var svg, forceG, uplink, dim, opts, zoomer;
 
     // D3 Selections
     var node;
 
     // ========================== Helper Functions
 
-    function init(_svg_, _forceG_, _uplink_, _dim_, _opts_) {
+    function init(_svg_, _forceG_, _uplink_, _dim_, _zoomer_, _opts_) {
         svg = _svg_;
         forceG = _forceG_;
         uplink = _uplink_;
         dim = _dim_;
         opts = _opts_;
+        zoomer = _zoomer_;
 
-        t2ls.init(svg, forceG, uplink, dim, opts);
+        t2ls.init(svg, forceG, uplink, dim, zoomer, opts);
     }
 
     function destroy() {
@@ -143,6 +144,14 @@
 
     function startDone(data) {
         $log.debug('>> topo2StartDone event:', data);
+    }
+
+    function modelEvent(data) {
+        $log.debug('>> topo2UiModelEvent event:', data);
+        // TODO: Interpret the event and update our topo model state (if needed)
+        // To Decide: Can we assume that the server will only send events
+        //    related to objects that we are currently showing?
+        //    (e.g. filtered by subregion contents?)
     }
 
     function showMastership(masterId) {
@@ -262,6 +271,8 @@
                 topo2CurrentLayout: currentLayout,
                 topo2CurrentRegion: currentRegion,
                 topo2StartDone: startDone,
+
+                topo2UiModelEvent: modelEvent,
 
                 showMastership: showMastership,
                 topo2PeerRegions: topo2PeerRegions,

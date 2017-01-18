@@ -170,8 +170,9 @@ public class IntentCleanup implements Runnable, IntentListener {
 
     private void resubmitCorrupt(IntentData intentData, boolean checkThreshold) {
         if (checkThreshold && intentData.errorCount() >= retryThreshold) {
+            //FIXME trace or debug statement?
             return; // threshold met or exceeded
-        }
+        } // FIXME should we backoff here?
 
         switch (intentData.request()) {
             case INSTALL_REQ:
@@ -188,15 +189,12 @@ public class IntentCleanup implements Runnable, IntentListener {
     }
 
     private void resubmitPendingRequest(IntentData intentData) {
+        // FIXME should we back off here?
         switch (intentData.request()) {
             case INSTALL_REQ:
-                service.submit(intentData.intent());
-                break;
             case WITHDRAW_REQ:
-                service.withdraw(intentData.intent());
-                break;
             case PURGE_REQ:
-                service.purge(intentData.intent());
+                service.addPending(intentData);
                 break;
             default:
                 log.warn("Failed to resubmit pending intent {} in state {} with request {}",
@@ -211,6 +209,13 @@ public class IntentCleanup implements Runnable, IntentListener {
      */
     private void cleanup() {
         int corruptCount = 0, failedCount = 0, stuckCount = 0, pendingCount = 0;
+
+        // Check the pending map first, because the check of the current map
+        // will add items to the pending map.
+        for (IntentData intentData : store.getPendingData(true, periodMs)) {
+            resubmitPendingRequest(intentData);
+            pendingCount++;
+        }
 
         for (IntentData intentData : store.getIntentData(true, periodMs)) {
             switch (intentData.state()) {
@@ -231,11 +236,6 @@ public class IntentCleanup implements Runnable, IntentListener {
                     //NOOP
                     break;
             }
-        }
-
-        for (IntentData intentData : store.getPendingData(true, periodMs)) {
-            resubmitPendingRequest(intentData);
-            stuckCount++;
         }
 
         if (corruptCount + failedCount + stuckCount + pendingCount > 0) {

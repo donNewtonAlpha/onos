@@ -23,11 +23,11 @@
     'use strict';
 
     // Injected Services
-    var $log, t2sr, t2ds, t2hs, t2ls;
+    var $log, t2sr, t2ds, t2hs, t2ls, t2zs, t2dps;
     var Model;
 
     // Internal
-    var region;
+    var region
 
     function init() {}
 
@@ -54,14 +54,51 @@
             link.createLink();
         });
 
+
+        // TODO: replace with an algorithm that computes appropriate transition
+        //        based on the location of the "region node" on the parent map
+
+        // TEMP Map Zoom
+        var regionPanZooms = {
+            "(root)": {
+                scale: 4.21,
+                translate: [-2066.3049871603093, -2130.190726668792]
+            },
+            c01: {
+                scale: 19.8855,
+                translate: [-10375.91165337411, -10862.217941271818]
+            },
+            c02: {
+                scale: 24.25,
+                translate: [-14169.70851936781, -15649.174761455488]
+            },
+            c03: {
+                scale: 22.72,
+                translate: [-14950.92246589002, -15390.955326616648]
+            },
+            c04: {
+                scale: 26.24,
+                translate: [-16664.006814209282, -16217.021478816077]
+            }
+        };
+
+
+        setTimeout(function () {
+            var regionPZ = regionPanZooms[region.get('id')];
+            t2zs.panAndZoom(regionPZ.translate, regionPZ.scale);
+        }, 10);
+
         $log.debug('Region: ', region);
     }
 
-    function findNodeById(id) {
+    function findNodeById(link, id) {
 
-        // Remove /{port} from id if needed
-        var regex = new RegExp('^[^/]*');
-        id = regex.exec(id)[0];
+
+        if (link.get('type') !== 'UiEdgeLink') {
+            // Remove /{port} from id if needed
+            var regex = new RegExp('^[^/]*');
+            id = regex.exec(id)[0];
+        }
 
         return region.get('devices').get(id) ||
             region.get('hosts').get(id) ||
@@ -90,13 +127,53 @@
         return (region) ? region.get('links').models : [];
     }
 
+    function deselectAllNodes() {
+
+        var selected = filterRegionNodes(function (node) {
+            return node.get('selected', true);
+        });
+
+        if (selected.length) {
+
+            selected.forEach(function (node) {
+                node.deselect();
+            });
+
+            t2dps().el.hide();
+            return true;
+        }
+
+        // TODO: close details panel
+
+        return false;
+    }
+
+    function deselectLink() {
+
+        var selected = _.filter(regionLinks(), function (link) {
+            return link.get('selected', true);
+        });
+
+        if (selected.length) {
+
+            selected.forEach(function (link) {
+                link.deselect();
+            });
+
+            t2dps().el.hide();
+            return true;
+        }
+
+        return false;
+    }
+
     angular.module('ovTopo2')
     .factory('Topo2RegionService',
         ['$log', 'Topo2Model',
         'Topo2SubRegionService', 'Topo2DeviceService',
-        'Topo2HostService', 'Topo2LinkService',
+        'Topo2HostService', 'Topo2LinkService', 'Topo2ZoomService', 'Topo2DetailsPanelService',
 
-        function (_$log_, _Model_, _t2sr_, _t2ds_, _t2hs_, _t2ls_) {
+        function (_$log_, _Model_, _t2sr_, _t2ds_, _t2hs_, _t2ls_, _t2zs_, _t2dps_) {
 
             $log = _$log_;
             Model = _Model_;
@@ -104,6 +181,8 @@
             t2ds = _t2ds_;
             t2hs = _t2hs_;
             t2ls = _t2ls_;
+            t2zs = _t2zs_;
+            t2dps = _t2dps_;
 
             return {
                 init: init,
@@ -112,6 +191,9 @@
                 regionNodes: regionNodes,
                 regionLinks: regionLinks,
                 filterRegionNodes: filterRegionNodes,
+
+                deselectAllNodes: deselectAllNodes,
+                deselectLink: deselectLink,
 
                 getSubRegions: t2sr.getSubRegions
             };

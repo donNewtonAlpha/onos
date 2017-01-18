@@ -23,17 +23,13 @@
     'use strict';
 
     // Injected Services
-    var Panel, gs, wss, flash, bs, fs, ns;
+    var Panel, gs, wss, flash, bs, fs, ns, listProps;
 
     // Internal State
     var detailsPanel;
 
     // configuration
     var id = 'topo2-p-detail',
-        className = 'topo-p',
-        panelOpts = {
-            width: 260          // summary and detail panel width
-        },
         handlerMap = {
             'showDetails': showDetails
         };
@@ -69,43 +65,7 @@
     function init() {
 
         bindHandlers();
-
-        var options = angular.extend({}, panelOpts, {
-            class: className
-        });
-
-        detailsPanel = new Panel(id, options);
-        detailsPanel.p.classed(className, true);
-    }
-
-    function addProp(tbody, label, value) {
-        var tr = tbody.append('tr'),
-            lab;
-        if (typeof label === 'string') {
-            lab = label.replace(/_/g, ' ');
-        } else {
-            lab = label;
-        }
-
-        function addCell(cls, txt) {
-            tr.append('td').attr('class', cls).html(txt);
-        }
-        addCell('label', lab + ' :');
-        addCell('value', value);
-    }
-
-    function addSep(tbody) {
-        tbody.append('tr').append('td').attr('colspan', 2).append('hr');
-    }
-
-    function listProps(tbody, data) {
-        data.propOrder.forEach(function (p) {
-            if (p === '-') {
-                addSep(tbody);
-            } else {
-                addProp(tbody, p, data.props[p]);
-            }
-        });
+        detailsPanel = Panel();
     }
 
     function addBtnFooter() {
@@ -136,9 +96,6 @@
                     cb: function () { ns.navTo(path, { devId: devId }); }
                 });
             }
-            // else if (btn = _getButtonDef(id, data)) {
-            //     addAction(btn);
-            // }
         });
     }
 
@@ -152,26 +109,46 @@
             title = detailsPanel.appendToHeader('h2')
                 .classed('clickable', true),
             table = detailsPanel.appendToBody('table'),
-            tbody = table.append('tbody'),
-            navFn;
+            tbody = table.append('tbody');
 
         gs.addGlyph(svg, (data.type || 'unknown'), 26);
         title.text(data.title);
-
-        // // only add navigation when displaying a device
-        // if (isDevice[data.type]) {
-        //     navFn = function () {
-        //         ns.navTo(devPath, { devId: data.id });
-        //     };
-        //
-        //     svg.on('click', navFn);
-        //     title.on('click', navFn);
-        // }
 
         listProps(tbody, data);
         addBtnFooter();
     }
 
+    function addProp(tbody, label, value) {
+        var tr = tbody.append('tr'),
+            lab;
+        if (typeof label === 'string') {
+            lab = label.replace(/_/g, ' ');
+        } else {
+            lab = label;
+        }
+
+        function addCell(cls, txt) {
+            tr.append('td').attr('class', cls).html(txt);
+        }
+        addCell('label', lab + ' :');
+        addCell('value', value);
+    }
+
+    function renderMulti(nodes) {
+        detailsPanel.emptyRegions();
+
+        var title = detailsPanel.appendToHeader('h3'),
+            table = detailsPanel.appendToBody('table'),
+            tbody = table.append('tbody');
+
+        title.text('Selected Items');
+        nodes.forEach(function (n, i) {
+            addProp(tbody, i + 1, n.get('id'));
+        });
+
+        // addBtnFooter();
+        show();
+    }
 
     function bindHandlers() {
         wss.bindHandlers(handlerMap);
@@ -191,17 +168,17 @@
     }
 
     function toggle() {
-        var on = detailsPanel.p.toggle(),
+        var on = detailsPanel.el.toggle(),
             verb = on ? 'Show' : 'Hide';
-        flash.flash(verb + ' Summary Panel');
+        flash.flash(verb + ' Details Panel');
     }
 
     function show() {
-        detailsPanel.p.show();
+        detailsPanel.el.show();
     }
 
     function hide() {
-        detailsPanel.p.hide();
+        detailsPanel.el.hide();
     }
 
     function destroy() {
@@ -211,9 +188,9 @@
 
     angular.module('ovTopo2')
     .factory('Topo2DeviceDetailsPanel',
-    ['Topo2PanelService', 'GlyphService', 'WebSocketService', 'FlashService',
-    'ButtonService', 'FnService', 'NavService',
-        function (_ps_, _gs_, _wss_, _flash_, _bs_, _fs_, _ns_) {
+    ['Topo2DetailsPanelService', 'GlyphService', 'WebSocketService', 'FlashService',
+    'ButtonService', 'FnService', 'NavService', 'ListService', 
+        function (_ps_, _gs_, _wss_, _flash_, _bs_, _fs_, _ns_, _listService_) {
 
             Panel = _ps_;
             gs = _gs_;
@@ -222,15 +199,18 @@
             bs = _bs_;
             fs = _fs_;
             ns = _ns_;
+            listProps = _listService_;
 
             return {
                 init: init,
                 updateDetails: updateDetails,
+                showMulti: renderMulti,
 
                 toggle: toggle,
                 show: show,
                 hide: hide,
-                destroy: destroy
+                destroy: destroy,
+                isVisible: function () { return detailsPanel.isVisible(); }
             };
         }
     ]);

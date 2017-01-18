@@ -35,7 +35,9 @@
         'bgvest',
         'sevlr',
         'ias',
-        'jweeidkpizn'
+        'jweeidkpizn',
+        'fmfv',
+        'hwdoc'
         // Add more beans...
     ];
 

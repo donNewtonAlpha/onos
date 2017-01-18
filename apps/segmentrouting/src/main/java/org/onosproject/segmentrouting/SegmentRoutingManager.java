@@ -15,6 +15,7 @@
  */
 package org.onosproject.segmentrouting;
 
+import com.google.common.collect.Maps;
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
@@ -32,6 +33,10 @@ import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.event.Event;
 import org.onosproject.incubator.net.config.basics.McastConfig;
+import org.onosproject.incubator.net.intf.InterfaceService;
+import org.onosproject.incubator.net.routing.RouteEvent;
+import org.onosproject.incubator.net.routing.RouteListener;
+import org.onosproject.incubator.net.routing.RouteService;
 import org.onosproject.mastership.MastershipService;
 import org.onosproject.net.Device;
 import org.onosproject.net.DeviceId;
@@ -46,7 +51,6 @@ import org.onosproject.net.config.basics.SubjectFactories;
 import org.onosproject.net.device.DeviceEvent;
 import org.onosproject.net.device.DeviceListener;
 import org.onosproject.net.device.DeviceService;
-import org.onosproject.net.flow.DefaultTrafficSelector;
 import org.onosproject.net.flow.TrafficSelector;
 import org.onosproject.net.flow.TrafficTreatment;
 import org.onosproject.net.flowobjective.FlowObjectiveService;
@@ -55,7 +59,6 @@ import org.onosproject.net.host.HostListener;
 import org.onosproject.net.mcast.McastEvent;
 import org.onosproject.net.mcast.McastListener;
 import org.onosproject.net.mcast.MulticastRouteService;
-import org.onosproject.net.packet.PacketPriority;
 import org.onosproject.net.topology.TopologyService;
 import org.onosproject.segmentrouting.config.DeviceConfigNotFoundException;
 import org.onosproject.segmentrouting.config.DeviceConfiguration;
@@ -92,7 +95,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -104,7 +106,6 @@ import java.util.concurrent.TimeUnit;
 import static com.google.common.base.Preconditions.checkState;
 import static org.onlab.util.Tools.groupedThreads;
 
-
 /**
  * Segment routing manager.
  */
@@ -112,71 +113,78 @@ import static org.onlab.util.Tools.groupedThreads;
 @Component(immediate = true)
 public class SegmentRoutingManager implements SegmentRoutingService {
 
-    private static Logger log = LoggerFactory
-            .getLogger(SegmentRoutingManager.class);
+    private static Logger log = LoggerFactory.getLogger(SegmentRoutingManager.class);
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected CoreService coreService;
+    private ComponentConfigService compCfgService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected PacketService packetService;
+    CoreService coreService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected HostService hostService;
+    PacketService packetService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected DeviceService deviceService;
+    HostService hostService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected FlowObjectiveService flowObjectiveService;
+    DeviceService deviceService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected LinkService linkService;
+    FlowObjectiveService flowObjectiveService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected MastershipService mastershipService;
+    LinkService linkService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected StorageService storageService;
+    MastershipService mastershipService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected NetworkConfigRegistry cfgService;
+    StorageService storageService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected ComponentConfigService compCfgService;
+    MulticastRouteService multicastRouteService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected MulticastRouteService multicastRouteService;
+    TopologyService topologyService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected TopologyService topologyService;
+    CordConfigService cordConfigService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected CordConfigService cordConfigService;
+    RouteService routeService;
 
-    protected ArpHandler arpHandler = null;
-    protected IcmpHandler icmpHandler = null;
-    protected IpHandler ipHandler = null;
-    protected RoutingRulePopulator routingRulePopulator = null;
-    protected ApplicationId appId;
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    public NetworkConfigRegistry cfgService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    public InterfaceService interfaceService;
+
+    ArpHandler arpHandler = null;
+    IcmpHandler icmpHandler = null;
+    IpHandler ipHandler = null;
+    RoutingRulePopulator routingRulePopulator = null;
+    public ApplicationId appId;
     protected DeviceConfiguration deviceConfiguration = null;
 
-    protected DefaultRoutingHandler defaultRoutingHandler = null;
+    DefaultRoutingHandler defaultRoutingHandler = null;
     private TunnelHandler tunnelHandler = null;
     private PolicyHandler policyHandler = null;
     private InternalPacketProcessor processor = null;
     private InternalLinkListener linkListener = null;
     private InternalDeviceListener deviceListener = null;
     private AppConfigHandler appCfgHandler = null;
-    protected XConnectHandler xConnectHandler = null;
+    XConnectHandler xConnectHandler = null;
     private McastHandler mcastHandler = null;
-    protected HostHandler hostHandler = null;
+    HostHandler hostHandler = null;
     private CordConfigHandler cordConfigHandler = null;
+    RouteHandler routeHandler = null;
     private InternalEventHandler eventHandler = new InternalEventHandler();
     private final InternalHostListener hostListener = new InternalHostListener();
     private final InternalConfigListener cfgListener = new InternalConfigListener(this);
     private final InternalMcastListener mcastListener = new InternalMcastListener();
     private final InternalCordConfigListener cordConfigListener = new InternalCordConfigListener();
+    private final InternalRouteEventListener routeListener = new InternalRouteEventListener();
 
     private ScheduledExecutorService executorService = Executors
             .newScheduledThreadPool(1, groupedThreads("SegmentRoutingManager", "event-%d", log));
@@ -255,7 +263,7 @@ public class SegmentRoutingManager implements SegmentRoutingService {
     /**
      * Segment Routing App ID.
      */
-    public static final String SR_APP_ID = "org.onosproject.segmentrouting";
+    public static final String APP_NAME = "org.onosproject.segmentrouting";
     /**
      * The starting value of per-subnet VLAN ID assignment.
      */
@@ -267,7 +275,7 @@ public class SegmentRoutingManager implements SegmentRoutingService {
 
     @Activate
     protected void activate() {
-        appId = coreService.registerApplication(SR_APP_ID);
+        appId = coreService.registerApplication(APP_NAME);
 
         log.debug("Creating EC map nsnextobjectivestore");
         EventuallyConsistentMapBuilder<NeighborSetNextObjectiveStoreKey, Integer>
@@ -322,9 +330,17 @@ public class SegmentRoutingManager implements SegmentRoutingService {
                 .build();
 
         compCfgService.preSetProperty("org.onosproject.net.group.impl.GroupManager",
-                "purgeOnDisconnection", "true");
+                                      "purgeOnDisconnection", "true");
         compCfgService.preSetProperty("org.onosproject.net.flow.impl.FlowRuleManager",
-                "purgeOnDisconnection", "true");
+                                      "purgeOnDisconnection", "true");
+        compCfgService.preSetProperty("org.onosproject.vrouter.Vrouter",
+                                      "fibInstalledEnabled", "false");
+        compCfgService.preSetProperty("org.onosproject.provider.host.impl.HostLocationProvider",
+                                      "requestInterceptsEnabled", "false");
+        compCfgService.preSetProperty("org.onosproject.incubator.net.neighbour.impl.NeighbourResolutionManager",
+                                      "requestInterceptsEnabled", "false");
+        compCfgService.preSetProperty("org.onosproject.dhcprelay.DhcpRelay",
+                                      "arpEnabled", "false");
 
         processor = new InternalPacketProcessor();
         linkListener = new InternalLinkListener();
@@ -334,6 +350,7 @@ public class SegmentRoutingManager implements SegmentRoutingService {
         mcastHandler = new McastHandler(this);
         hostHandler = new HostHandler(this);
         cordConfigHandler = new CordConfigHandler(this);
+        routeHandler = new RouteHandler(this);
 
         cfgService.addListener(cfgListener);
         cfgService.registerConfigFactory(deviceConfigFactory);
@@ -347,12 +364,9 @@ public class SegmentRoutingManager implements SegmentRoutingService {
         multicastRouteService.addListener(mcastListener);
         cordConfigService.addListener(cordConfigListener);
 
-        // Request ARP packet-in
-        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
-        selector.matchEthType(Ethernet.TYPE_ARP);
-        packetService.requestPackets(selector.build(), PacketPriority.CONTROL, appId, Optional.empty());
-
         cfgListener.configureNetwork();
+
+        routeService.addListener(routeListener);
 
         log.info("Started");
     }
@@ -379,18 +393,15 @@ public class SegmentRoutingManager implements SegmentRoutingService {
         cfgService.removeListener(cfgListener);
         cfgService.unregisterConfigFactory(deviceConfigFactory);
         cfgService.unregisterConfigFactory(appConfigFactory);
+        cfgService.unregisterConfigFactory(xConnectConfigFactory);
         cfgService.unregisterConfigFactory(mcastConfigFactory);
-
-        // Withdraw ARP packet-in
-        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
-        selector.matchEthType(Ethernet.TYPE_ARP);
-        packetService.cancelPackets(selector.build(), PacketPriority.CONTROL, appId, Optional.empty());
 
         packetService.removeProcessor(processor);
         linkService.removeListener(linkListener);
         deviceService.removeListener(deviceListener);
         multicastRouteService.removeListener(mcastListener);
         cordConfigService.removeListener(cordConfigListener);
+        routeService.removeListener(routeListener);
 
         processor = null;
         linkListener = null;
@@ -452,6 +463,26 @@ public class SegmentRoutingManager implements SegmentRoutingService {
             defaultRoutingHandler.populatePortAddressingRules(device.id());
         }
         defaultRoutingHandler.startPopulationProcess();
+    }
+
+    @Override
+    public Map<DeviceId, Set<Ip4Prefix>> getDeviceSubnetMap() {
+        Map<DeviceId, Set<Ip4Prefix>> deviceSubnetMap = Maps.newHashMap();
+        deviceService.getAvailableDevices().forEach(device -> {
+            deviceSubnetMap.put(device.id(), deviceConfiguration.getSubnets(device.id()));
+        });
+        return deviceSubnetMap;
+    }
+
+    /**
+     * Returns the MPLS-ECMP configuration.
+     *
+     * @return MPLS-ECMP value
+     */
+    public boolean getMplsEcmp() {
+        SegmentRoutingAppConfig segmentRoutingAppConfig = cfgService
+                .getConfig(this.appId, SegmentRoutingAppConfig.class);
+        return segmentRoutingAppConfig != null && segmentRoutingAppConfig.mplsEcmp();
     }
 
     /**
@@ -617,11 +648,13 @@ public class SegmentRoutingManager implements SegmentRoutingService {
                 arpHandler.processPacketIn(pkt);
             } else if (ethernet.getEtherType() == Ethernet.TYPE_IPV4) {
                 IPv4 ipPacket = (IPv4) ethernet.getPayload();
-                ipHandler.addToPacketBuffer(ipPacket);
+                // ipHandler.addToPacketBuffer(ipPacket);
                 if (ipPacket.getProtocol() == IPv4.PROTOCOL_ICMP) {
                     icmpHandler.processPacketIn(pkt);
                 } else {
-                    ipHandler.processPacketIn(pkt);
+                    // NOTE: We don't support IP learning at this moment so this
+                    //       is not necessary. Also it causes duplication of DHCP packets.
+                    // ipHandler.processPacketIn(pkt);
                 }
             }
         }
@@ -643,7 +676,8 @@ public class SegmentRoutingManager implements SegmentRoutingService {
         public void event(DeviceEvent event) {
             switch (event.type()) {
             case DEVICE_ADDED:
-            case PORT_REMOVED:
+            case PORT_UPDATED:
+            case PORT_ADDED:
             case DEVICE_UPDATED:
             case DEVICE_AVAILABILITY_CHANGED:
                 log.debug("Event {} received from Device Service", event.type());
@@ -716,20 +750,24 @@ public class SegmentRoutingManager implements SegmentRoutingService {
                                     event.type(), ((Device) event.subject()).id());
                             processDeviceRemoved((Device) event.subject());
                         }
-                    } else if (event.type() == DeviceEvent.Type.PORT_REMOVED) {
-                        processPortRemoved((Device) event.subject(),
-                                           ((DeviceEvent) event).port());
-                    } else if (event.type() == DeviceEvent.Type.PORT_ADDED ||
-                            event.type() == DeviceEvent.Type.PORT_UPDATED) {
-                        log.info("** PORT ADDED OR UPDATED {}/{} -> {}",
+                    } else if (event.type() == DeviceEvent.Type.PORT_ADDED) {
+                        // typically these calls come when device is added first time
+                        // so port filtering rules are handled at the device_added event.
+                        // port added calls represent all ports on the device,
+                        // enabled or not.
+                        log.debug("** PORT ADDED {}/{} -> {}",
+                                  ((DeviceEvent) event).subject().id(),
+                                  ((DeviceEvent) event).port().number(),
+                                  event.type());
+                    } else if (event.type() == DeviceEvent.Type.PORT_UPDATED) {
+                        // these calls happen for every subsequent event
+                        // ports enabled, disabled, switch goes away, comes back
+                        log.info("** PORT UPDATED {}/{} -> {}",
                                  event.subject(),
                                  ((DeviceEvent) event).port(),
                                  event.type());
-                        /* XXX create method for single port filtering rules
-                        if (defaultRoutingHandler != null) {
-                            defaultRoutingHandler.populatePortAddressingRules(
-                                ((Device) event.subject()).id());
-                        }*/
+                        processPortUpdated(((Device) event.subject()),
+                                           ((DeviceEvent) event).port());
                     } else {
                         log.warn("Unhandled event type: {}", event.type());
                     }
@@ -836,7 +874,7 @@ public class SegmentRoutingManager implements SegmentRoutingService {
         defaultRoutingHandler.populatePortAddressingRules(deviceId);
 
         if (mastershipService.isLocalMaster(deviceId)) {
-            hostHandler.readInitialHosts(deviceId);
+            hostHandler.init(deviceId);
             xConnectHandler.init(deviceId);
             cordConfigHandler.init(deviceId);
             DefaultGroupHandler groupHandler = groupHandlerMap.get(deviceId);
@@ -844,7 +882,8 @@ public class SegmentRoutingManager implements SegmentRoutingService {
             routingRulePopulator.populateSubnetBroadcastRule(deviceId);
         }
 
-        appCfgHandler.initVRouters(deviceId);
+        appCfgHandler.init(deviceId);
+        routeHandler.init(deviceId);
     }
 
     private void processDeviceRemoved(Device device) {
@@ -874,39 +913,77 @@ public class SegmentRoutingManager implements SegmentRoutingService {
         xConnectHandler.removeDevice(device.id());
     }
 
-    private void processPortRemoved(Device device, Port port) {
-        log.info("Port {} was removed", port.toString());
+    private void processPortUpdated(Device device, Port port) {
+        if (deviceConfiguration == null || !deviceConfiguration.isConfigured(device.id())) {
+            log.warn("Device configuration uploading. Not handling port event for"
+                    + "dev: {} port: {}", device.id(), port.number());
+            return;
+        }
+        /* XXX create method for single port filtering rules which are needed
+           for both switch-to-switch ports and edge ports
+        if (defaultRoutingHandler != null) {
+            defaultRoutingHandler.populatePortAddressingRules(
+                ((Device) event.subject()).id());
+        }*/
+
+        // portUpdated calls are for ports that have gone down or up. For switch
+        // to switch ports, link-events should take care of any re-routing or
+        // group editing necessary for port up/down. Here we only process edge ports
+        // that are already configured.
+         Ip4Prefix configuredSubnet = deviceConfiguration.getPortSubnet(device.id(),
+                                                                        port.number());
+        if (configuredSubnet == null) {
+            log.debug("Not handling port updated event for unconfigured port "
+                    + "dev/port: {}/{}", device.id(), port.number());
+            return;
+        }
+        processEdgePort(device, port, configuredSubnet);
+    }
+
+    private void processEdgePort(Device device, Port port, Ip4Prefix subnet) {
+        boolean portUp = port.isEnabled();
+        if (portUp) {
+            log.info("Device:EdgePort {}:{} is enabled in subnet: {}", device.id(),
+                     port.number(), subnet);
+        } else {
+            log.info("Device:EdgePort {}:{} is disabled in subnet: {}", device.id(),
+                     port.number(), subnet);
+        }
+
         DefaultGroupHandler groupHandler = groupHandlerMap.get(device.id());
         if (groupHandler != null) {
-            groupHandler.portDown(port.number(),
+            groupHandler.processEdgePort(port.number(), subnet, portUp,
                                   mastershipService.isLocalMaster(device.id()));
+        } else {
+            log.warn("Group handler not found for dev:{}. Not handling edge port"
+                    + " {} event for port:{}", device.id(),
+                    (portUp) ? "UP" : "DOWN", port.number());
         }
     }
 
     private class InternalConfigListener implements NetworkConfigListener {
-        SegmentRoutingManager segmentRoutingManager;
+        SegmentRoutingManager srManager;
 
         /**
          * Constructs the internal network config listener.
          *
-         * @param srMgr segment routing manager
+         * @param srManager segment routing manager
          */
-        public InternalConfigListener(SegmentRoutingManager srMgr) {
-            this.segmentRoutingManager = srMgr;
+        public InternalConfigListener(SegmentRoutingManager srManager) {
+            this.srManager = srManager;
         }
 
         /**
          * Reads network config and initializes related data structure accordingly.
          */
         public void configureNetwork() {
-            deviceConfiguration = new DeviceConfiguration(appId,
-                    segmentRoutingManager.cfgService);
+            deviceConfiguration = new DeviceConfiguration(srManager);
 
-            arpHandler = new ArpHandler(segmentRoutingManager);
-            icmpHandler = new IcmpHandler(segmentRoutingManager);
-            ipHandler = new IpHandler(segmentRoutingManager);
-            routingRulePopulator = new RoutingRulePopulator(segmentRoutingManager);
-            defaultRoutingHandler = new DefaultRoutingHandler(segmentRoutingManager);
+            arpHandler = new ArpHandler(srManager);
+            icmpHandler = new IcmpHandler(srManager);
+            ipHandler = new IpHandler(srManager);
+            routingRulePopulator = new RoutingRulePopulator(srManager);
+            defaultRoutingHandler = new DefaultRoutingHandler(srManager);
 
             tunnelHandler = new TunnelHandler(linkService, deviceConfiguration,
                                               groupHandlerMap, tunnelStore);
@@ -953,6 +1030,7 @@ public class SegmentRoutingManager implements SegmentRoutingService {
                     default:
                         break;
                 }
+                configureNetwork();
             } else if (event.configClass().equals(XConnectConfig.class)) {
                 checkState(xConnectHandler != null, "XConnectHandler is not initialized");
                 switch (event.type()) {
@@ -1038,6 +1116,25 @@ public class SegmentRoutingManager implements SegmentRoutingService {
                 case ACCESS_DEVICE_ADDED:
                 case ACCESS_DEVICE_UPDATED:
                 case ACCESS_DEVICE_REMOVED:
+                default:
+                    break;
+            }
+        }
+    }
+
+    private class InternalRouteEventListener implements RouteListener {
+        @Override
+        public void event(RouteEvent event) {
+            switch (event.type()) {
+                case ROUTE_ADDED:
+                    routeHandler.processRouteAdded(event);
+                    break;
+                case ROUTE_UPDATED:
+                    routeHandler.processRouteUpdated(event);
+                    break;
+                case ROUTE_REMOVED:
+                    routeHandler.processRouteRemoved(event);
+                    break;
                 default:
                     break;
             }

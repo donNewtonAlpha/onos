@@ -74,6 +74,8 @@ import org.slf4j.Logger;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiFunction;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -109,7 +111,14 @@ public class DistributedVirtualNetworkStore
     private Map<NetworkId, VirtualNetwork> networkIdVirtualNetworkMap;
 
     // Listener for virtual network events
-    private final MapEventListener<NetworkId, VirtualNetwork> virtualMapListener = new InternalMapListener();
+    private final MapEventListener<NetworkId, VirtualNetwork> virtualNetworkMapListener =
+            new InternalMapListener<>((mapEventType, virtualNetwork) -> {
+                VirtualNetworkEvent.Type eventType =
+                    mapEventType.equals(MapEvent.Type.INSERT) ? VirtualNetworkEvent.Type.NETWORK_ADDED :
+                    mapEventType.equals(MapEvent.Type.UPDATE) ? VirtualNetworkEvent.Type.NETWORK_UPDATED :
+                    mapEventType.equals(MapEvent.Type.REMOVE) ? VirtualNetworkEvent.Type.NETWORK_REMOVED : null;
+                return eventType == null ? null : new VirtualNetworkEvent(eventType, virtualNetwork.id());
+            });
 
     // Track virtual network IDs by tenant Id
     private ConsistentMap<TenantId, Set<NetworkId>> tenantIdNetworkIdSetConsistentMap;
@@ -118,6 +127,17 @@ public class DistributedVirtualNetworkStore
     // Track virtual devices by device Id
     private ConsistentMap<DeviceId, VirtualDevice> deviceIdVirtualDeviceConsistentMap;
     private Map<DeviceId, VirtualDevice> deviceIdVirtualDeviceMap;
+
+    // Listener for virtual device events
+    private final MapEventListener<DeviceId, VirtualDevice> virtualDeviceMapListener =
+            new InternalMapListener<>((mapEventType, virtualDevice) -> {
+                VirtualNetworkEvent.Type eventType =
+                    mapEventType.equals(MapEvent.Type.INSERT) ? VirtualNetworkEvent.Type.VIRTUAL_DEVICE_ADDED :
+                    mapEventType.equals(MapEvent.Type.UPDATE) ? VirtualNetworkEvent.Type.VIRTUAL_DEVICE_UPDATED :
+                    mapEventType.equals(MapEvent.Type.REMOVE) ? VirtualNetworkEvent.Type.VIRTUAL_DEVICE_REMOVED : null;
+                return eventType == null ? null :
+                        new VirtualNetworkEvent(eventType, virtualDevice.networkId(), virtualDevice);
+            });
 
     // Track device IDs by network Id
     private ConsistentMap<NetworkId, Set<DeviceId>> networkIdDeviceIdSetConsistentMap;
@@ -189,7 +209,7 @@ public class DistributedVirtualNetworkStore
                 .withName("onos-networkId-virtualnetwork")
                 .withRelaxedReadConsistency()
                 .build();
-        networkIdVirtualNetworkConsistentMap.addListener(virtualMapListener);
+        networkIdVirtualNetworkConsistentMap.addListener(virtualNetworkMapListener);
         networkIdVirtualNetworkMap = networkIdVirtualNetworkConsistentMap.asJavaMap();
 
         tenantIdNetworkIdSetConsistentMap = storageService.<TenantId, Set<NetworkId>>consistentMapBuilder()
@@ -204,6 +224,7 @@ public class DistributedVirtualNetworkStore
                 .withName("onos-deviceId-virtualdevice")
                 .withRelaxedReadConsistency()
                 .build();
+        deviceIdVirtualDeviceConsistentMap.addListener(virtualDeviceMapListener);
         deviceIdVirtualDeviceMap = deviceIdVirtualDeviceConsistentMap.asJavaMap();
 
         networkIdDeviceIdSetConsistentMap = storageService.<NetworkId, Set<DeviceId>>consistentMapBuilder()
@@ -264,7 +285,8 @@ public class DistributedVirtualNetworkStore
     @Deactivate
     public void deactivate() {
         tenantIdSet.removeListener(setListener);
-        networkIdVirtualNetworkConsistentMap.removeListener(virtualMapListener);
+        networkIdVirtualNetworkConsistentMap.removeListener(virtualNetworkMapListener);
+        deviceIdVirtualDeviceConsistentMap.removeListener(virtualDeviceMapListener);
         log.info("Stopped");
     }
 
@@ -537,6 +559,8 @@ public class DistributedVirtualNetworkStore
                                                          portNumber, realizedBy);
         virtualPortSet.add(virtualPort);
         networkIdVirtualPortSetMap.put(networkId, virtualPortSet);
+        notifyDelegate(new VirtualNetworkEvent(VirtualNetworkEvent.Type.VIRTUAL_PORT_ADDED,
+                                               networkId, virtualPort));
         return virtualPort;
     }
 
@@ -560,6 +584,8 @@ public class DistributedVirtualNetworkStore
         vPort = new DefaultVirtualPort(networkId, device, portNumber, realizedBy);
         virtualPortSet.add(vPort);
         networkIdVirtualPortSetMap.put(networkId, virtualPortSet);
+        notifyDelegate(new VirtualNetworkEvent(VirtualNetworkEvent.Type.VIRTUAL_PORT_UPDATED,
+                                               networkId, vPort));
     }
 
     @Override
@@ -573,14 +599,22 @@ public class DistributedVirtualNetworkStore
             }
         });
 
-        if (virtualPortSet != null) {
+        if (!virtualPortSet.isEmpty()) {
+            AtomicBoolean portRemoved = new AtomicBoolean(false);
             networkIdVirtualPortSetMap.compute(networkId, (id, existingVirtualPorts) -> {
                 if (existingVirtualPorts == null || existingVirtualPorts.isEmpty()) {
                     return new HashSet<>();
                 } else {
+                    portRemoved.set(true);
                     return new HashSet<>(Sets.difference(existingVirtualPorts, virtualPortSet));
                 }
             });
+            if (portRemoved.get()) {
+                virtualPortSet.forEach(virtualPort -> notifyDelegate(
+                        new VirtualNetworkEvent(VirtualNetworkEvent.Type.VIRTUAL_PORT_REMOVED,
+                                                networkId, virtualPort)
+                ));
+            }
         }
     }
 
@@ -772,29 +806,40 @@ public class DistributedVirtualNetworkStore
     /**
      * Listener class to map listener map events to the virtual network events.
      */
-    private class InternalMapListener implements MapEventListener<NetworkId, VirtualNetwork> {
+    private class InternalMapListener<K, V> implements MapEventListener<K, V> {
+
+        private final BiFunction<MapEvent.Type, V, VirtualNetworkEvent> createEvent;
+
+        InternalMapListener(BiFunction<MapEvent.Type, V, VirtualNetworkEvent> createEvent) {
+            this.createEvent = createEvent;
+        }
+
         @Override
-        public void event(MapEvent<NetworkId, VirtualNetwork> event) {
-            NetworkId networkId = checkNotNull(event.key());
-            VirtualNetworkEvent.Type type = null;
+        public void event(MapEvent<K, V> event) {
+            checkNotNull(event.key());
+            VirtualNetworkEvent vnetEvent = null;
             switch (event.type()) {
                 case INSERT:
-                    type = VirtualNetworkEvent.Type.NETWORK_ADDED;
+                    vnetEvent = createEvent.apply(event.type(), event.newValue().value());
                     break;
                 case UPDATE:
                     if ((event.oldValue().value() != null) && (event.newValue().value() == null)) {
-                        type = VirtualNetworkEvent.Type.NETWORK_REMOVED;
+                        vnetEvent = createEvent.apply(MapEvent.Type.REMOVE, event.oldValue().value());
                     } else {
-                        type = VirtualNetworkEvent.Type.NETWORK_UPDATED;
+                        vnetEvent = createEvent.apply(event.type(), event.newValue().value());
                     }
                     break;
                 case REMOVE:
-                    type = VirtualNetworkEvent.Type.NETWORK_REMOVED;
+                    if (event.oldValue() != null) {
+                        vnetEvent = createEvent.apply(event.type(), event.oldValue().value());
+                    }
                     break;
                 default:
                     log.error("Unsupported event type: " + event.type());
             }
-            notifyDelegate(new VirtualNetworkEvent(type, networkId));
+            if (vnetEvent != null) {
+                notifyDelegate(vnetEvent);
+            }
         }
     }
 }

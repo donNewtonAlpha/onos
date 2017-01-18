@@ -23,22 +23,29 @@ import org.onlab.util.ByteOperator;
 import org.onosproject.lisp.msg.exceptions.LispParseError;
 import org.onosproject.lisp.msg.exceptions.LispReaderException;
 import org.onosproject.lisp.msg.exceptions.LispWriterException;
+import org.onosproject.lisp.msg.protocols.DefaultLispMapRecord.MapRecordReader;
+import org.onosproject.lisp.msg.protocols.DefaultLispMapRecord.MapRecordWriter;
 
 import java.util.List;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
-import static org.onosproject.lisp.msg.protocols.DefaultLispMapRecord.MapRecordWriter;
 
 /**
  * Default LISP map reply message class.
  */
-public final class DefaultLispMapReply implements LispMapReply {
+public final class DefaultLispMapReply extends AbstractLispMessage
+        implements LispMapReply {
 
     private final long nonce;
     private final boolean probe;
     private final boolean etr;
     private final boolean security;
     private final List<LispMapRecord> mapRecords;
+
+    static final ReplyWriter WRITER;
+    static {
+        WRITER = new ReplyWriter();
+    }
 
     /**
      * A private constructor that protects object instantiation from external.
@@ -63,8 +70,8 @@ public final class DefaultLispMapReply implements LispMapReply {
     }
 
     @Override
-    public void writeTo(ByteBuf byteBuf) {
-        // TODO: serialize LispMapReply message
+    public void writeTo(ByteBuf byteBuf) throws LispWriterException {
+        WRITER.writeTo(byteBuf, this);
     }
 
     @Override
@@ -224,7 +231,7 @@ public final class DefaultLispMapReply implements LispMapReply {
 
             List<LispMapRecord> mapRecords = Lists.newArrayList();
             for (int i = 0; i < recordCount; i++) {
-                mapRecords.add(new DefaultLispMapRecord.MapRecordReader().readFrom(byteBuf));
+                mapRecords.add(new MapRecordReader().readFrom(byteBuf));
             }
 
             return new DefaultReplyBuilder()

@@ -16,6 +16,8 @@
 
 package org.onosproject.sdnip;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import org.junit.Before;
@@ -43,6 +45,9 @@ import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.FilteredConnectPoint;
 import org.onosproject.net.PortNumber;
+import org.onosproject.net.config.Config;
+import org.onosproject.net.config.ConfigApplyDelegate;
+import org.onosproject.net.config.NetworkConfigServiceAdapter;
 import org.onosproject.net.flow.DefaultTrafficSelector;
 import org.onosproject.net.flow.DefaultTrafficTreatment;
 import org.onosproject.net.flow.TrafficSelector;
@@ -52,18 +57,13 @@ import org.onosproject.net.intent.AbstractIntentTest;
 import org.onosproject.net.intent.Key;
 import org.onosproject.net.intent.MultiPointToSinglePointIntent;
 import org.onosproject.routing.IntentSynchronizationService;
+import org.onosproject.sdnip.config.SdnIpConfig;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
-import static org.easymock.EasyMock.anyObject;
-import static org.easymock.EasyMock.createMock;
-import static org.easymock.EasyMock.expect;
-import static org.easymock.EasyMock.expectLastCall;
-import static org.easymock.EasyMock.replay;
-import static org.easymock.EasyMock.reset;
-import static org.easymock.EasyMock.verify;
+import static org.easymock.EasyMock.*;
 import static org.onosproject.routing.TestIntentServiceHelper.eqExceptId;
 
 /**
@@ -142,6 +142,7 @@ public class SdnIpFibTest extends AbstractIntentTest {
         sdnipFib = new SdnIpFib();
         sdnipFib.routeService = new TestRouteService();
         sdnipFib.coreService = new TestCoreService();
+        sdnipFib.networkConfigService = new TestNetworkConfigService();
         sdnipFib.interfaceService = interfaceService;
         sdnipFib.intentSynchronizer = intentSynchronizer;
 
@@ -191,7 +192,7 @@ public class SdnIpFibTest extends AbstractIntentTest {
     @Test
     public void testRouteAddToNoVlan() {
         // Build the expected route
-        ResolvedRoute route = new ResolvedRoute(PREFIX1, IP3, MAC3);
+        ResolvedRoute route = new ResolvedRoute(PREFIX1, IP3, MAC3, SW3_ETH1);
 
         MultiPointToSinglePointIntent intent =
                 createIntentToThreeSrcOneTwo(PREFIX1);
@@ -215,7 +216,7 @@ public class SdnIpFibTest extends AbstractIntentTest {
     @Test
     public void testRouteAddToVlan() {
         // Build the expected route
-        ResolvedRoute route = new ResolvedRoute(PREFIX2, IP1, MAC1);
+        ResolvedRoute route = new ResolvedRoute(PREFIX2, IP1, MAC1, SW1_ETH1);
 
         MultiPointToSinglePointIntent intent = createIntentToOne(PREFIX2);
 
@@ -244,7 +245,8 @@ public class SdnIpFibTest extends AbstractIntentTest {
         testRouteAddToNoVlan();
 
         // Build the new route entries for prefix1 and prefix2
-        ResolvedRoute routePrefixOne = new ResolvedRoute(PREFIX1, IP1, MAC1);
+        ResolvedRoute oldRoutePrefixOne = new ResolvedRoute(PREFIX1, IP3, MAC3, SW3_ETH1);
+        ResolvedRoute routePrefixOne = new ResolvedRoute(PREFIX1, IP1, MAC1, SW1_ETH1);
 
         // Create the new expected intents
         MultiPointToSinglePointIntent newPrefixOneIntent = createIntentToOne(PREFIX1);
@@ -258,7 +260,7 @@ public class SdnIpFibTest extends AbstractIntentTest {
 
         // Send in the update events
         routeListener.event(new RouteEvent(RouteEvent.Type.ROUTE_UPDATED,
-                                           routePrefixOne));
+                                           routePrefixOne, oldRoutePrefixOne));
 
         verify(intentSynchronizer);
     }
@@ -278,7 +280,8 @@ public class SdnIpFibTest extends AbstractIntentTest {
         testRouteAddToVlan();
 
         // Build the new route entries for prefix1 and prefix2
-        ResolvedRoute routePrefix = new ResolvedRoute(PREFIX2, IP3, MAC3);
+        ResolvedRoute oldRoutePrefix = new ResolvedRoute(PREFIX2, IP1, MAC1, SW1_ETH1);
+        ResolvedRoute routePrefix = new ResolvedRoute(PREFIX2, IP3, MAC3, SW3_ETH1);
 
         // Create the new expected intents
         MultiPointToSinglePointIntent newPrefixIntent =
@@ -293,7 +296,7 @@ public class SdnIpFibTest extends AbstractIntentTest {
 
         // Send in the update events
         routeListener.event(new RouteEvent(RouteEvent.Type.ROUTE_UPDATED,
-                                           routePrefix));
+                                           routePrefix, oldRoutePrefix));
 
         verify(intentSynchronizer);
     }
@@ -310,7 +313,7 @@ public class SdnIpFibTest extends AbstractIntentTest {
         testRouteAddToNoVlan();
 
         // Construct the existing route entry
-        ResolvedRoute route = new ResolvedRoute(PREFIX1, null, null);
+        ResolvedRoute route = new ResolvedRoute(PREFIX1, IP3, MAC3, SW3_ETH1);
 
         // Create existing intent
         MultiPointToSinglePointIntent removedIntent =
@@ -634,10 +637,41 @@ public class SdnIpFibTest extends AbstractIntentTest {
         }
     }
 
+    private class TestNetworkConfigService extends NetworkConfigServiceAdapter {
+        /**
+         * Returns an empty BGP network configuration to be able to correctly
+         * return the encapsulation parameter when needed.
+         *
+         * @return an empty BGP network configuration object
+         */
+        @Override
+        public <S, C extends Config<S>> C getConfig(S subject, Class<C> configClass) {
+            ApplicationId appId =
+                    new TestApplicationId(SdnIp.SDN_IP_APP);
+
+            ObjectMapper mapper = new ObjectMapper();
+            ConfigApplyDelegate delegate = new MockCfgDelegate();
+            JsonNode emptyTree = new ObjectMapper().createObjectNode();
+
+            SdnIpConfig sdnIpConfig = new SdnIpConfig();
+
+            sdnIpConfig.init(appId, "sdnip-test", emptyTree, mapper, delegate);
+
+            return (C) sdnIpConfig;
+        }
+    }
+
     private class InterfaceServiceDelegate extends InterfaceServiceAdapter {
         @Override
         public void addListener(InterfaceListener listener) {
             SdnIpFibTest.this.interfaceListener = listener;
+        }
+    }
+
+    private class MockCfgDelegate implements ConfigApplyDelegate {
+        @Override
+        public void onApply(@SuppressWarnings("rawtypes") Config config) {
+            config.apply();
         }
     }
 }

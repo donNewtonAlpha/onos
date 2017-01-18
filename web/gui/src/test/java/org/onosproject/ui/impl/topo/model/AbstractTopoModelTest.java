@@ -30,6 +30,7 @@ import org.onosproject.cluster.RoleInfo;
 import org.onosproject.mastership.MastershipService;
 import org.onosproject.mastership.MastershipServiceAdapter;
 import org.onosproject.net.ConnectPoint;
+import org.onosproject.net.DefaultAnnotations;
 import org.onosproject.net.DefaultDevice;
 import org.onosproject.net.DefaultHost;
 import org.onosproject.net.DefaultLink;
@@ -263,7 +264,7 @@ abstract class AbstractTopoModelTest extends AbstractUiImplTest {
                                          String parentId) {
         UiTopoLayoutId pid = parentId == null
                 ? UiTopoLayoutId.DEFAULT_ID : layoutId(parentId);
-        return new UiTopoLayout(layoutId(layoutId), region, pid);
+        return new UiTopoLayout(layoutId(layoutId)).region(region).parent(pid);
     }
 
     /**
@@ -277,7 +278,7 @@ abstract class AbstractTopoModelTest extends AbstractUiImplTest {
     protected static Region region(String id, Region.Type type,
                                    List<Set<NodeId>> masters) {
         return new DefaultRegion(RegionId.regionId(id), "Region-" + id,
-                type, masters);
+                type, DefaultAnnotations.EMPTY, masters);
     }
 
     /**

@@ -22,7 +22,13 @@ import org.onosproject.lisp.msg.exceptions.LispWriterException;
 
 import java.util.Objects;
 
-import static org.onosproject.lisp.msg.types.AddressFamilyIdentifierEnum.*;
+import static org.onosproject.lisp.msg.types.AddressFamilyIdentifierEnum.IP4;
+import static org.onosproject.lisp.msg.types.AddressFamilyIdentifierEnum.IP6;
+import static org.onosproject.lisp.msg.types.AddressFamilyIdentifierEnum.NO_ADDRESS;
+import static org.onosproject.lisp.msg.types.AddressFamilyIdentifierEnum.DISTINGUISHED_NAME;
+import static org.onosproject.lisp.msg.types.AddressFamilyIdentifierEnum.MAC;
+import static org.onosproject.lisp.msg.types.AddressFamilyIdentifierEnum.LCAF;
+import static org.onosproject.lisp.msg.types.AddressFamilyIdentifierEnum.AS;
 
 /**
  * LISP Locator address typed by Address Family Identifier (AFI).
@@ -89,6 +95,12 @@ public abstract class LispAfiAddress {
             // AFI code -> 16 bits
             short afiCode = (short) byteBuf.getUnsignedShort(index);
 
+            // handle no address
+            if (afiCode == NO_ADDRESS.getIanaCode()) {
+                byteBuf.readUnsignedShort();
+                return new LispNoAddress.NoAddressReader().readFrom(byteBuf);
+            }
+
             // handle IPv4 and IPv6 address
             if (afiCode == IP4.getIanaCode() ||
                 afiCode == IP6.getIanaCode()) {
@@ -131,6 +143,9 @@ public abstract class LispAfiAddress {
             byteBuf.writeShort(address.getAfi().getIanaCode());
 
             switch (address.getAfi()) {
+                case NO_ADDRESS:
+                    new LispNoAddress.NoAddressWriter().writeTo(byteBuf, (LispNoAddress) address);
+                    break;
                 case IP4:
                     new LispIpAddress.IpAddressWriter().writeTo(byteBuf, (LispIpv4Address) address);
                     break;

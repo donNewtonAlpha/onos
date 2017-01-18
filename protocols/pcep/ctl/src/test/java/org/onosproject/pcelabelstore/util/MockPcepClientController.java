@@ -1,9 +1,21 @@
+/*
+ * Copyright 2016-present Open Networking Laboratory
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.onosproject.pcelabelstore.util;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.Map;
+
 
 import org.onosproject.incubator.net.tunnel.DefaultLabelStack;
 import org.onosproject.incubator.net.tunnel.LabelStack;
@@ -17,6 +29,12 @@ import org.onosproject.pcep.controller.PcepEventListener;
 import org.onosproject.pcep.controller.PcepNodeListener;
 import org.onosproject.pcepio.protocol.PcepMessage;
 import org.onosproject.pcepio.types.PcepValueType;
+
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.List;
 
 public class MockPcepClientController implements PcepClientController {
 
@@ -102,6 +120,31 @@ public class MockPcepClientController implements PcepClientController {
     public LinkedList<PcepValueType> createPcepLabelStack(DefaultLabelStack labelStack, Path path) {
         // TODO Auto-generated method stub
         return null;
+    }
+
+    @Override
+    public Map<String, List<String>> getPcepExceptions() {
+        return null;
+    }
+
+    @Override
+    public Map<Integer, Integer> getPcepErrorMsg() {
+        return null;
+    }
+
+    @Override
+    public Map<String, String> getPcepSessionMap() {
+        return null;
+    }
+
+    @Override
+    public Map<String, Byte> getPcepSessionIdMap() {
+        return null;
+    }
+
+    @Override
+    public void peerErrorMsg(String peerId, Integer errorType, Integer errValue) {
+
     }
 
     @Override

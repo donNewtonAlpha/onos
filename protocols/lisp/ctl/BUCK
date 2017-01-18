@@ -5,6 +5,7 @@ COMPILE_DEPS = [
     '//lib:netty-buffer',
     '//lib:netty-codec',
     '//lib:netty-transport',
+    '//lib:netty-transport-native-epoll',
     '//lib:netty-handler'
 ]
 
@@ -12,6 +13,7 @@ TEST_DEPS = [
     '//lib:TEST_ADAPTERS',
     '//utils/osgi:onlab-osgi-tests',
     '//core/api:onos-api-tests',
+    '//protocols/lisp/api:onos-protocols-lisp-api-tests',
 ]
 
 osgi_jar_with_tests (

@@ -87,7 +87,7 @@ public class IpHandler {
 
         // IP packets for unknown host
         } else {
-            log.debug("ICMP request for unknown host {} which is not in the subnet",
+            log.debug("IP request for unknown host {} which is not in the subnet",
                     destinationAddress);
             // Do nothing
         }
@@ -109,13 +109,9 @@ public class IpHandler {
 
         Ip4Address destIpAddress = Ip4Address.valueOf(ipPacket.getDestinationAddress());
 
-        if (ipPacketQueue.get(destIpAddress) == null) {
-            ConcurrentLinkedQueue<IPv4> queue = new ConcurrentLinkedQueue<>();
-            queue.add(ipPacket);
-            ipPacketQueue.put(destIpAddress, queue);
-        } else {
-            ipPacketQueue.get(destIpAddress).add(ipPacket);
-        }
+        ipPacketQueue
+            .computeIfAbsent(destIpAddress, a -> new ConcurrentLinkedQueue<>())
+            .add(ipPacket);
     }
 
     /**

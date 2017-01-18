@@ -365,6 +365,10 @@ public class NullProviders {
             return new MeshTopologySimulator();
         } else if (topoShape.matches("grid([,].*|$)")) {
             return new GridTopologySimulator();
+        } else if (topoShape.matches("fattree([,].*|$)")) {
+            return new FatTreeTopologySimulator();
+        } else if (topoShape.matches("chordal([,].*|$)")) {
+            return new ChordalTopologySimulator();
         } else if (topoShape.matches("custom([,].*|$)")) {
             return new CustomTopologySimulator();
         } else {

@@ -23,7 +23,7 @@
     'use strict';
 
     // Injected Services
-    var Panel, gs, wss, flash;
+    var Panel, gs, wss, flash, listProps;
 
     // Internal State
     var summaryPanel, summaryData;
@@ -33,7 +33,7 @@
         className = 'topo-p',
         panelOpts = {
             show: true,
-            width: 260          // summary and detail panel width
+            width: 260 // summary and detail panel width
         },
         handlerMap = {
             showSummary: handleSummaryData
@@ -49,38 +49,7 @@
         });
 
         summaryPanel = new Panel(id, options);
-
-        summaryPanel.p.classed(className, true);
-    }
-
-    function addProp(tbody, label, value) {
-        var tr = tbody.append('tr'),
-            lab;
-        if (typeof label === 'string') {
-            lab = label.replace(/_/g, ' ');
-        } else {
-            lab = label;
-        }
-
-        function addCell(cls, txt) {
-            tr.append('td').attr('class', cls).html(txt);
-        }
-        addCell('label', lab + ' :');
-        addCell('value', value);
-    }
-
-    function addSep(tbody) {
-        tbody.append('tr').append('td').attr('colspan', 2).append('hr');
-    }
-
-    function listProps(tbody, data) {
-        summaryData.propOrder.forEach(function (p) {
-            if (p === '-') {
-                addSep(tbody);
-            } else {
-                addProp(tbody, p, summaryData.props[p]);
-            }
-        });
+        summaryPanel.el.classed(className, true);
     }
 
     function render() {
@@ -95,7 +64,7 @@
 
         title.text(summaryData.title);
         gs.addGlyph(svg, 'bird', 24, 0, [1, 1]);
-        listProps(tbody);
+        listProps(tbody, summaryData);
     }
 
     function handleSummaryData(data) {
@@ -108,31 +77,35 @@
     }
 
     function toggle() {
-        var on = summaryPanel.p.toggle(),
+        var on = summaryPanel.el.toggle(),
             verb = on ? 'Show' : 'Hide';
+
         flash.flash(verb + ' Summary Panel');
+        wss.sendEvent(on ? 'requestSummary' : 'cancelSummary');
     }
 
     function destroy() {
         wss.unbindHandlers(handlerMap);
+        wss.sendEvent('cancelSummary');
         summaryPanel.destroy();
     }
 
     angular.module('ovTopo2')
     .factory('Topo2SummaryPanelService',
-    ['Topo2PanelService', 'GlyphService', 'WebSocketService', 'FlashService',
-        function (_ps_, _gs_, _wss_, _flash_) {
+    ['Topo2PanelService', 'GlyphService', 'WebSocketService', 'FlashService', 'ListService',
+        function (_ps_, _gs_, _wss_, _flash_, _listService_) {
 
             Panel = _ps_;
             gs = _gs_;
             wss = _wss_;
             flash = _flash_;
+            listProps = _listService_;
 
             return {
                 init: init,
-
                 toggle: toggle,
-                destroy: destroy
+                destroy: destroy,
+                isVisible: function () { return summaryPanel.isVisible(); }
             };
         }
     ]);

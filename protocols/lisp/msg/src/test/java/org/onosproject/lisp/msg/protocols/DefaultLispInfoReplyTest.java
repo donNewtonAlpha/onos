@@ -27,9 +27,10 @@ import org.onosproject.lisp.msg.exceptions.LispWriterException;
 import org.onosproject.lisp.msg.protocols.DefaultLispInfoReply.DefaultInfoReplyBuilder;
 import org.onosproject.lisp.msg.protocols.DefaultLispInfoReply.InfoReplyReader;
 import org.onosproject.lisp.msg.protocols.DefaultLispInfoReply.InfoReplyWriter;
-import org.onosproject.lisp.msg.protocols.LispInfoReply.InfoReplyBuilder;
 import org.onosproject.lisp.msg.types.LispIpv4Address;
 import org.onosproject.lisp.msg.types.LispNatLcafAddress;
+import org.onosproject.lisp.msg.protocols.LispInfoReply.InfoReplyBuilder;
+import org.onosproject.lisp.msg.types.LispNatLcafAddress.NatAddressBuilder;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -42,6 +43,8 @@ public final class DefaultLispInfoReplyTest {
     private LispInfoReply reply1;
     private LispInfoReply sameAsReply1;
     private LispInfoReply reply2;
+
+    private static final String AUTH_KEY = "onos";
 
     @Before
     public void setup() {
@@ -56,19 +59,20 @@ public final class DefaultLispInfoReplyTest {
 
         LispIpv4Address address1 = new LispIpv4Address(IpAddress.valueOf("192.168.1.4"));
 
-        LispNatLcafAddress natLcafAddress1 = new LispNatLcafAddress.NatAddressBuilder()
-                                                        .withLength((short) 0)
-                                                        .withMsUdpPortNumber(msUdpPortNumber1)
-                                                        .withEtrUdpPortNumber(etrUdpPortNumber1)
-                                                        .withGlobalEtrRlocAddress(globalEtrRlocAddress1)
-                                                        .withMsRlocAddress(msRlocAddress1)
-                                                        .withPrivateEtrRlocAddress(privateEtrRlocAddress1)
-                                                        .build();
+        LispNatLcafAddress natLcafAddress1 = new NatAddressBuilder()
+                                                    .withLength((short) 0)
+                                                    .withMsUdpPortNumber(msUdpPortNumber1)
+                                                    .withEtrUdpPortNumber(etrUdpPortNumber1)
+                                                    .withGlobalEtrRlocAddress(globalEtrRlocAddress1)
+                                                    .withMsRlocAddress(msRlocAddress1)
+                                                    .withPrivateEtrRlocAddress(privateEtrRlocAddress1)
+                                                    .build();
 
         reply1 = builder1
                     .withNonce(1L)
                     .withKeyId((short) 1)
-                    .withInfoReply(false)
+                    .withAuthKey(AUTH_KEY)
+                    .withIsInfoReply(true)
                     .withMaskLength((byte) 1)
                     .withEidPrefix(address1)
                     .withNatLcafAddress(natLcafAddress1).build();
@@ -78,7 +82,8 @@ public final class DefaultLispInfoReplyTest {
         sameAsReply1 = builder2
                             .withNonce(1L)
                             .withKeyId((short) 1)
-                            .withInfoReply(false)
+                            .withAuthKey(AUTH_KEY)
+                            .withIsInfoReply(true)
                             .withMaskLength((byte) 1)
                             .withEidPrefix(address1)
                             .withNatLcafAddress(natLcafAddress1).build();
@@ -93,19 +98,20 @@ public final class DefaultLispInfoReplyTest {
 
         LispIpv4Address address2 = new LispIpv4Address(IpAddress.valueOf("192.168.2.4"));
 
-        LispNatLcafAddress natLcafAddress2 = new LispNatLcafAddress.NatAddressBuilder()
-                                                        .withLength((short) 0)
-                                                        .withMsUdpPortNumber(msUdpPortNumber2)
-                                                        .withEtrUdpPortNumber(etrUdpPortNumber2)
-                                                        .withGlobalEtrRlocAddress(globalEtrRlocAddress2)
-                                                        .withMsRlocAddress(msRlocAddress2)
-                                                        .withPrivateEtrRlocAddress(privateEtrRlocAddress2)
-                                                        .build();
+        LispNatLcafAddress natLcafAddress2 = new NatAddressBuilder()
+                                                    .withLength((short) 0)
+                                                    .withMsUdpPortNumber(msUdpPortNumber2)
+                                                    .withEtrUdpPortNumber(etrUdpPortNumber2)
+                                                    .withGlobalEtrRlocAddress(globalEtrRlocAddress2)
+                                                    .withMsRlocAddress(msRlocAddress2)
+                                                    .withPrivateEtrRlocAddress(privateEtrRlocAddress2)
+                                                    .build();
 
         reply2 = builder3
                         .withNonce(2L)
                         .withKeyId((short) 2)
-                        .withInfoReply(true)
+                        .withAuthKey(AUTH_KEY)
+                        .withIsInfoReply(true)
                         .withMaskLength((byte) 1)
                         .withEidPrefix(address2)
                         .withNatLcafAddress(natLcafAddress2).build();
@@ -130,7 +136,7 @@ public final class DefaultLispInfoReplyTest {
         LispIpv4Address msRlocAddress1 = new LispIpv4Address(IpAddress.valueOf("192.168.1.2"));
         LispIpv4Address privateEtrRlocAddress1 = new LispIpv4Address(IpAddress.valueOf("192.168.1.3"));
 
-        LispNatLcafAddress natLcafAddress = new LispNatLcafAddress.NatAddressBuilder()
+        LispNatLcafAddress natLcafAddress = new NatAddressBuilder()
                 .withLength((short) 0)
                 .withMsUdpPortNumber(msUdpPortNumber1)
                 .withEtrUdpPortNumber(etrUdpPortNumber1)
@@ -139,7 +145,7 @@ public final class DefaultLispInfoReplyTest {
                 .withPrivateEtrRlocAddress(privateEtrRlocAddress1)
                 .build();
 
-        assertThat(reply.hasInfoReply(), is(false));
+        assertThat(reply.isInfoReply(), is(true));
         assertThat(reply.getNonce(), is(1L));
         assertThat(reply.getKeyId(), is((short) 1));
         assertThat(reply.getMaskLength(), is((byte) 1));

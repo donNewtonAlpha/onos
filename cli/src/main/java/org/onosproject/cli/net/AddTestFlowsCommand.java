@@ -1,4 +1,3 @@
-
 /*
  * Copyright 2015-present Open Networking Laboratory
  *
@@ -93,7 +92,8 @@ public class AddTestFlowsCommand extends AbstractShellCommand {
                         .matchEthDst(MacAddress.valueOf((Integer.MAX_VALUE - i) * RandomUtils.nextInt()));
 
 
-                int randomPriority = RandomUtils.nextInt();
+                int randomPriority = RandomUtils.nextInt(
+                        FlowRule.MAX_PRIORITY - FlowRule.MIN_PRIORITY + 1) + FlowRule.MIN_PRIORITY;
 
                 FlowRule addRule = DefaultFlowRule.builder()
                         .forDevice(d.id())

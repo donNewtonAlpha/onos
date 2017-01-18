@@ -48,6 +48,7 @@ import org.onosproject.net.flow.criteria.ExtensionSelectorType.ExtensionSelector
 import org.onosproject.net.flow.instructions.Instructions;
 import org.onosproject.openflow.controller.ExtensionSelectorInterpreter;
 import org.onosproject.openflow.controller.ExtensionTreatmentInterpreter;
+import org.onosproject.provider.of.flow.impl.NewAdaptiveFlowStatsCollector;
 import org.projectfloodlight.openflow.protocol.OFFlowMod;
 import org.projectfloodlight.openflow.protocol.OFFlowRemoved;
 import org.projectfloodlight.openflow.protocol.OFFlowStatsEntry;
@@ -60,6 +61,7 @@ import org.projectfloodlight.openflow.protocol.action.OFActionExperimenter;
 import org.projectfloodlight.openflow.protocol.action.OFActionGroup;
 import org.projectfloodlight.openflow.protocol.action.OFActionOutput;
 import org.projectfloodlight.openflow.protocol.action.OFActionPopMpls;
+import org.projectfloodlight.openflow.protocol.action.OFActionPushVlan;
 import org.projectfloodlight.openflow.protocol.action.OFActionSetDlDst;
 import org.projectfloodlight.openflow.protocol.action.OFActionSetDlSrc;
 import org.projectfloodlight.openflow.protocol.action.OFActionSetField;
@@ -82,6 +84,7 @@ import org.projectfloodlight.openflow.types.CircuitSignalID;
 import org.projectfloodlight.openflow.types.IPv4Address;
 import org.projectfloodlight.openflow.types.IPv6Address;
 import org.projectfloodlight.openflow.types.Masked;
+import org.projectfloodlight.openflow.types.OFBooleanValue;
 import org.projectfloodlight.openflow.types.OFVlanVidMatch;
 import org.projectfloodlight.openflow.types.OduSignalID;
 import org.projectfloodlight.openflow.types.TransportPort;
@@ -122,6 +125,10 @@ public class FlowEntryBuilder {
 
     private final DriverService driverService;
 
+    // NewAdaptiveFlowStatsCollector for AdaptiveFlowSampling mode,
+    // null is not AFM mode, namely SimpleStatsCollector mode
+    private NewAdaptiveFlowStatsCollector afsc;
+
     public FlowEntryBuilder(DeviceId deviceId, OFFlowStatsEntry entry, DriverService driverService) {
         this.stat = entry;
         this.match = entry.getMatch();
@@ -131,6 +138,7 @@ public class FlowEntryBuilder {
         this.flowMod = null;
         this.type = FlowType.STAT;
         this.driverService = driverService;
+        this.afsc = null;
     }
 
     public FlowEntryBuilder(DeviceId deviceId, OFFlowRemoved removed, DriverService driverService) {
@@ -142,6 +150,7 @@ public class FlowEntryBuilder {
         this.flowMod = null;
         this.type = FlowType.REMOVED;
         this.driverService = driverService;
+        this.afsc = null;
     }
 
     public FlowEntryBuilder(DeviceId deviceId, OFFlowMod fm, DriverService driverService) {
@@ -153,6 +162,12 @@ public class FlowEntryBuilder {
         this.stat = null;
         this.removed = null;
         this.driverService = driverService;
+        this.afsc = null;
+    }
+
+    public FlowEntryBuilder withSetAfsc(NewAdaptiveFlowStatsCollector afsc) {
+        this.afsc = afsc;
+        return this;
     }
 
     public FlowEntry build(FlowEntryState... state) {
@@ -171,11 +186,21 @@ public class FlowEntryBuilder {
                         builder.forTable(stat.getTableId().getValue());
                     }
 
-                    return new DefaultFlowEntry(builder.build(), FlowEntryState.ADDED,
-                                                SECONDS.toNanos(stat.getDurationSec())
-                                                        + stat.getDurationNsec(), NANOSECONDS,
-                                                stat.getPacketCount().getValue(),
-                                                stat.getByteCount().getValue());
+                    if (afsc != null) {
+                        FlowEntry.FlowLiveType liveType = afsc.calFlowLiveType(stat.getDurationSec());
+                        return new DefaultFlowEntry(builder.build(), FlowEntryState.ADDED,
+                                                    SECONDS.toNanos(stat.getDurationSec())
+                                                            + stat.getDurationNsec(), NANOSECONDS,
+                                                    liveType,
+                                                    stat.getPacketCount().getValue(),
+                                                    stat.getByteCount().getValue());
+                    } else {
+                        return new DefaultFlowEntry(builder.build(), FlowEntryState.ADDED,
+                                                    stat.getDurationSec(),
+                                                    stat.getPacketCount().getValue(),
+                                                    stat.getByteCount().getValue());
+                    }
+
                 case REMOVED:
                     builder = DefaultFlowRule.builder()
                             .forDevice(deviceId)
@@ -189,11 +214,21 @@ public class FlowEntryBuilder {
                         builder.forTable(removed.getTableId().getValue());
                     }
 
-                    return new DefaultFlowEntry(builder.build(), FlowEntryState.REMOVED,
-                                                SECONDS.toNanos(removed.getDurationSec())
-                                                        + removed.getDurationNsec(), NANOSECONDS,
-                                                removed.getPacketCount().getValue(),
-                                                removed.getByteCount().getValue());
+                    if (afsc != null) {
+                        FlowEntry.FlowLiveType liveType = afsc.calFlowLiveType(removed.getDurationSec());
+                        return new DefaultFlowEntry(builder.build(), FlowEntryState.REMOVED,
+                                                    SECONDS.toNanos(removed.getDurationSec())
+                                                            + removed.getDurationNsec(), NANOSECONDS,
+                                                    liveType,
+                                                    removed.getPacketCount().getValue(),
+                                                    removed.getByteCount().getValue());
+                    } else {
+                        return new DefaultFlowEntry(builder.build(), FlowEntryState.REMOVED,
+                                                    removed.getDurationSec(),
+                                                    removed.getPacketCount().getValue(),
+                                                    removed.getByteCount().getValue());
+                    }
+
                 case MOD:
                     FlowEntryState flowState = state.length > 0 ? state[0] : FlowEntryState.FAILED;
                     builder = DefaultFlowRule.builder()
@@ -207,7 +242,12 @@ public class FlowEntryBuilder {
                         builder.forTable(flowMod.getTableId().getValue());
                     }
 
-                    return new DefaultFlowEntry(builder.build(), flowState, 0, 0, 0);
+                    if (afsc != null) {
+                        FlowEntry.FlowLiveType liveType = FlowEntry.FlowLiveType.IMMEDIATE;
+                        return new DefaultFlowEntry(builder.build(), flowState, 0, liveType, 0, 0);
+                    } else {
+                        return new DefaultFlowEntry(builder.build(), flowState, 0, 0, 0);
+                    }
                 default:
                     log.error("Unknown flow type : {}", this.type);
                     return null;
@@ -400,7 +440,8 @@ public class FlowEntryBuilder {
                     builder.popVlan();
                     break;
                 case PUSH_VLAN:
-                    builder.pushVlan();
+                    OFActionPushVlan pushVlan = (OFActionPushVlan) act;
+                    builder.pushVlan(new EthType((short) pushVlan.getEthertype().getValue()));
                     break;
                 case SET_TP_DST:
                 case SET_TP_SRC:
@@ -427,7 +468,7 @@ public class FlowEntryBuilder {
         return configureTreatmentBuilder(actions, builder, driverHandler, deviceId);
     }
 
-
+    // CHECKSTYLE IGNORE MethodLength FOR NEXT 1 LINES
     private static void handleSetField(TrafficTreatment.Builder builder,
                                        OFActionSetField action,
                                        DriverHandler driverHandler,
@@ -438,7 +479,6 @@ public class FlowEntryBuilder {
         } else {
             treatmentInterpreter = null;
         }
-
         OFOxm<?> oxm = action.getField();
         switch (oxm.getMatchField().id) {
         case VLAN_PCP:
@@ -488,8 +528,8 @@ public class FlowEntryBuilder {
             break;
         case MPLS_BOS:
             @SuppressWarnings("unchecked")
-            OFOxm<U8> mplsBos = (OFOxm<U8>) oxm;
-            builder.setMplsBos(mplsBos.getValue() != U8.ZERO);
+            OFOxm<OFBooleanValue> mplsBos = (OFOxm<OFBooleanValue>) oxm;
+            builder.setMplsBos(mplsBos.getValue().getValue());
             break;
         case TUNNEL_ID:
             @SuppressWarnings("unchecked")
@@ -576,6 +616,19 @@ public class FlowEntryBuilder {
             @SuppressWarnings("unchecked")
             OFOxm<IPv4Address> arpspa = (OFOxm<IPv4Address>) oxm;
             builder.setArpSpa(Ip4Address.valueOf(arpspa.getValue().getInt()));
+            break;
+        case OFDPA_MPLS_TYPE:
+        case OFDPA_OVID:
+        case OFDPA_MPLS_L2_PORT:
+        case OFDPA_QOS_INDEX:
+            if (treatmentInterpreter != null) {
+                try {
+                    builder.extension(treatmentInterpreter.mapAction(action), deviceId);
+                    break;
+                } catch (UnsupportedOperationException e) {
+                    log.warn("Unsupported action extension");
+                }
+            }
             break;
         case ARP_THA:
         case ARP_TPA:
@@ -945,6 +998,30 @@ public class FlowEntryBuilder {
                         builder.extension(selectorInterpreter.mapOxm(oxm), deviceId);
                     } catch (UnsupportedOperationException e) {
                         log.debug(e.getMessage());
+                    }
+                }
+                break;
+            case OFDPA_OVID:
+                if (selectorInterpreter != null &&
+                        selectorInterpreter.supported(ExtensionSelectorTypes.OFDPA_MATCH_OVID.type())) {
+                    if (match.getVersion().equals(OFVersion.OF_13)) {
+                        OFOxm oxm = ((OFMatchV3) match).getOxmList().get(MatchField.OFDPA_OVID);
+                        builder.extension(selectorInterpreter.mapOxm(oxm),
+                                          deviceId);
+                    } else {
+                        break;
+                    }
+                }
+                break;
+            case OFDPA_MPLS_L2_PORT:
+                if (selectorInterpreter != null &&
+                        selectorInterpreter.supported(ExtensionSelectorTypes.OFDPA_MATCH_MPLS_L2_PORT.type())) {
+                    if (match.getVersion().equals(OFVersion.OF_13)) {
+                        OFOxm oxm = ((OFMatchV3) match).getOxmList().get(MatchField.OFDPA_MPLS_L2_PORT);
+                        builder.extension(selectorInterpreter.mapOxm(oxm),
+                                          deviceId);
+                    } else {
+                        break;
                     }
                 }
                 break;

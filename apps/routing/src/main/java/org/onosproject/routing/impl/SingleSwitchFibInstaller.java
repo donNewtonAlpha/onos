@@ -94,6 +94,8 @@ public class SingleSwitchFibInstaller {
     private static final int PRIORITY_OFFSET = 100;
     private static final int PRIORITY_MULTIPLIER = 5;
 
+    // FIXME: This should be eliminated when we have an API in SR that
+    //        programs the fabric switches for VR
     public static final short ASSIGNED_VLAN = 4094;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
@@ -178,6 +180,8 @@ public class SingleSwitchFibInstaller {
 
         updateConfig();
 
+        // FIXME: There can be an issue when this component is deactivated before vRouter.
+        //        This will be addressed in CORD-710.
         applicationService.registerDeactivateHook(vrouterAppId, () -> cleanUp());
 
         log.info("Started");
@@ -185,7 +189,10 @@ public class SingleSwitchFibInstaller {
 
     @Deactivate
     protected void deactivate() {
-        routeService.removeListener(routeListener);
+         // FIXME: This will also remove flows when an instance goes down.
+         //        This is a temporary solution and should be addressed in CORD-710.
+        cleanUp();
+
         deviceService.removeListener(deviceListener);
         interfaceService.removeListener(internalInterfaceList);
         networkConfigService.removeListener(configListener);
@@ -215,7 +222,7 @@ public class SingleSwitchFibInstaller {
 
         //clean up the routes.
         for (Map.Entry<IpPrefix, IpAddress> routes: prefixToNextHop.entrySet()) {
-            deleteRoute(new ResolvedRoute(routes.getKey(), null, null));
+            deleteRoute(new ResolvedRoute(routes.getKey(), null, null, null));
         }
 
         //clean up the filtering objective for interfaces.
@@ -282,7 +289,7 @@ public class SingleSwitchFibInstaller {
 
     private Set<Interface> getInterfaces() {
         Set<Interface> intfs;
-        if (interfaces.isEmpty()) {
+        if (interfaces == null || interfaces.isEmpty()) {
             intfs = interfaceService.getInterfaces();
         } else {
             // TODO need to fix by making interface names globally unique
@@ -292,11 +299,10 @@ public class SingleSwitchFibInstaller {
     }
 
     private Set<Interface> filterInterfaces(List<String> interfaces) {
-        Set<Interface> intfs = interfaceService.getInterfaces().stream()
+        return interfaceService.getInterfaces().stream()
                 .filter(intf -> intf.connectPoint().deviceId().equals(deviceId))
                 .filter(intf -> interfaces.contains(intf.name()))
                 .collect(Collectors.toSet());
-        return intfs;
     }
 
     private void updateRoute(ResolvedRoute route) {

@@ -25,6 +25,8 @@ import org.onlab.packet.IpAddress;
 import org.onosproject.lisp.msg.exceptions.LispParseError;
 import org.onosproject.lisp.msg.exceptions.LispReaderException;
 import org.onosproject.lisp.msg.exceptions.LispWriterException;
+import org.onosproject.lisp.msg.protocols.DefaultLispMapRecord.DefaultMapRecordBuilder;
+import org.onosproject.lisp.msg.protocols.DefaultLispMapRegister.DefaultRegisterBuilder;
 import org.onosproject.lisp.msg.protocols.DefaultLispMapRegister.RegisterReader;
 import org.onosproject.lisp.msg.protocols.DefaultLispMapRegister.RegisterWriter;
 import org.onosproject.lisp.msg.protocols.LispMapRecord.MapRecordBuilder;
@@ -35,8 +37,6 @@ import java.util.List;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.onosproject.lisp.msg.protocols.DefaultLispMapRecord.DefaultMapRecordBuilder;
-import static org.onosproject.lisp.msg.protocols.DefaultLispMapRegister.DefaultRegisterBuilder;
 
 /**
  * Unit tests for DefaultLispMapRegister class.
@@ -46,6 +46,7 @@ public final class DefaultLispMapRegisterTest {
     private LispMapRegister register1;
     private LispMapRegister sameAsRegister1;
     private LispMapRegister register2;
+    private static final String AUTH_KEY = "onos";
 
     @Before
     public void setup() {
@@ -58,6 +59,7 @@ public final class DefaultLispMapRegisterTest {
                         .withIsProxyMapReply(true)
                         .withIsWantMapNotify(false)
                         .withKeyId((short) 1)
+                        .withAuthKey(AUTH_KEY)
                         .withNonce(1L)
                         .withMapRecords(records1)
                         .build();
@@ -70,6 +72,7 @@ public final class DefaultLispMapRegisterTest {
                         .withIsProxyMapReply(true)
                         .withIsWantMapNotify(false)
                         .withKeyId((short) 1)
+                        .withAuthKey(AUTH_KEY)
                         .withNonce(1L)
                         .withMapRecords(records2)
                         .build();
@@ -80,6 +83,7 @@ public final class DefaultLispMapRegisterTest {
                         .withIsProxyMapReply(true)
                         .withIsWantMapNotify(false)
                         .withKeyId((short) 2)
+                        .withAuthKey(AUTH_KEY)
                         .withNonce(2L)
                         .build();
     }
@@ -127,7 +131,6 @@ public final class DefaultLispMapRegisterTest {
         RegisterReader reader = new RegisterReader();
         LispMapRegister deserialized = reader.readFrom(byteBuf);
 
-        new EqualsTester()
-                .addEqualityGroup(register1, deserialized).testEquals();
+        new EqualsTester().addEqualityGroup(register1, deserialized).testEquals();
     }
 }

@@ -50,7 +50,6 @@ import org.onosproject.openstacknode.OpenstackNode;
 import org.onosproject.openstacknode.OpenstackNodeEvent;
 import org.onosproject.openstacknode.OpenstackNodeListener;
 import org.onosproject.openstacknode.OpenstackNodeService;
-import org.onosproject.scalablegateway.api.GatewayNode;
 import org.onosproject.scalablegateway.api.ScalableGatewayService;
 import org.onosproject.store.serializers.KryoNamespaces;
 import org.onosproject.store.service.ConsistentMap;
@@ -68,7 +67,6 @@ import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.onlab.util.Tools.groupedThreads;
 import static org.onosproject.openstacknetworking.Constants.*;
 import static org.onosproject.openstacknetworking.RulePopulatorUtil.buildExtension;
-import static org.onosproject.openstacknode.OpenstackNodeService.NodeType.GATEWAY;
 
 
 @Service
@@ -156,6 +154,32 @@ public class OpenstackFloatingIpManager extends AbstractVmHandler implements Ope
     }
 
     @Override
+    public void reinstallVmFlow(Host host) {
+        if (host == null) {
+            hostService.getHosts().forEach(h -> {
+                hostDetected(h);
+                log.info("Re-Install data plane flow of virtual machine {}", h);
+            });
+        } else {
+            hostDetected(host);
+            log.info("Re-Install data plane flow of virtual machine {}", host);
+        }
+    }
+
+    @Override
+    public void purgeVmFlow(Host host) {
+        if (host == null) {
+            hostService.getHosts().forEach(h -> {
+                hostRemoved(h);
+                log.info("Purge data plane flow of virtual machine {}", h);
+            });
+        } else {
+            hostRemoved(host);
+            log.info("Purge data plane flow of virtual machine {}", host);
+        }
+    }
+
+    @Override
     public void createFloatingIp(OpenstackFloatingIP floatingIp) {
     }
 
@@ -237,29 +261,32 @@ public class OpenstackFloatingIpManager extends AbstractVmHandler implements Ope
                     .matchIPDst(floatingIp.toIpPrefix())
                     .matchInPort(nodeService.tunnelPort(deviceId).get());
 
-            RulePopulatorUtil.removeRule(
+            RulePopulatorUtil.setRule(
                     flowObjectiveService,
                     appId,
                     deviceId,
                     sOutgoingBuilder.build(),
+                    DefaultTrafficTreatment.builder().build(),
                     ForwardingObjective.Flag.VERSATILE,
-                    FLOATING_RULE_PRIORITY);
+                    FLOATING_RULE_PRIORITY, false);
 
-            RulePopulatorUtil.removeRule(
+            RulePopulatorUtil.setRule(
                     flowObjectiveService,
                     appId,
                     deviceId,
                     sIncomingBuilder.build(),
+                    DefaultTrafficTreatment.builder().build(),
                     ForwardingObjective.Flag.VERSATILE,
-                    FLOATING_RULE_PRIORITY);
+                    FLOATING_RULE_PRIORITY, false);
 
-            RulePopulatorUtil.removeRule(
+            RulePopulatorUtil.setRule(
                     flowObjectiveService,
                     appId,
                     deviceId,
                     sForTrafficFromVmBuilder.build(),
+                    DefaultTrafficTreatment.builder().build(),
                     ForwardingObjective.Flag.VERSATILE,
-                    FLOATING_RULE_FOR_TRAFFIC_FROM_VM_PRIORITY);
+                    FLOATING_RULE_FOR_TRAFFIC_FROM_VM_PRIORITY, false);
         });
     }
 
@@ -366,17 +393,7 @@ public class OpenstackFloatingIpManager extends AbstractVmHandler implements Ope
 
             switch (event.type()) {
                 case COMPLETE:
-                    if (node.type() == GATEWAY) {
-                        log.info("GATEWAY node {} detected", node.hostname());
-                        eventExecutor.execute(() -> {
-                            GatewayNode gnode = GatewayNode.builder()
-                                    .gatewayDeviceId(node.intBridge())
-                                    .dataIpAddress(node.dataIp().getIp4Address())
-                                    .uplinkIntf(node.externalPortName().get())
-                                    .build();
-                            gatewayService.addGatewayNode(gnode);
-                        });
-                    }
+                    reinstallVmFlow(null);
                     break;
                 case INIT:
                 case DEVICE_CREATED:

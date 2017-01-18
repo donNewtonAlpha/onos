@@ -1,0 +1,23 @@
+#!/bin/bash
+
+set -e
+onos-buck -V
+
+rm -f /tmp/publish.sh
+trap "rm -f /tmp/publish.sh /tmp/publish.sh.bak" EXIT
+
+
+onos-buck query "kind('onos_jar', deps('//tools/package:onos-package'))" >> /tmp/publish.sh
+
+sed -i.bak 's/^/onos-buck publish --to-local-repo /g' /tmp/publish.sh
+
+bash /tmp/publish.sh
+
+rm /tmp/publish.sh
+rm /tmp/publish.sh.bak
+
+onos-buck query "testsof(kind('onos_jar', deps('//tools/package:onos-package')))" >> /tmp/publish.sh
+sed -i.bak 's#^#onos-buck publish --to-local-repo #g' /tmp/publish.sh
+
+bash /tmp/publish.sh
+rm /tmp/publish.sh.bak

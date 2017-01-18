@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.onlab.osgi.ServiceDirectory;
+import org.onlab.packet.IpAddress;
 import org.onosproject.cluster.ClusterService;
 import org.onosproject.cluster.NodeId;
 import org.onosproject.incubator.net.PortStatisticsService;
@@ -29,14 +30,18 @@ import org.onosproject.mastership.MastershipService;
 import org.onosproject.net.Annotated;
 import org.onosproject.net.Annotations;
 import org.onosproject.net.Device;
+import org.onosproject.net.DeviceId;
+import org.onosproject.net.Host;
 import org.onosproject.net.device.DeviceService;
 import org.onosproject.net.flow.FlowRuleService;
 import org.onosproject.net.host.HostService;
 import org.onosproject.net.intent.IntentService;
 import org.onosproject.net.link.LinkService;
+import org.onosproject.net.region.Region;
 import org.onosproject.net.statistic.StatisticService;
 import org.onosproject.net.topology.TopologyService;
 import org.onosproject.ui.JsonUtils;
+import org.onosproject.ui.impl.topo.model.UiModelEvent;
 import org.onosproject.ui.model.topo.UiClusterMember;
 import org.onosproject.ui.model.topo.UiDevice;
 import org.onosproject.ui.model.topo.UiHost;
@@ -65,7 +70,7 @@ import static org.onosproject.ui.model.topo.UiNode.LAYER_DEFAULT;
  * Facility for creating JSON messages to send to the topology view in the
  * Web client.
  */
-class Topo2Jsonifier {
+public class Topo2Jsonifier {
 
     private static final String E_DEF_NOT_LAST =
             "UiNode.LAYER_DEFAULT not last in layer list";
@@ -75,6 +80,8 @@ class Topo2Jsonifier {
     private static final String REGION = "region";
     private static final String DEVICE = "device";
     private static final String HOST = "host";
+    private static final String TYPE = "type";
+    private static final String SUBJECT = "subject";
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -106,7 +113,7 @@ class Topo2Jsonifier {
      *
      * @param directory service directory
      */
-    Topo2Jsonifier(ServiceDirectory directory) {
+    public Topo2Jsonifier(ServiceDirectory directory) {
         this.directory = checkNotNull(directory, "Directory cannot be null");
 
         clusterService = directory.get(ClusterService.class);
@@ -159,13 +166,14 @@ class Topo2Jsonifier {
     }
 
     private ObjectNode json(UiClusterMember member, boolean isUiAttached) {
+        int switchCount = mastershipService.getDevicesOf(member.id()).size();
         return objectNode()
                 .put("id", member.id().toString())
                 .put("ip", member.ip().toString())
                 .put("online", member.isOnline())
                 .put("ready", member.isReady())
                 .put("uiAttached", isUiAttached)
-                .put("switches", member.deviceCount());
+                .put("switches", switchCount);
     }
 
     /**
@@ -216,13 +224,8 @@ class Topo2Jsonifier {
             return payload;
         }
         payload.put("id", region.idAsString());
-        if (subRegions != null) {
-            payload.set("subregions", jsonSubRegions(subRegions));
-        }
-
-        if (links != null) {
-            payload.set("links", jsonLinks(links));
-        }
+        payload.set("subregions", jsonSubRegions(subRegions));
+        payload.set("links", jsonLinks(links));
 
         List<String> layerTags = region.layerOrder();
         List<Set<UiNode>> splitDevices = splitByLayer(layerTags, region.devices());
@@ -263,6 +266,29 @@ class Topo2Jsonifier {
         return result;
     }
 
+    /**
+     * Creates a JSON representation of a UI model event.
+     *
+     * @param modelEvent the source model event
+     * @return a JSON representation of that event
+     */
+    public ObjectNode jsonEvent(UiModelEvent modelEvent) {
+        ObjectNode payload = objectNode();
+        payload.put(TYPE, enumToString(modelEvent.type()));
+        payload.put(SUBJECT, modelEvent.subject().idAsString());
+        return payload;
+    }
+
+    // TODO: Investigate why we can't do this inline
+    private String enumToString(Enum<?> e) {
+        return e.toString();
+    }
+
+    // Returns the name of the master node for the specified device id.
+    private String master(DeviceId deviceId) {
+        NodeId master = mastershipService.getMasterFor(deviceId);
+        return master != null ? master.toString() : "";
+    }
 
     private ObjectNode json(UiNode node) {
         if (node instanceof UiRegion) {
@@ -283,7 +309,7 @@ class Topo2Jsonifier {
                 .put("nodeType", DEVICE)
                 .put("type", device.type())
                 .put("online", deviceService.isAvailable(device.id()))
-                .put("master", nullIsEmpty(device.master()))
+                .put("master", master(device.id()))
                 .put("layer", device.layer());
 
         Device d = device.backingDevice();
@@ -295,8 +321,8 @@ class Topo2Jsonifier {
         return node;
     }
 
-    private void addProps(ObjectNode node, Device dev) {
-        Annotations annot = dev.annotations();
+    private void addProps(ObjectNode node, Annotated a) {
+        Annotations annot = a.annotations();
         ObjectNode props = objectNode();
         if (annot != null) {
             annot.keys().forEach(k -> props.put(k, annot.value(k)));
@@ -332,6 +358,17 @@ class Topo2Jsonifier {
         }
     }
 
+    private void addIps(ObjectNode node, Host h) {
+        Set<IpAddress> ips = h.ipAddresses();
+
+        ArrayNode a = arrayNode();
+        for (IpAddress ip : ips) {
+            a.add(ip.toString());
+        }
+
+        node.set("ips", a);
+    }
+
     // return list of string values from annotated instance, for given keys
     // return null if any keys are not present
     List<String> getAnnotValues(Annotated a, String... annotKeys) {
@@ -356,11 +393,18 @@ class Topo2Jsonifier {
     }
 
     private ObjectNode json(UiHost host) {
-        return objectNode()
+        ObjectNode node = objectNode()
                 .put("id", host.idAsString())
                 .put("nodeType", HOST)
                 .put("layer", host.layer());
         // TODO: complete host details
+        Host h = host.backingHost();
+
+        addIps(node, h);
+        addGeoLocation(node, h);
+        addMetaUi(node, host.idAsString());
+
+        return node;
     }
 
     private ObjectNode json(UiSynthLink sLink) {
@@ -389,7 +433,10 @@ class Topo2Jsonifier {
                 .put("nodeType", REGION)
                 .put("nDevs", region.deviceCount())
                 .put("nHosts", region.hostCount());
-        // TODO: complete closed-region details
+
+        Region r = region.backingRegion();
+        addGeoLocation(node, r);
+        addProps(node, r);
 
         addMetaUi(node, region.idAsString());
         return node;

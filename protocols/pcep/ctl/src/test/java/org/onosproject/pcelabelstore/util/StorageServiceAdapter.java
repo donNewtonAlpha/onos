@@ -16,11 +16,15 @@
 package org.onosproject.pcelabelstore.util;
 
 import org.onosproject.store.service.AsyncDocumentTree;
+import org.onosproject.store.service.AsyncConsistentMultimap;
+import org.onosproject.store.service.AsyncConsistentTreeMap;
 import org.onosproject.store.service.AtomicCounterBuilder;
 import org.onosproject.store.service.AtomicValueBuilder;
 import org.onosproject.store.service.ConsistentMapBuilder;
+import org.onosproject.store.service.ConsistentMultimapBuilder;
 import org.onosproject.store.service.ConsistentTreeMapBuilder;
 import org.onosproject.store.service.DistributedSetBuilder;
+import org.onosproject.store.service.DocumentTreeBuilder;
 import org.onosproject.store.service.EventuallyConsistentMapBuilder;
 import org.onosproject.store.service.LeaderElectorBuilder;
 import org.onosproject.store.service.Serializer;
@@ -40,6 +44,11 @@ public class StorageServiceAdapter implements StorageService {
 
     @Override
     public <K, V> ConsistentMapBuilder<K, V> consistentMapBuilder() {
+        return null;
+    }
+
+    @Override
+    public <V> DocumentTreeBuilder<V> documentTreeBuilder() {
         return null;
     }
 
@@ -74,6 +83,16 @@ public class StorageServiceAdapter implements StorageService {
     }
 
     @Override
+    public <K, V> AsyncConsistentMultimap<K, V> getAsyncSetMultimap(String name, Serializer serializer) {
+        return null;
+    }
+
+    @Override
+    public <V> AsyncConsistentTreeMap<V> getAsyncTreeMap(String name, Serializer serializer) {
+        return null;
+    }
+
+    @Override
     public <T> Topic<T> getTopic(String name, Serializer serializer) {
         // TODO Auto-generated method stub
         return null;
@@ -87,6 +106,9 @@ public class StorageServiceAdapter implements StorageService {
 
     @Override
     public <V> AsyncDocumentTree<V> getDocumentTree(String name, Serializer serializer) {
+        return null;
+    }
+    public <K, V> ConsistentMultimapBuilder<K, V> consistentMultimapBuilder() {
         return null;
     }
 }
