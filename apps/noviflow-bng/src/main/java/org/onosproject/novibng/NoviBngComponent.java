@@ -9,8 +9,6 @@ import org.apache.felix.scr.annotations.*;
 import org.onlab.packet.*;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
-import org.onosproject.driver.extensions.NoviflowPopVxLan;
-import org.onosproject.driver.extensions.NoviflowSetVxLan;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.flow.*;
@@ -20,17 +18,17 @@ import org.onosproject.net.flow.DefaultTrafficTreatment;
 import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.flow.TrafficSelector;
 import org.onosproject.net.flow.TrafficTreatment;
+import org.onosproject.net.flow.criteria.Criterion;
+import org.onosproject.net.flow.criteria.IPProtocolCriterion;
 import org.onosproject.net.group.*;
 import org.onosproject.net.meter.*;
 import org.onosproject.net.packet.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.ByteBuffer;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
+import org.onosproject.novibng.config.BngDeviceConfig;
+
+import java.util.*;
 
 
 /**
@@ -45,7 +43,6 @@ public class NoviBngComponent {
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected CoreService coreService;
-
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected FlowRuleService flowRuleService;
@@ -63,51 +60,61 @@ public class NoviBngComponent {
 
     static ApplicationId appId;
 
-    static final DeviceId deviceId = DeviceId.deviceId("of:000000223d5a00d9");
 
-    private static PortNumber uplinkPort = PortNumber.portNumber(8);
-    private static MacAddress uplinkMac = MacAddress.valueOf("a0:36:9f:27:88:f0");
-    private static Ip4Address uplinkIp = Ip4Address.valueOf("10.1.4.1");
-
-    private static MacAddress torMac = MacAddress.valueOf("11:22:33:44:55:66");
-    private static Ip4Address torIp = Ip4Address.valueOf("20.20.0.1");
-    private static Ip4Address torRoutedInterfaceIp = Ip4Address.valueOf("10.1.4.0");
-
-    private LinkedList<Integer> sTagsEnabled = new LinkedList<>();
-
-    private PacketProcessor processor;
+    private static final int ARP_INTERCEPT_PRIORITY = 15000;
+    private static final int ICMP_INTERCEPT_PRIORITY = 14000;
+    private static final int IGMP_INTERCEPT_PRIORITY = 13000;
+    private static final int ENCAPSULATION_PRIORITY = 1600;
+    private static final int DECAPSULATION_PRIORITY = 1000;
 
 
 
+    private NoviBngPacketProcessor processor;
+    //private LinkFailureDetection linkFailureDetection;
 
+    //private HashMap<DeviceId, MulticastHandler> multicastHandlers;
+    private HashMap<DeviceId, BngDeviceConfig> devicesConfig;
+
+    private HashMap<DeviceId, HashMap<Ip4Address, SubscriberInfo>> subscribersInfo;
+    private HashMap<DeviceId, List<TablesInfo>> tablesInfos;
+    private HashMap<DeviceId, List<GatewayInfo>> gatewayInfos;
+
+    private static NoviBngComponent instance = null;
+
+    public static NoviBngComponent getComponent() {
+        return instance;
+
+    }
 
 
     @Activate
     protected void activate() {
 
         log.debug("trying to activate");
+
+        instance = this;
         appId = coreService.registerApplication("org.onosproject.novibng");
 
-        processor = new NoviBngPacketProcessor();
 
+
+        //Multicast
+        //multicastHandlers = new HashMap<>();
+
+        //Configs
+        devicesConfig = new HashMap<>();
+
+        //Packet processor
+        processor = new NoviBngPacketProcessor(packetService);
         packetService.addProcessor(processor, 1);
+        processor.startARPingThread();
 
-        acl();
-        arpIntercept();
-        voIpDetection();
-        downstreamTrafficHandling();
+        //linkFailureDetection = new LinkFailureDetection(flowRuleService, new LinkedList<>());
 
-        for(int i = 2; i < 4 ; i++) {
-
-            for(int j = 2; j < 4 ; j++) {
-
-                int kbpsRate = (2*i+3*j)*1000;
-                addCustomer(i, j, 5, kbpsRate, kbpsRate);
-
-            }
-        }
-
-
+        //L2 infos
+        subscribersInfo = new HashMap<>();
+        
+        //Tables infos
+        tablesInfos = new HashMap<>();
 
         log.info("NoviFlow BNG activated");
 
@@ -117,56 +124,199 @@ public class NoviBngComponent {
     @Deactivate
     protected void deactivate() {
 
+        packetService.removeProcessor(processor);
+        processor.stopARPingThread();
+
+
         flowRuleService.removeFlowRulesById(appId);
 
+        try {
 
-        Iterable<Group> appGroups = groupService.getGroups(deviceId, appId);
-        for(Group group : appGroups) {
-            groupService.removeGroup(group.deviceId(), group.appCookie(), group.appId());
-        }
+            Set<DeviceId> deviceIds = devicesConfig.keySet();
 
-        //Clear meters
-        Collection<Meter> meters = meterService.getMeters(deviceId);
-        for(Meter meter : meters) {
-            if(meter.appId().equals(appId)){
-                meterService.withdraw(DefaultMeterRequest.builder().remove(), meter.id());
+            for(DeviceId deviceId : deviceIds) {
+
+                Iterable<Group> appGroups = groupService.getGroups(deviceId, appId);
+                for (Group group : appGroups) {
+                    groupService.removeGroup(group.deviceId(), group.appCookie(), group.appId());
+                }
+
+                //Clear meters
+                Collection<Meter> meters = meterService.getMeters(deviceId);
+                for (Meter meter : meters) {
+                    if (meter.appId().equals(appId)) {
+                        meterService.withdraw(DefaultMeterRequest.builder().remove(), meter.id());
+                    }
+                }
             }
+
+
+        } catch (Exception e) {
+            log.error("Deactivation exception", e);
         }
-
-
 
         log.info("Stopped");
     }
 
-    private Ip4Address tagsToIpMatching(int sTag, int cTag) {
+   /* private Ip4Address tagsToIpMatching(SubscriberInfo info) {
 
         return Ip4Address.valueOf("20.20." + sTag + "." + cTag);
-    }
+    }*/
 
-    private boolean isStagEnabled(int sTag) {
-        return sTagsEnabled.contains(sTag);
-    }
 
-    private void addCustomer(int sTag, int cTag, int port, int upstreamRate, int downstreamRate) {
+    public void allocateIpBlock(DeviceId deviceId, Ip4Prefix ipBlock, Ip4Address gatewayIp, MacAddress gatewayMac) {
 
-        //Upstream
 
-        if(!isStagEnabled(sTag)){
-            sTagMatch(port, sTag);
+        if(ipBlock.prefixLength() < 24) {
+            //split the block
+            int ip = ipBlock.address().toInt();
+            Ip4Prefix subBlock1 = Ip4Prefix.valueOf(Ip4Address.valueOf(ip) , ipBlock.prefixLength() + 1);
+            Ip4Prefix subBlock2 = Ip4Prefix.valueOf(Ip4Address.valueOf(ip + (int)Math.pow(2, 32 - ipBlock.prefixLength())), ipBlock.prefixLength() + 1);
+
+            allocateIpBlock(deviceId, subBlock1, gatewayIp, gatewayMac);
+            allocateIpBlock(deviceId, subBlock2, gatewayIp, gatewayMac);
+            return;
         }
 
-        meterAssignmentAndOut(sTag, cTag, upstreamRate);
+
+        //Configure gateway
+        List<GatewayInfo> deviceGateways = gatewayInfos.get(deviceId);
+        boolean addNewGateway = true;
+        for(GatewayInfo info : deviceGateways) {
+
+            if(info.getGatewayIp().equals(gatewayIp)) {
+                addNewGateway = false;
+                info.addIpBlock(ipBlock);
+            }
+
+        }
+        if(addNewGateway) {
+            //Add the gateway to the list of gateway needing to respond, and track which gateway for which block
+            GatewayInfo newGatewayInfo = new GatewayInfo(gatewayIp);
+            newGatewayInfo.addIpBlock(ipBlock);
+            gatewayInfos.get(deviceId).add(newGatewayInfo);
+            //add the flows (ARP, PING) for the gateway
+            arpIntercept(gatewayIp, deviceId);
+            icmpIntercept(gatewayIp, deviceId);
+            processor.addRoutingInfo(deviceId, PortNumber.ANY, ipBlock, gatewayIp, gatewayMac);
+            //TODO: Not optimal, there may be problem with processor.getMac()
+
+        }
 
 
-        //Downstream
+        int tableMax = 0;
+        boolean blockAssigned = false;
 
-        downstreamCtag(sTag, cTag);
-        downstreamStag(sTag, cTag, port, downstreamRate);
+        for(TablesInfo tablesInfo : tablesInfos.get(deviceId)) {
+            if(tablesInfo.containsBlock(ipBlock)) {
+                blockAssigned = true;
+            }
+        }
+
+        for(TablesInfo tableInfo : tablesInfos.get(deviceId)) {
+            if(!blockAssigned) {
+
+                if (tableInfo.tryAddIpBlock(ipBlock)) {
+                    //Block assigned
+                    blockAssigned = true;
+                    tableSplit(tableInfo, ipBlock, deviceId);
+                } else {
+                    if (tableInfo.getRootTable() > tableMax) {
+                        tableMax = tableInfo.getRootTable();
+                    }
+                }
+            }
+        }
+
+        if(!blockAssigned) {
+            //All tables are full, need a new table set
+            TablesInfo newTable = new TablesInfo(tableMax + TablesInfo.CONSECUTIVES_TABLES);
+            if(!newTable.tryAddIpBlock(ipBlock)){
+                log.error("Unable to add ip block in new tables !!!!!");
+                return;
+            }
+            tablesInfos.get(deviceId).add(newTable);
+            tableSplit(newTable, ipBlock, deviceId);
+
+        }
+        
+    }
+    
+    public void addSubscriber(Ip4Address subscriberIp, Ip4Address gatewayIp, int uploadSpeed, int downloadSpeed, DeviceId deviceId) {
+
+        //Check if the subscriber is already configured on this device
+        if(subscribersInfo.get(deviceId).containsKey(subscriberIp)){
+            log.info("Subscriber " + subscriberIp + " already configured on device " + deviceId);
+            //Send to modifySubscriber instead
+            modifySubscriber(subscriberIp, gatewayIp, uploadSpeed, downloadSpeed);
+
+        }
 
 
     }
 
-    private void downstreamCtag(int sTag, int cTag) {
+    public void modifySubscriber(Ip4Address subscriberIp, Ip4Address gatewayIp, int uploadSpeed, int downloadSpeed) {
+        //TODO:
+        //verify if there is a difference with previous configuration
+        //remove former config
+        //add new config
+
+
+    }
+
+    public void tableSplit(TablesInfo tableInfo, Ip4Prefix ipBlock, DeviceId deviceId) {
+
+
+        for(int i = 0; i <TablesInfo.CONSECUTIVES_TABLES; i++) {
+
+            //Downstream flow
+
+            TrafficSelector.Builder selectorDownStream = DefaultTrafficSelector.builder();
+            selectorDownStream.matchIPDscp(TablesInfo.DSCP_LEVELS[i]);
+            selectorDownStream.matchIPDst(ipBlock);
+
+
+            TrafficTreatment.Builder treatmentDownstream = DefaultTrafficTreatment.builder();
+            treatmentDownstream.transition(tableInfo.getRootTable() + 1);
+
+            FlowRule.Builder ruleDownstream = DefaultFlowRule.builder();
+            ruleDownstream.withSelector(selectorDownStream.build());
+            ruleDownstream.withTreatment(treatmentDownstream.build());
+            ruleDownstream.withPriority(2000);
+            ruleDownstream.forTable(0);
+            ruleDownstream.fromApp(appId);
+            ruleDownstream.forDevice(deviceId);
+            ruleDownstream.makePermanent();
+
+            flowRuleService.applyFlowRules(ruleDownstream.build());
+
+            //Upstream flow
+
+            TrafficSelector.Builder selectorUpstream = DefaultTrafficSelector.builder();
+            selectorUpstream.matchIPDscp(TablesInfo.DSCP_LEVELS[i]);
+            selectorUpstream.matchIPDst(ipBlock);
+
+
+            TrafficTreatment.Builder treatmentUpstream = DefaultTrafficTreatment.builder();
+            treatmentUpstream.transition(tableInfo.getRootTable() + 1);
+
+            FlowRule.Builder ruleUpstream = DefaultFlowRule.builder();
+            ruleUpstream.withSelector(selectorUpstream.build());
+            ruleUpstream.withTreatment(treatmentUpstream.build());
+            ruleUpstream.withPriority(2500);
+            ruleUpstream.forTable(0);
+            ruleUpstream.fromApp(appId);
+            ruleUpstream.forDevice(deviceId);
+            ruleUpstream.makePermanent();
+
+            flowRuleService.applyFlowRules(ruleDownstream.build());
+
+        }
+    }
+
+
+/*
+    private void downstreamCtag(int sTag, int cTag, DeviceId deviceId) {
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchIPDst(tagsToIpMatching(sTag, cTag).toIpPrefix());
@@ -190,7 +340,7 @@ public class NoviBngComponent {
 
     }
 
-    private void downstreamStag(int sTag, int cTag, int port, int kbps) {
+    private void downstreamStag(int sTag, int cTag, int port, int kbps, DeviceId deviceId) {
 
         //create a new meter
         MeterRequest.Builder meter = DefaultMeterRequest.builder();
@@ -232,7 +382,7 @@ public class NoviBngComponent {
 
     }
 
-    private void downstreamTrafficHandling(){
+    private void downstreamTrafficHandling(DeviceId deviceId){
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchInPort(uplinkPort);
@@ -307,49 +457,7 @@ public class NoviBngComponent {
         flowRuleService.applyFlowRules(rule.build());
     }
 
-    private void acl(){
 
-        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
-
-        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
-        treatment.transition(3);
-
-        FlowRule.Builder rule = DefaultFlowRule.builder();
-        rule.withSelector(selector.build());
-        rule.withTreatment(treatment.build());
-        rule.withPriority(1);
-        rule.forTable(1);
-        rule.fromApp(appId);
-        rule.forDevice(deviceId);
-        rule.makePermanent();
-
-        flowRuleService.applyFlowRules(rule.build());
-
-        aclDropFlow(Ip4Address.valueOf("12.34.56.78"), null);
-
-    }
-
-    private void voIpDetection() {
-
-        //TODO
-
-        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
-
-        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
-        treatment.transition(4);
-
-        FlowRule.Builder rule = DefaultFlowRule.builder();
-        rule.withSelector(selector.build());
-        rule.withTreatment(treatment.build());
-        rule.withPriority(1);
-        rule.forTable(3);
-        rule.fromApp(appId);
-        rule.forDevice(deviceId);
-        rule.makePermanent();
-
-        flowRuleService.applyFlowRules(rule.build());
-
-    }
 
     private void meterAssignmentAndOut(int sTag, int cTag, int kbps){
 
@@ -390,14 +498,18 @@ public class NoviBngComponent {
 
         flowRuleService.applyFlowRules(rule.build());
 
-    }
+    }*/
 
-    private void arpIntercept() {
-        
-        //TODO : make a table rule and integrate IGMP  (table 20) ?
+    // ------------------------------------------------------------
+
+    //Intercepts
+
+    private void arpIntercept(Ip4Address respondFor, DeviceId deviceId) {
+
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchEthType(Ethernet.TYPE_ARP);
+        selector.matchArpTpa(respondFor);
 
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
@@ -406,7 +518,7 @@ public class NoviBngComponent {
         FlowRule.Builder rule = DefaultFlowRule.builder();
         rule.withSelector(selector.build());
         rule.withTreatment(treatment.build());
-        rule.withPriority(10000);
+        rule.withPriority(ARP_INTERCEPT_PRIORITY);
         rule.forTable(0);
         rule.fromApp(appId);
         rule.forDevice(deviceId);
@@ -415,140 +527,191 @@ public class NoviBngComponent {
         flowRuleService.applyFlowRules(rule.build());
     }
 
+    private void icmpIntercept(Ip4Address respondFor, DeviceId deviceId) {
+
+        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+        selector.matchEthType(Ethernet.TYPE_IPV4);
+        selector.matchIPDst(respondFor.toIpPrefix());
+        selector.matchIPProtocol(IPv4.PROTOCOL_ICMP);
 
 
-    private class NoviBngPacketProcessor implements PacketProcessor {
+        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+        treatment.punt();
 
+        FlowRule.Builder rule = DefaultFlowRule.builder();
+        rule.withSelector(selector.build());
+        rule.withTreatment(treatment.build());
+        rule.withPriority(ICMP_INTERCEPT_PRIORITY);
+        rule.forTable(0);
+        rule.fromApp(appId);
+        rule.forDevice(deviceId);
+        rule.makePermanent();
 
-        @Override
-        public void process(PacketContext context) {
-            if (context.isHandled()) {
-                return;
-            }
+        flowRuleService.applyFlowRules(rule.build());
 
-            try {
-                InboundPacket pkt = context.inPacket();
+    }
 
+    private void clearIntercepts(DeviceId deviceId) {
 
-                Ethernet ethPkt = pkt.parsed();
-                IPacket payload = ethPkt.getPayload();
+        Iterable<FlowRule> flows = flowRuleService.getFlowRulesById(appId);
 
-                if (payload instanceof ARP) {
+        for (FlowRule flow :flows) {
 
-                    log.debug("ARP packet received by phase 1");
+            if (flow.deviceId().equals(deviceId)) {
 
-                    ARP arp = (ARP) payload;
-
-                    PortNumber inPort = pkt.receivedFrom().port();
-
-                    if (arp.getOpCode() == ARP.OP_REQUEST) {
-                        log.debug("It is an ARP request");
-                        handleArpRequest(inPort, ethPkt);
-                    } else {
-                        log.debug("It is an ARP reply");
-                        handleArpReply(inPort, ethPkt);
+                if(flow.selector().getCriterion(Criterion.Type.ARP_TPA) != null) {
+                    //ARP intercepts
+                    flowRuleService.removeFlowRules(flow);
+                } else if (flow.selector().getCriterion(Criterion.Type.IP_PROTO) != null){
+                    IPProtocolCriterion proto = (IPProtocolCriterion) flow.selector().getCriterion(Criterion.Type.IP_PROTO);
+                    if(proto.protocol() == 1 || proto.protocol() == 2) {
+                        //ICMP or IGMP intercepts
+                        flowRuleService.removeFlowRules(flow);
                     }
                 }
-            } catch(Exception e){
-                log.error("Exception during processing" , e);
-            }
-        }
-        
-
-        private void handleArpRequest(PortNumber inPort, Ethernet ethPkt) {
-            ARP arpRequest = (ARP) ethPkt.getPayload();
-            
-
-            // ARP request for router. Send ARP reply.
-            if (isArpForTor(arpRequest)) {
-                sendArpResponse(ethPkt, arpRequest, inPort);
-            }
-        }
-
-        private void handleArpReply(PortNumber inPort, Ethernet ethPkt) {
-            ARP arpReply = (ARP) ethPkt.getPayload();
-
-
-            // ARP reply for router. Process all pending IP packets.
-            Ip4Address hostIpAddress = Ip4Address.valueOf(arpReply.getSenderProtocolAddress());
-            if(hostIpAddress.equals(uplinkIp)) {
-                MacAddress newUplinkMac = MacAddress.valueOf(arpReply.getSenderHardwareAddress());
-                //Check if the one previously on file was different
-                if(uplinkMac != null && !newUplinkMac.equals(uplinkMac)){
-                    //The Mac has changed, need to refresh the flows
-                }
-                log.info("Uplink MAC found : "  +newUplinkMac.toString());
-            }
-        }
-
-
-        private boolean isArpForTor(ARP arpMsg) {
-            Ip4Address targetProtocolAddress = Ip4Address.valueOf(
-                    arpMsg.getTargetProtocolAddress());
-            return (targetProtocolAddress.equals(torIp)||targetProtocolAddress.equals(torRoutedInterfaceIp));
-        }
-
-
-        public void sendArpRequest(IpAddress targetAddress, PortNumber dstPort, VlanId vlanId) {
-
-
-            ARP arpRequest = new ARP();
-            arpRequest.setHardwareType(ARP.HW_TYPE_ETHERNET)
-                    .setProtocolType(ARP.PROTO_TYPE_IP)
-                    .setHardwareAddressLength(
-                            (byte) Ethernet.DATALAYER_ADDRESS_LENGTH)
-                    .setProtocolAddressLength((byte) Ip4Address.BYTE_LENGTH)
-                    .setOpCode(ARP.OP_REQUEST)
-                    .setSenderHardwareAddress(torMac.toBytes())
-                    .setTargetHardwareAddress(MacAddress.ZERO.toBytes())
-                    .setSenderProtocolAddress(torIp.toOctets())
-                    .setTargetProtocolAddress(targetAddress.toOctets());
-
-            Ethernet eth = new Ethernet();
-            eth.setDestinationMACAddress(MacAddress.BROADCAST.toBytes())
-                    .setSourceMACAddress(torMac)
-                    .setEtherType(Ethernet.TYPE_ARP).setPayload(arpRequest);
-
-            if(!vlanId.equals(VlanId.NONE)){
-                eth.setVlanID(vlanId.toShort());
             }
 
-            TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
-            treatment.setOutput(dstPort);
-            OutboundPacket outPacket = new DefaultOutboundPacket(deviceId,
-                    treatment.build(), ByteBuffer.wrap(eth.serialize()));
-
-            packetService.emit(outPacket);
-        }
-
-        private void sendArpResponse(Ethernet eth, ARP arpRequest, PortNumber dstPort) {
-            ARP arpReply = new ARP();
-            arpReply.setHardwareType(ARP.HW_TYPE_ETHERNET)
-                    .setProtocolType(ARP.PROTO_TYPE_IP)
-                    .setHardwareAddressLength(
-                            (byte) Ethernet.DATALAYER_ADDRESS_LENGTH)
-                    .setProtocolAddressLength((byte) Ip4Address.BYTE_LENGTH)
-                    .setOpCode(ARP.OP_REPLY)
-                    .setSenderHardwareAddress(torMac.toBytes())
-                    .setSenderProtocolAddress(arpRequest.getTargetProtocolAddress())
-                    .setTargetHardwareAddress(arpRequest.getSenderHardwareAddress())
-                    .setTargetProtocolAddress(arpRequest.getSenderProtocolAddress());
-
-            //Modify the original request and send it back : It keeps the proper vlan tagging
-            eth.setDestinationMACAddress(arpRequest.getSenderHardwareAddress())
-                    .setSourceMACAddress(torMac)
-                    .setEtherType(Ethernet.TYPE_ARP)
-                    .setPayload(arpReply);
-            
-
-            TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
-            treatment.setOutput(dstPort);
-            OutboundPacket outPacket = new DefaultOutboundPacket(deviceId,
-                    treatment.build(), ByteBuffer.wrap(eth.serialize()));
-
-            packetService.emit(outPacket);
         }
     }
+
+    //--------------------------------------------------------
+
+    //Config
+
+
+    public void checkNewConfig(BngDeviceConfig aggConfig) {
+
+        BngDeviceConfig oldConfig = devicesConfig.get(aggConfig.getDeviceId());
+
+        if(oldConfig != null) {
+            //A config already exist for this device
+            //Check if different
+            if(aggConfig.equals(oldConfig)) {
+                log.info("This config for device " + aggConfig.getDeviceId() + " has not changed");
+                return;
+            } else {
+                log.info("Config for device " + aggConfig.getDeviceId() + " has been modified");
+                newConfig(aggConfig);
+                devicesConfig.replace(aggConfig.getDeviceId(), aggConfig);
+            }
+        } else {
+            // Config did not exist
+            log.info("New config for device " + aggConfig.getDeviceId());
+            newConfig(aggConfig);
+            devicesConfig.put(aggConfig.getDeviceId(), aggConfig);
+
+        }
+
+    }
+
+    private void newConfig(BngDeviceConfig config) {
+
+
+        DeviceId deviceId = config.getDeviceId();
+        log.info("Ready to remove old config for " + deviceId);
+
+        //Clean up old knowledge
+        clearIntercepts(deviceId);
+
+        processor.clearRoutingInfo(deviceId);
+
+        //For now do not clear it everytime : ??
+        //Only initiate it for the first time
+        if(!subscribersInfo.containsKey(deviceId)) {
+            subscribersInfo.put(deviceId, new HashMap<>());
+        }
+        
+        if(!tablesInfos.containsKey(deviceId)) {
+            List<TablesInfo> deviceTablesInfo = new LinkedList<>();
+            deviceTablesInfo.add(new TablesInfo(1));
+            tablesInfos.put(deviceId, deviceTablesInfo);
+        }
+
+        if(!gatewayInfos.containsKey(deviceId)) {
+            gatewayInfos.put(deviceId, new LinkedList<>());
+        }
+
+/*        //TODO
+        getMulticastHandler(deviceId).kill();
+        removeMulticastHandler(deviceId);*/
+
+        //TODO
+        //linkFailureDetection.removeDevice(deviceId);
+
+        log.info("Old knowledge cleared");
+
+
+        //New Knowledge
+
+        //IPs the agg switch is responding to ARP
+        arpIntercept(config.getPrimaryLinkIp(), deviceId);
+        arpIntercept(config.getSecondaryLinkIp(), deviceId);
+
+        //IPs the agg switch is responding to ping
+        icmpIntercept(config.getLoopbackIP(), deviceId);
+        icmpIntercept(config.getPrimaryLinkIp(), deviceId);
+        icmpIntercept(config.getSecondaryLinkIp(), deviceId);
+
+        log.info("New intercepts set up");
+
+        //loopback
+        processor.addRoutingInfo(deviceId, config.getPrimaryLinkPort(), Ip4Prefix.valueOf(config.getLoopbackIP(), 24), config.getLoopbackIP(), MacAddress.valueOf("00:00:00:00:00:00"));
+        processor.addRoutingInfo(deviceId, config.getSecondaryLinkPort(), Ip4Prefix.valueOf(config.getLoopbackIP(), 24), config.getLoopbackIP(), MacAddress.valueOf("00:00:00:00:00:00"));
+        //Uplinks
+        processor.addRoutingInfo(deviceId, config.getPrimaryLinkPort(), config.getPrimaryLinkSubnet(), config.getPrimaryLinkIp(), config.getPrimaryLinkMac());
+        processor.addRoutingInfo(deviceId, config.getSecondaryLinkPort(), config.getSecondaryLinkSubnet(), config.getSecondaryLinkIp(), config.getSecondaryLinkMac());
+
+        log.info("Routing infos added");
+
+       /*
+        //TODO
+        igmpIntercept(deviceId);
+        addMulticastHandler(deviceId);
+
+        log.info("Multicast handler added");*/
+
+        //TODO : LinkFailureDetection
+
+        //linkFailureDetection.addRedundancyPort(new ConnectPoint(deviceId, config.getPrimaryLinkPort()));
+        //linkFailureDetection.addRedundancyPort(new ConnectPoint(deviceId, config.getSecondaryLinkPort()));
+
+        log.info("Link failure detection set up");
+
+    }
+
+    //--------------------------------------------------------------------------------
+
+    //Link failure
+
+    public void notifyFailure(DeviceId deviceId, PortNumber port, MacAddress oldMac) {
+        log.warn("Failure detected :  device " + deviceId +", port " + port);
+        log.error("Link Failure detection not yet implemented : notifyFailure()");
+        //TODO
+        //linkFailureDetection.event(deviceId, port, true, false, oldMac, null);
+    }
+
+    public void notifyRecovery(DeviceId deviceId, PortNumber port, MacAddress oldMac, MacAddress newDstMac) {
+        log.warn("Recovery detected :  device " + deviceId +", port " + port + " changing MAC form " + oldMac + " to " + newDstMac);
+        log.error("Link Failure detection not yet implemented : notifyRecovery()");
+        //TODO:
+        //linkFailureDetection.event(deviceId, port, false, true, oldMac, newDstMac);
+    }
+
+    public void notifyRecovery(DeviceId deviceId, PortNumber port, MacAddress oldMac) {
+        log.warn("Recovery detected :  device " + deviceId +", port " + port);
+        log.error("Link Failure detection not yet implemented : notifyRecovery()");
+        //TODO:
+        //linkFailureDetection.event(deviceId, port, false, false, oldMac, null);
+    }
+
+    public void notifyMacChange(DeviceId deviceId, PortNumber port, MacAddress oldMac, MacAddress newDstMac) {
+        log.error("Link Failure detection not yet implemented : notifyMacChange()");
+        //TODO:
+        notifyFailure(deviceId, port, oldMac);
+        notifyRecovery(deviceId, port, oldMac, newDstMac);
+    }
+
+
 
 
 

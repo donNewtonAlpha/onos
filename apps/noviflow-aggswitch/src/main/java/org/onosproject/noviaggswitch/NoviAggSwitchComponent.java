@@ -83,8 +83,8 @@ public class NoviAggSwitchComponent {
     static ApplicationId appId;
 
 
-    static final DeviceId noviflow = DeviceId.deviceId("of:000000223d5a00d9");
-/*
+  /*  static final DeviceId noviflow = DeviceId.deviceId("of:000000223d5a00d9");
+
     private static MacAddress switchMac = MacAddress.valueOf("68:05:33:44:55:66");
     private static Ip4Address aggSwitchIP = Ip4Address.valueOf("10.50.1.1");
     private static Ip4Address primaryLinkIP = Ip4Address.valueOf("10.10.1.0");
@@ -781,8 +781,11 @@ public class NoviAggSwitchComponent {
                     //ARP intercepts
                     flowRuleService.removeFlowRules(flow);
                 } else if (flow.selector().getCriterion(Criterion.Type.IP_PROTO) != null){
-                    //ICMP or IGMP intercepts
-                    flowRuleService.removeFlowRules(flow);
+                    IPProtocolCriterion proto = (IPProtocolCriterion) flow.selector().getCriterion(Criterion.Type.IP_PROTO);
+                    if(proto.protocol() == 1 || proto.protocol() == 2) {
+                        //ICMP or IGMP intercepts
+                        flowRuleService.removeFlowRules(flow);
+                    }
                 }
             }
 

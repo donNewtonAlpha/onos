@@ -263,7 +263,7 @@ public class NoviAggSwitchConfig extends Config<ApplicationId> {
     }
 
     public void testConfig(){
-        log.info("Testing the config, valid : " + isValid() +", " + toString());
+        log.info("Testing the config, valid : " + isValid() +"\n" + toString());
     }
 
 
