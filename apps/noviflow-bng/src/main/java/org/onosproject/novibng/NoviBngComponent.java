@@ -64,8 +64,10 @@ public class NoviBngComponent {
     private static final int ARP_INTERCEPT_PRIORITY = 15000;
     private static final int ICMP_INTERCEPT_PRIORITY = 14000;
     private static final int IGMP_INTERCEPT_PRIORITY = 13000;
-    private static final int ENCAPSULATION_PRIORITY = 1600;
-    private static final int DECAPSULATION_PRIORITY = 1000;
+    private static final int SUBSCRIBER_DOWNSTREAM_EXIT_PRIORITY = 1600;
+    private static final int SUBSCRIBER_DOWNSTREAM_TRANSITION_PRIORITY = 1400;
+    private static final int SUBSCRIBER_UPSTREAM_EXIT_PRIORITY = 1300;
+    private static final int SUBSCRIBER_UPSTREAM_TRANSITION_PRIORITY = 1100;
 
 
 
@@ -115,6 +117,9 @@ public class NoviBngComponent {
         
         //Tables infos
         tablesInfos = new HashMap<>();
+
+        //Gateway infos
+        gatewayInfos = new HashMap<>();
 
         log.info("NoviFlow BNG activated");
 
@@ -192,7 +197,7 @@ public class NoviBngComponent {
         }
         if(addNewGateway) {
             //Add the gateway to the list of gateway needing to respond, and track which gateway for which block
-            GatewayInfo newGatewayInfo = new GatewayInfo(gatewayIp);
+            GatewayInfo newGatewayInfo = new GatewayInfo(gatewayIp, gatewayMac);
             newGatewayInfo.addIpBlock(ipBlock);
             gatewayInfos.get(deviceId).add(newGatewayInfo);
             //add the flows (ARP, PING) for the gateway
@@ -252,6 +257,42 @@ public class NoviBngComponent {
 
         }
 
+        //Check if gateway and ip block are enabled
+        boolean readyToProvision = false;
+
+        for(GatewayInfo gatewayInfo : gatewayInfos.get(deviceId)) {
+            if(gatewayInfo.getGatewayIp().equals(gatewayIp)) {
+                //gateway OK, check Ip block
+                if(gatewayInfo.containsIp(subscriberIp)) {
+                    readyToProvision = true;
+                } else {
+                    log.error("Gateway " + gatewayIp + " is ready but the ip block for subscriber " + subscriberIp + " has not been provisioned");
+                    return;
+                }
+            }
+        }
+
+        if(!readyToProvision) {
+            log.error("Gateway " + gatewayIp + " is not provisioned");
+            return;
+        }
+
+        //Find which table deal with this
+        TablesInfo matchingTableInfo = null;
+        for(TablesInfo tableInfo : tablesInfos.get(deviceId)) {
+
+            if(tableInfo.containsIp(subscriberIp)) {
+                matchingTableInfo = tableInfo;
+            }
+        }
+
+        if(matchingTableInfo == null) {
+            log.error("No table configured for " + subscriberIp + " !! Yet gateway and ip block OK !?!?!!");
+            return;
+        }
+
+        //Add subscriber to standby list
+
 
     }
 
@@ -263,6 +304,155 @@ public class NoviBngComponent {
 
 
     }
+
+    private void addSubscriberFlows(Ip4Address subscriberIp, SubscriberInfo subscriberInfo, TablesInfo tableInfo, DeviceId deviceId) {
+
+        //TODO : redundancy (link failure)
+        GatewayInfo matchingGatewayInfo = null;
+
+        for(GatewayInfo gwInfo : gatewayInfos.get(deviceId)){
+            if(gwInfo.getGatewayIp().equals(subscriberInfo.getGatewayIp())){
+                matchingGatewayInfo = gwInfo;
+            }
+        }
+
+        if(matchingGatewayInfo == null) {
+            log.error("No matching gateway info were found for " + subscriberInfo.getGatewayIp() + " !!?!?!?!?!");
+            return;
+        }
+
+        for(int i = 0; i < TablesInfo.CONSECUTIVES_TABLES; i++) {
+
+            //Downstream flow
+
+
+            MeterRequest.Builder downstreamMeter = DefaultMeterRequest.builder();
+            downstreamMeter.forDevice(deviceId);
+            downstreamMeter.fromApp(appId);
+            downstreamMeter.withUnit(Meter.Unit.KB_PER_SEC);
+            Band.Builder downstreamBand = DefaultBand.builder();
+            downstreamBand.withRate(subscriberInfo.getDownloadSpeed());
+            downstreamBand.ofType(Band.Type.DROP);
+            downstreamMeter.withBands(Collections.singleton(downstreamBand.build()));
+
+            Meter finalDownstreamMeter = meterService.submit(downstreamMeter.add());
+
+
+            TrafficSelector.Builder selectorDownStream = DefaultTrafficSelector.builder();
+            selectorDownStream.matchIPDscp(TablesInfo.DSCP_LEVELS[i]);
+            selectorDownStream.matchIPDst(subscriberIp.toIpPrefix());
+
+
+            TrafficTreatment.Builder treatmentDownstream = DefaultTrafficTreatment.builder();
+            treatmentDownstream.meter(finalDownstreamMeter.id());
+            //routing
+            treatmentDownstream.setEthSrc(matchingGatewayInfo.getGatewayMac());
+            treatmentDownstream.setEthDst(subscriberInfo.getMac());
+            treatmentDownstream.setQueue(i);
+            treatmentDownstream.setOutput(subscriberInfo.getPort());
+            if(i < TablesInfo.CONSECUTIVES_TABLES - 1) {
+                treatmentDownstream.transition(tableInfo.getRootTable() + i + 1);
+            }
+
+            FlowRule.Builder ruleDownstream = DefaultFlowRule.builder();
+            ruleDownstream.withSelector(selectorDownStream.build());
+            ruleDownstream.withTreatment(treatmentDownstream.build());
+            ruleDownstream.withPriority(SUBSCRIBER_DOWNSTREAM_EXIT_PRIORITY);
+            ruleDownstream.forTable(tableInfo.getRootTable() + i);
+            ruleDownstream.fromApp(appId);
+            ruleDownstream.forDevice(deviceId);
+            ruleDownstream.makePermanent();
+
+            flowRuleService.applyFlowRules(ruleDownstream.build());
+
+            if (i > 0 && i < (TablesInfo.CONSECUTIVES_TABLES - 1)) {
+
+                TrafficSelector.Builder selectorDownStream2 = DefaultTrafficSelector.builder();
+                selectorDownStream2.matchIPDst(subscriberIp.toIpPrefix());
+
+                TrafficTreatment.Builder treatmentDownstream2 = DefaultTrafficTreatment.builder();
+                treatmentDownstream2.meter(finalDownstreamMeter.id());
+                treatmentDownstream2.transition(tableInfo.getRootTable() + i + 1);
+
+                FlowRule.Builder ruleDownstream2 = DefaultFlowRule.builder();
+                ruleDownstream2.withSelector(selectorDownStream2.build());
+                ruleDownstream2.withTreatment(treatmentDownstream2.build());
+                ruleDownstream2.withPriority(SUBSCRIBER_DOWNSTREAM_TRANSITION_PRIORITY);
+                ruleDownstream2.forTable(tableInfo.getRootTable() + i);
+                ruleDownstream2.fromApp(appId);
+                ruleDownstream2.forDevice(deviceId);
+                ruleDownstream2.makePermanent();
+
+                flowRuleService.applyFlowRules(ruleDownstream.build());
+
+            }
+
+            //Upstream flow
+
+            MeterRequest.Builder uptreamMeter = DefaultMeterRequest.builder();
+            uptreamMeter.forDevice(deviceId);
+            uptreamMeter.fromApp(appId);
+            uptreamMeter.withUnit(Meter.Unit.KB_PER_SEC);
+            Band.Builder upstreamBand = DefaultBand.builder();
+            upstreamBand.withRate(subscriberInfo.getDownloadSpeed());
+            upstreamBand.ofType(Band.Type.DROP);
+            uptreamMeter.withBands(Collections.singleton(upstreamBand.build()));
+
+            Meter finalUpstreamMeter = meterService.submit(downstreamMeter.add());
+
+            TrafficSelector.Builder selectorUpstream = DefaultTrafficSelector.builder();
+            selectorUpstream.matchIPDscp(TablesInfo.DSCP_LEVELS[i]);
+            selectorUpstream.matchIPSrc(subscriberIp.toIpPrefix());
+
+
+            TrafficTreatment.Builder treatmentUpstream = DefaultTrafficTreatment.builder();
+            treatmentUpstream.meter(finalUpstreamMeter.id());
+            treatmentUpstream.setEthSrc(matchingGatewayInfo.getGatewayMac());
+            treatmentUpstream.setEthDst(processor.getMac(devicesConfig.get(deviceId).getPrimaryNextHopIp(), deviceId));
+            treatmentUpstream.setQueue(i);
+            treatmentUpstream.setOutput(devicesConfig.get(deviceId).getPrimaryLinkPort());
+            if(i < TablesInfo.CONSECUTIVES_TABLES - 1) {
+                treatmentUpstream.transition(tableInfo.getRootTable() + i + 1);
+            }
+
+            FlowRule.Builder ruleUpstream = DefaultFlowRule.builder();
+            ruleUpstream.withSelector(selectorUpstream.build());
+            ruleUpstream.withTreatment(treatmentUpstream.build());
+            ruleUpstream.withPriority(SUBSCRIBER_UPSTREAM_EXIT_PRIORITY);
+            ruleUpstream.forTable(tableInfo.getRootTable() + i);
+            ruleUpstream.fromApp(appId);
+            ruleUpstream.forDevice(deviceId);
+            ruleUpstream.makePermanent();
+
+            flowRuleService.applyFlowRules(ruleDownstream.build());
+
+            if (i > 0 && i < (TablesInfo.CONSECUTIVES_TABLES - 1)) {
+
+                TrafficSelector.Builder selectorUpstream2 = DefaultTrafficSelector.builder();
+                selectorUpstream2.matchIPSrc(subscriberIp.toIpPrefix());
+
+
+                TrafficTreatment.Builder treatmentUpstream2 = DefaultTrafficTreatment.builder();
+                treatmentUpstream2.meter(finalUpstreamMeter.id());
+                treatmentUpstream2.transition(tableInfo.getRootTable() + i + 1);
+
+                FlowRule.Builder ruleUpstream2 = DefaultFlowRule.builder();
+                ruleUpstream2.withSelector(selectorUpstream2.build());
+                ruleUpstream2.withTreatment(treatmentUpstream2.build());
+                ruleUpstream2.withPriority(SUBSCRIBER_UPSTREAM_TRANSITION_PRIORITY);
+                ruleUpstream2.forTable(tableInfo.getRootTable() + i);
+                ruleUpstream2.fromApp(appId);
+                ruleUpstream2.forDevice(deviceId);
+                ruleUpstream2.makePermanent();
+
+                flowRuleService.applyFlowRules(ruleDownstream.build());
+
+            }
+        }
+    }
+
+
+
 
     public void tableSplit(TablesInfo tableInfo, Ip4Prefix ipBlock, DeviceId deviceId) {
 
@@ -277,7 +467,7 @@ public class NoviBngComponent {
 
 
             TrafficTreatment.Builder treatmentDownstream = DefaultTrafficTreatment.builder();
-            treatmentDownstream.transition(tableInfo.getRootTable() + 1);
+            treatmentDownstream.transition(tableInfo.getRootTable() + i);
 
             FlowRule.Builder ruleDownstream = DefaultFlowRule.builder();
             ruleDownstream.withSelector(selectorDownStream.build());
@@ -294,11 +484,11 @@ public class NoviBngComponent {
 
             TrafficSelector.Builder selectorUpstream = DefaultTrafficSelector.builder();
             selectorUpstream.matchIPDscp(TablesInfo.DSCP_LEVELS[i]);
-            selectorUpstream.matchIPDst(ipBlock);
+            selectorUpstream.matchIPSrc(ipBlock);
 
 
             TrafficTreatment.Builder treatmentUpstream = DefaultTrafficTreatment.builder();
-            treatmentUpstream.transition(tableInfo.getRootTable() + 1);
+            treatmentUpstream.transition(tableInfo.getRootTable() + i);
 
             FlowRule.Builder ruleUpstream = DefaultFlowRule.builder();
             ruleUpstream.withSelector(selectorUpstream.build());
@@ -631,11 +821,11 @@ public class NoviBngComponent {
             gatewayInfos.put(deviceId, new LinkedList<>());
         }
 
-/*        //TODO
+/*        //TODO : multicast
         getMulticastHandler(deviceId).kill();
         removeMulticastHandler(deviceId);*/
 
-        //TODO
+        //TODO : link failure detection
         //linkFailureDetection.removeDevice(deviceId);
 
         log.info("Old knowledge cleared");
@@ -664,7 +854,7 @@ public class NoviBngComponent {
         log.info("Routing infos added");
 
        /*
-        //TODO
+        //TODO : multicast
         igmpIntercept(deviceId);
         addMulticastHandler(deviceId);
 
@@ -686,27 +876,27 @@ public class NoviBngComponent {
     public void notifyFailure(DeviceId deviceId, PortNumber port, MacAddress oldMac) {
         log.warn("Failure detected :  device " + deviceId +", port " + port);
         log.error("Link Failure detection not yet implemented : notifyFailure()");
-        //TODO
+        //TODO : link failure detection
         //linkFailureDetection.event(deviceId, port, true, false, oldMac, null);
     }
 
     public void notifyRecovery(DeviceId deviceId, PortNumber port, MacAddress oldMac, MacAddress newDstMac) {
         log.warn("Recovery detected :  device " + deviceId +", port " + port + " changing MAC form " + oldMac + " to " + newDstMac);
         log.error("Link Failure detection not yet implemented : notifyRecovery()");
-        //TODO:
+        //TODO: link failure detection
         //linkFailureDetection.event(deviceId, port, false, true, oldMac, newDstMac);
     }
 
     public void notifyRecovery(DeviceId deviceId, PortNumber port, MacAddress oldMac) {
         log.warn("Recovery detected :  device " + deviceId +", port " + port);
         log.error("Link Failure detection not yet implemented : notifyRecovery()");
-        //TODO:
+        //TODO: link failure detection
         //linkFailureDetection.event(deviceId, port, false, false, oldMac, null);
     }
 
     public void notifyMacChange(DeviceId deviceId, PortNumber port, MacAddress oldMac, MacAddress newDstMac) {
         log.error("Link Failure detection not yet implemented : notifyMacChange()");
-        //TODO:
+        //TODO: link failure detection
         notifyFailure(deviceId, port, oldMac);
         notifyRecovery(deviceId, port, oldMac, newDstMac);
     }

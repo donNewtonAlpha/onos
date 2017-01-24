@@ -336,13 +336,13 @@ public class NoviBngPacketProcessor implements PacketProcessor {
 
 
 
-    public MacAddress getMac(Ip4Address ip) {
+    public MacAddress getMac(Ip4Address ip, DeviceId deviceId) {
 
         //Check if we already have some MacRequest for this Ip
 
         for(MacRequest request : macRequests) {
 
-            if(request.getIp().equals(ip)) {
+            if(request.getDeviceId().equals(deviceId) && request.getIp().equals(ip)) {
                 //A request already exist, add this tunnelId to the requesting tunnels
                 if(request.getMac() != null) {
                     return request.getMac();
@@ -366,7 +366,7 @@ public class NoviBngPacketProcessor implements PacketProcessor {
         //Find matching routing info
         RoutingInfo matchingInfo = null;
         for(RoutingInfo info : routingInfos) {
-            if(info.getSubnet().contains(ip)){
+            if(info.getDeviceId().equals(deviceId) && info.getSubnet().contains(ip)){
                 matchingInfo = info;
             }
         }

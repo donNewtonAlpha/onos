@@ -25,9 +25,13 @@ public class BngDeviceConfig {
     private MacAddress secondaryLinkMac;
     private PortNumber primaryLinkPort;
     private PortNumber secondaryLinkPort;
+    private Ip4Address primaryNextHopIp;
+    private Ip4Address secondaryNextHopIp;
 
-    public BngDeviceConfig(DeviceId deviceId, Ip4Address loopbackIP, Ip4Address primaryLinkIp, int primaryLinkSubnetLength, Ip4Address secondaryLinkIp,
-                           int secondaryLinkSubnetLength, MacAddress primaryLinkMac, MacAddress secondaryLinkMac, PortNumber primaryLinkPort, PortNumber secondaryLinkPort) {
+    public BngDeviceConfig(DeviceId deviceId, Ip4Address loopbackIP, Ip4Address primaryLinkIp,
+                           int primaryLinkSubnetLength, Ip4Address secondaryLinkIp, int secondaryLinkSubnetLength,
+                           MacAddress primaryLinkMac, MacAddress secondaryLinkMac, PortNumber primaryLinkPort,
+                           PortNumber secondaryLinkPort, Ip4Address primaryNextHopIp, Ip4Address secondaryNextHopIp) {
 
         this.deviceId = deviceId;
         this.loopbackIP = loopbackIP;
@@ -39,6 +43,8 @@ public class BngDeviceConfig {
         this.secondaryLinkMac = secondaryLinkMac;
         this.primaryLinkPort = primaryLinkPort;
         this.secondaryLinkPort = secondaryLinkPort;
+        this.primaryNextHopIp = primaryNextHopIp;
+        this.secondaryNextHopIp = secondaryNextHopIp;
 
     }
 
@@ -82,8 +88,15 @@ public class BngDeviceConfig {
         return secondaryLinkPort;
     }
 
+    public Ip4Address getPrimaryNextHopIp() {
+        return primaryNextHopIp;
+    }
 
-     public boolean equals(Object otherObject) {
+    public Ip4Address getSecondaryNextHopIp() {
+        return secondaryNextHopIp;
+    }
+
+    public boolean equals(Object otherObject) {
 
         if(otherObject instanceof BngDeviceConfig) {
 

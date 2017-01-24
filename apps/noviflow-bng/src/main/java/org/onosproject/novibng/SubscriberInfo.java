@@ -1,8 +1,14 @@
 package org.onosproject.novibng;
 
+import org.onlab.packet.Ip4Address;
+import org.onlab.packet.MacAddress;
 import org.onlab.packet.VlanId;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
+import org.onosproject.net.flow.FlowRule;
+
+import java.util.LinkedList;
+import java.util.List;
 
 /**
  * Created by nick on 1/19/17.
@@ -14,11 +20,17 @@ public class SubscriberInfo {
     private VlanId sTag;
     private int uploadSpeed;
     private int downloadSpeed;
+    private MacAddress mac;
+    private Ip4Address gatewayIp;
+    private List<FlowRule> flows;
 
     public SubscriberInfo() {
         this.port = null;
         this.cTag = null;
         this.sTag = null;
+        this.mac = null;
+        this.gatewayIp = null;
+        this.flows = new LinkedList<>();
     }
 
 
@@ -40,6 +52,30 @@ public class SubscriberInfo {
 
     public int getDownloadSpeed() {
         return downloadSpeed;
+    }
+
+    public List<FlowRule> getFlows() {
+        return flows;
+    }
+
+    public void addFlow(FlowRule flow) {
+        flows.add(flow);
+    }
+
+    public MacAddress getMac() {
+        return mac;
+    }
+
+    public Ip4Address getGatewayIp() {
+        return gatewayIp;
+    }
+
+    public void setGatewayIp(Ip4Address gatewayIp) {
+        this.gatewayIp = gatewayIp;
+    }
+
+    public void setMac(MacAddress mac) {
+        this.mac = mac;
     }
 
     public void setUploadSpeed(int uploadSpeed) {
