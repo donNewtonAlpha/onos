@@ -64,7 +64,9 @@ public class NoviBngComponent {
     private static final int ARP_INTERCEPT_PRIORITY = 15000;
     private static final int ICMP_INTERCEPT_PRIORITY = 14000;
     private static final int IGMP_INTERCEPT_PRIORITY = 13000;
-    private static final int SUB_INTERCEPT_PRIORITY = 2000;
+    private static final int SUB_INTERCEPT_PRIORITY = 5000;
+    private static final int UPSTREAM_SPLIT = 2500;
+    private static final int DOWNSTREAM_SPLIT = 2500;
     private static final int SUBSCRIBER_DOWNSTREAM_EXIT_PRIORITY = 1600;
     private static final int SUBSCRIBER_DOWNSTREAM_TRANSITION_PRIORITY = 1400;
     private static final int SUBSCRIBER_UPSTREAM_EXIT_PRIORITY = 1300;
@@ -497,7 +499,7 @@ public class NoviBngComponent {
             FlowRule.Builder ruleDownstream = DefaultFlowRule.builder();
             ruleDownstream.withSelector(selectorDownStream.build());
             ruleDownstream.withTreatment(treatmentDownstream.build());
-            ruleDownstream.withPriority(2000);
+            ruleDownstream.withPriority(DOWNSTREAM_SPLIT);
             ruleDownstream.forTable(0);
             ruleDownstream.fromApp(appId);
             ruleDownstream.forDevice(deviceId);
@@ -518,7 +520,7 @@ public class NoviBngComponent {
             FlowRule.Builder ruleUpstream = DefaultFlowRule.builder();
             ruleUpstream.withSelector(selectorUpstream.build());
             ruleUpstream.withTreatment(treatmentUpstream.build());
-            ruleUpstream.withPriority(2500);
+            ruleUpstream.withPriority(UPSTREAM_SPLIT);
             ruleUpstream.forTable(0);
             ruleUpstream.fromApp(appId);
             ruleUpstream.forDevice(deviceId);
