@@ -104,6 +104,8 @@ public class NoviBngPacketProcessor implements PacketProcessor {
                 log.debug("IP packet received");
                 IPv4 ipPkt = (IPv4) payload;
 
+                checkNewSub(deviceId, inPort, Ip4Address.valueOf(ipPkt.getSourceAddress()), ethPkt);
+
                 IPacket ipPayload = ipPkt.getPayload();
 
                 if(ipPayload instanceof ICMP) {
@@ -118,14 +120,14 @@ public class NoviBngPacketProcessor implements PacketProcessor {
                         handlePingRequest(deviceId, inPort, ethPkt);
                     } else if (ping.getIcmpType() == ICMP.TYPE_ECHO_REPLY) {
                             log.info("ICMP reply received");
-                        //TODO
+                        //TODO : ICMP reply
                     }
                 } else if (ipPayload instanceof IGMP) {
 
                     log.info("IGMP packet received");
                     log.error("IGMP treatment not yet implemented");
 
-                    //TODO:
+                    //TODO: multicast
                     //IGMPhandler.handlePacket(context);
 
 
@@ -136,13 +138,35 @@ public class NoviBngPacketProcessor implements PacketProcessor {
         }
     }
 
+    private void checkNewSub(DeviceId deviceId, PortNumber inPort, Ip4Address subIp, Ethernet pkt) {
+
+        SubscriberInfo subInfo = NoviBngComponent.getComponent().subscribersInfo.get(deviceId).get(subIp);
+        if(subInfo == null) {
+            return;
+        }
+        if(subInfo.isStandby()){
+            subInfo.setPort(inPort);
+            subInfo.setCTag(VlanId.vlanId(pkt.getVlanID()));
+            subInfo.setMac(pkt.getSourceMAC());
+
+            //Removing the intercept for this sub
+            NoviBngComponent.getComponent().flowRuleService.removeFlowRules(subInfo.getFlows().remove(0));
+
+            NoviBngComponent.getComponent().addSubscriberFlows(subIp, subInfo, subInfo.getTableInfo(), deviceId);
+
+        }
+    }
+
 
     private void handleArpRequest(DeviceId deviceId, PortNumber inPort, Ethernet ethPkt) {
         ARP arpRequest = (ARP) ethPkt.getPayload();
         Ip4Address targetProtocolAddress = Ip4Address.valueOf(
                 arpRequest.getTargetProtocolAddress());
-        log.info("ARP request for " + targetProtocolAddress + " on port " + inPort.toString() + " from " + Ip4Address.valueOf(
-                arpRequest.getSenderProtocolAddress()));
+        Ip4Address sourceIp = Ip4Address.valueOf(arpRequest.getSenderProtocolAddress());
+
+        log.info("ARP request for " + targetProtocolAddress + " on port " + inPort.toString() + " from " + sourceIp);
+
+        checkNewSub(deviceId, inPort, sourceIp, ethPkt);
         // Check if this is an ARP for the switch
         boolean matchingInfoFound = false;
         for(RoutingInfo info : routingInfos) {

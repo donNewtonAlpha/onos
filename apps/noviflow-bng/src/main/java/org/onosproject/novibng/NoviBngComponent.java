@@ -45,7 +45,7 @@ public class NoviBngComponent {
     protected CoreService coreService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected FlowRuleService flowRuleService;
+    FlowRuleService flowRuleService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected GroupService groupService;
@@ -64,6 +64,7 @@ public class NoviBngComponent {
     private static final int ARP_INTERCEPT_PRIORITY = 15000;
     private static final int ICMP_INTERCEPT_PRIORITY = 14000;
     private static final int IGMP_INTERCEPT_PRIORITY = 13000;
+    private static final int SUB_INTERCEPT_PRIORITY = 2000;
     private static final int SUBSCRIBER_DOWNSTREAM_EXIT_PRIORITY = 1600;
     private static final int SUBSCRIBER_DOWNSTREAM_TRANSITION_PRIORITY = 1400;
     private static final int SUBSCRIBER_UPSTREAM_EXIT_PRIORITY = 1300;
@@ -77,7 +78,7 @@ public class NoviBngComponent {
     //private HashMap<DeviceId, MulticastHandler> multicastHandlers;
     private HashMap<DeviceId, BngDeviceConfig> devicesConfig;
 
-    private HashMap<DeviceId, HashMap<Ip4Address, SubscriberInfo>> subscribersInfo;
+    public HashMap<DeviceId, HashMap<Ip4Address, SubscriberInfo>> subscribersInfo;
     private HashMap<DeviceId, List<TablesInfo>> tablesInfos;
     private HashMap<DeviceId, List<GatewayInfo>> gatewayInfos;
 
@@ -88,6 +89,7 @@ public class NoviBngComponent {
 
     }
 
+    //TODO : QinQ
 
     @Activate
     protected void activate() {
@@ -293,6 +295,15 @@ public class NoviBngComponent {
 
         //Add subscriber to standby list
 
+        SubscriberInfo subInfo = new SubscriberInfo();
+        subInfo.setGatewayIp(gatewayIp);
+        subInfo.setDownloadSpeed(downloadSpeed);
+        subInfo.setUploadSpeed(uploadSpeed);
+        subInfo.setTableInfo(matchingTableInfo);
+
+        subInfo.addFlow(subIntercept(subscriberIp, deviceId));
+
+        subscribersInfo.get(deviceId).put(subscriberIp, subInfo);
 
     }
 
@@ -305,7 +316,7 @@ public class NoviBngComponent {
 
     }
 
-    private void addSubscriberFlows(Ip4Address subscriberIp, SubscriberInfo subscriberInfo, TablesInfo tableInfo, DeviceId deviceId) {
+    public void addSubscriberFlows(Ip4Address subscriberIp, SubscriberInfo subscriberInfo, TablesInfo tableInfo, DeviceId deviceId) {
 
         //TODO : redundancy (link failure)
         GatewayInfo matchingGatewayInfo = null;
@@ -346,6 +357,7 @@ public class NoviBngComponent {
             TrafficTreatment.Builder treatmentDownstream = DefaultTrafficTreatment.builder();
             treatmentDownstream.meter(finalDownstreamMeter.id());
             //routing
+            treatmentDownstream.setVlanId(subscriberInfo.getCTag());
             treatmentDownstream.setEthSrc(matchingGatewayInfo.getGatewayMac());
             treatmentDownstream.setEthDst(subscriberInfo.getMac());
             treatmentDownstream.setQueue(i);
@@ -363,7 +375,10 @@ public class NoviBngComponent {
             ruleDownstream.forDevice(deviceId);
             ruleDownstream.makePermanent();
 
-            flowRuleService.applyFlowRules(ruleDownstream.build());
+            FlowRule flowDownstream = ruleDownstream.build();
+
+            flowRuleService.applyFlowRules(flowDownstream);
+            subscriberInfo.addFlow(flowDownstream);
 
             if (i > 0 && i < (TablesInfo.CONSECUTIVES_TABLES - 1)) {
 
@@ -383,8 +398,10 @@ public class NoviBngComponent {
                 ruleDownstream2.forDevice(deviceId);
                 ruleDownstream2.makePermanent();
 
-                flowRuleService.applyFlowRules(ruleDownstream.build());
+                FlowRule flowDownstream2 = ruleDownstream2.build();
 
+                flowRuleService.applyFlowRules(flowDownstream2);
+                subscriberInfo.addFlow(flowDownstream2);
             }
 
             //Upstream flow
@@ -407,6 +424,7 @@ public class NoviBngComponent {
 
             TrafficTreatment.Builder treatmentUpstream = DefaultTrafficTreatment.builder();
             treatmentUpstream.meter(finalUpstreamMeter.id());
+            treatmentUpstream.popVlan();
             treatmentUpstream.setEthSrc(matchingGatewayInfo.getGatewayMac());
             treatmentUpstream.setEthDst(processor.getMac(devicesConfig.get(deviceId).getPrimaryNextHopIp(), deviceId));
             treatmentUpstream.setQueue(i);
@@ -424,7 +442,11 @@ public class NoviBngComponent {
             ruleUpstream.forDevice(deviceId);
             ruleUpstream.makePermanent();
 
-            flowRuleService.applyFlowRules(ruleDownstream.build());
+
+            FlowRule flowUpstream = ruleUpstream.build();
+
+            flowRuleService.applyFlowRules(flowUpstream);
+            subscriberInfo.addFlow(flowUpstream);
 
             if (i > 0 && i < (TablesInfo.CONSECUTIVES_TABLES - 1)) {
 
@@ -445,7 +467,10 @@ public class NoviBngComponent {
                 ruleUpstream2.forDevice(deviceId);
                 ruleUpstream2.makePermanent();
 
-                flowRuleService.applyFlowRules(ruleDownstream.build());
+                FlowRule flowUpstream2 = ruleUpstream2.build();
+
+                flowRuleService.applyFlowRules(flowUpstream2);
+                subscriberInfo.addFlow(flowUpstream2);
 
             }
         }
@@ -738,6 +763,32 @@ public class NoviBngComponent {
         rule.makePermanent();
 
         flowRuleService.applyFlowRules(rule.build());
+
+    }
+
+    private FlowRule subIntercept(Ip4Address catchIp, DeviceId deviceId) {
+
+        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+        selector.matchIPSrc(catchIp.toIpPrefix());
+
+
+        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+        treatment.punt();
+
+        FlowRule.Builder rule = DefaultFlowRule.builder();
+        rule.withSelector(selector.build());
+        rule.withTreatment(treatment.build());
+        rule.withPriority(SUB_INTERCEPT_PRIORITY);
+        rule.forTable(0);
+        rule.fromApp(appId);
+        rule.forDevice(deviceId);
+        rule.makePermanent();
+
+        FlowRule flow = rule.build();
+
+        flowRuleService.applyFlowRules(flow);
+
+        return flow;
 
     }
 

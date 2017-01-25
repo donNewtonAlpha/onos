@@ -23,6 +23,8 @@ public class SubscriberInfo {
     private MacAddress mac;
     private Ip4Address gatewayIp;
     private List<FlowRule> flows;
+    private boolean standby;
+    private TablesInfo tableInfo;
 
     public SubscriberInfo() {
         this.port = null;
@@ -31,6 +33,8 @@ public class SubscriberInfo {
         this.mac = null;
         this.gatewayIp = null;
         this.flows = new LinkedList<>();
+        tableInfo = null;
+        standby = true;
     }
 
 
@@ -70,6 +74,14 @@ public class SubscriberInfo {
         return gatewayIp;
     }
 
+    public TablesInfo getTableInfo() {
+        return tableInfo;
+    }
+
+    public void setTableInfo(TablesInfo tableInfo) {
+        this.tableInfo = tableInfo;
+    }
+
     public void setGatewayIp(Ip4Address gatewayIp) {
         this.gatewayIp = gatewayIp;
     }
@@ -88,6 +100,7 @@ public class SubscriberInfo {
 
     public void setPort(PortNumber port) {
         this.port = port;
+        this.standby = false;
     }
 
     public void setCTag(VlanId cTag) {
@@ -96,5 +109,9 @@ public class SubscriberInfo {
 
     public void setSTag(VlanId sTag) {
         this.sTag = sTag;
+    }
+
+    public boolean isStandby() {
+        return standby;
     }
 }
