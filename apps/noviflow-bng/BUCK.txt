@@ -1,0 +1,11 @@
+BUNDLES = [
+    '//apps/noviflow-bng:onos-app-novibng',
+
+]
+
+onos_app (
+  title = 'NoviFlow BNG App',
+  url = 'http://onosproject.org',
+  included_bundles = BUNDLES,
+  description = 'ONOS app for BNG on NoviFlow',
+)
