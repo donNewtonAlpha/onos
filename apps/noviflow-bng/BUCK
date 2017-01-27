@@ -2,20 +2,15 @@ COMPILE_DEPS = [
   '//lib:CORE_DEPS',
   '//core/store/serializers:onos-core-serializers',
   '//lib:org.apache.karaf.shell.console',
-  '//cli:onos-cli',
   '//core/api:onos-api',
   '//lib:javax.ws.rs-api',
   '//lib:jersey-server',
   '//utils/rest:onlab-rest',
 ]
 
-TEST_DEPS = [
-  '//lib:TEST_ADAPTERS',
-]
 
 osgi_jar_with_tests (
   deps = COMPILE_DEPS,
-  test_deps = TEST_DEPS,
 )
 
 onos_app (

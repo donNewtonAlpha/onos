@@ -32,7 +32,6 @@
     <properties>
         <onos.version>1.9.0-SNAPSHOT</onos.version>
         <onos.app.name>org.onosproject.novibng</onos.app.name>
-        <onos.app.origin>SDN Arena, Inc.</onos.app.origin>
     </properties>
 
     <dependencies>
