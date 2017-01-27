@@ -152,7 +152,6 @@ public class NoviBngComponent {
 
         //L2 infos
         subscribersInfo = new HashMap<>();
-        
         //Tables infos
         tablesInfos = new HashMap<>();
 
@@ -284,9 +283,9 @@ public class NoviBngComponent {
             tableSplit(newTable, ipBlock, deviceId);
 
         }
-        
+
     }
-    
+
     public void addSubscriber(Ip4Address subscriberIp, Ip4Address gatewayIp, int uploadSpeed, int downloadSpeed,
                               DeviceId deviceId) {
 
@@ -903,7 +902,7 @@ public class NoviBngComponent {
         if (!subscribersInfo.containsKey(deviceId)) {
             subscribersInfo.put(deviceId, new HashMap<>());
         }
-        
+
         if (!tablesInfos.containsKey(deviceId)) {
             List<TablesInfo> deviceTablesInfo = new LinkedList<>();
             deviceTablesInfo.add(new TablesInfo(1));
