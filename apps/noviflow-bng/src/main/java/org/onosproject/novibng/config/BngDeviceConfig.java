@@ -130,4 +130,15 @@ public class BngDeviceConfig {
         return false;
 
     }
+
+    public int hashCode() {
+
+        int hash = deviceId.hashCode() + 2 * loopbackIP.hashCode() + 3 * primaryLinkIp.hashCode() +
+                5 * secondaryLinkIp.hashCode() + 7 * primaryLinkSubnetLength + 11 * secondaryLinkSubnetLength +
+                13 * primaryLinkPort.hashCode() + 17 * secondaryLinkPort.hashCode() + 19 * primaryLinkMac.hashCode() +
+                23 * secondaryLinkMac.hashCode();
+
+        return hash;
+
+    }
 }

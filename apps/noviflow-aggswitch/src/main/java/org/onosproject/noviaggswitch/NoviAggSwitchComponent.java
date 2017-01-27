@@ -156,11 +156,15 @@ public class NoviAggSwitchComponent {
         //4 info
 
         //loopback
-        processor.addRoutingInfo(deviceId, bngPort, Ip4Prefix.valueOf(aggSwitchIP, 24), aggSwitchIP, MacAddress.valueOf("00:00:00:00:00:00"));
-        processor.addRoutingInfo(deviceId, secondaryBngPort, Ip4Prefix.valueOf(aggSwitchIP, 24), aggSwitchIP, MacAddress.valueOf("00:00:00:00:00:00"));
+        processor.addRoutingInfo(deviceId, bngPort, Ip4Prefix.valueOf(aggSwitchIP, 24), aggSwitchIP,
+        MacAddress.valueOf("00:00:00:00:00:00"));
+        processor.addRoutingInfo(deviceId, secondaryBngPort, Ip4Prefix.valueOf(aggSwitchIP, 24), aggSwitchIP,
+        MacAddress.valueOf("00:00:00:00:00:00"));
         //Uplinks
-        processor.addRoutingInfo(deviceId, bngPort, Ip4Prefix.valueOf(primaryLinkIP, 31), primaryLinkIP, MacAddress.valueOf("68:05:11:11:11:11"));
-        processor.addRoutingInfo(deviceId, secondaryBngPort, Ip4Prefix.valueOf(secondaryLinlkIP, 31), secondaryLinlkIP, MacAddress.valueOf("68:05:22:22:22:22"));
+        processor.addRoutingInfo(deviceId, bngPort, Ip4Prefix.valueOf(primaryLinkIP, 31), primaryLinkIP,
+        MacAddress.valueOf("68:05:11:11:11:11"));
+        processor.addRoutingInfo(deviceId, secondaryBngPort, Ip4Prefix.valueOf(secondaryLinlkIP, 31), secondaryLinlkIP,
+        MacAddress.valueOf("68:05:22:22:22:22"));
 
 
         //LinkFailureDetection
@@ -190,8 +194,10 @@ public class NoviAggSwitchComponent {
         int udpPort2 = rand.nextInt() + 2000;
 
 
-        addAccessDevice(deviceId, 5, 5002, udpPort, "10.50.1.2", "10.10.1.1", "10.10.2.1", aggSwitchIP, MacAddress.valueOf("68:05:11:11:11:11"), MacAddress.valueOf("68:05:22:22:22:22"));
-        addAccessDevice(deviceId, 9, 5003, udpPort2, "10.50.1.3", "10.10.1.1", "10.10.2.1", aggSwitchIP, MacAddress.valueOf("68:05:11:11:11:11"), MacAddress.valueOf("68:05:22:22:22:22"));
+        addAccessDevice(deviceId, 5, 5002, udpPort, "10.50.1.2", "10.10.1.1", "10.10.2.1", aggSwitchIP,
+        MacAddress.valueOf("68:05:11:11:11:11"), MacAddress.valueOf("68:05:22:22:22:22"));
+        addAccessDevice(deviceId, 9, 5003, udpPort2, "10.50.1.3", "10.10.1.1", "10.10.2.1", aggSwitchIP,
+        MacAddress.valueOf("68:05:11:11:11:11"), MacAddress.valueOf("68:05:22:22:22:22"));
 
 */
 
@@ -258,7 +264,8 @@ public class NoviAggSwitchComponent {
 
     }*/
 
-    public void addAccessDevice(DeviceId deviceId, int port, int vni, String bngVxlanIp, String viaPrimaryIP, String viaSecondaryIP) {
+    public void addAccessDevice(DeviceId deviceId, int port, int vni, String bngVxlanIp,
+                                String viaPrimaryIP, String viaSecondaryIP) {
 
         Random rand = new Random();
         int udpPort = rand.nextInt() + 2000;
@@ -267,18 +274,22 @@ public class NoviAggSwitchComponent {
 
             //NoviAggSwitchConfig config = (NoviAggSwitchConfig) cfgService.getConfig(appId, NoviAggSwitchConfig.class);
 
-            addAccessDevice(deviceId, port, vni, udpPort, bngVxlanIp, viaPrimaryIP, viaSecondaryIP, devicesConfig.get(deviceId).getLoopbackIP(), devicesConfig.get(deviceId).getPrimaryLinkMac(), devicesConfig.get(deviceId).getSecondaryLinkMac());
+            addAccessDevice(deviceId, port, vni, udpPort, bngVxlanIp, viaPrimaryIP, viaSecondaryIP,
+                    devicesConfig.get(deviceId).getLoopbackIP(), devicesConfig.get(deviceId).getPrimaryLinkMac(),
+                    devicesConfig.get(deviceId).getSecondaryLinkMac());
         /*} catch (Exception e) {
 
-            addAccessDevice(deviceId, port, vni, udpPort, bngVxlanIp, viaPrimaryIP, viaSecondaryIP, aggSwitchIP, MacAddress.valueOf("68:05:11:11:11:11"), MacAddress.valueOf("68:05:11:11:11:22"));
+            addAccessDevice(deviceId, port, vni, udpPort, bngVxlanIp, viaPrimaryIP, viaSecondaryIP, aggSwitchIP,
+            MacAddress.valueOf("68:05:11:11:11:11"), MacAddress.valueOf("68:05:11:11:11:22"));
 
 
         }*/
 
     }
 
-    private void addAccessDevice(DeviceId deviceId, int port, int vni, int udpPort, String bngVxlanIp, String viaPrimaryIP, String viaSecondaryIP,
-                                 Ip4Address switchVxlanIp, MacAddress primaryLinkSwitchMac, MacAddress secondaryLinkSwitchMac) {
+    private void addAccessDevice(DeviceId deviceId, int port, int vni, int udpPort, String bngVxlanIp,
+                                 String viaPrimaryIP, String viaSecondaryIP, Ip4Address switchVxlanIp,
+                                 MacAddress primaryLinkSwitchMac, MacAddress secondaryLinkSwitchMac) {
 
         Runnable r = new Runnable() {
 
@@ -302,8 +313,10 @@ public class NoviAggSwitchComponent {
                     log.info("MAC found, ready to add flows");
 
                     try {
-                        accessToBng(deviceId, PortNumber.portNumber(port), vni, udpPort, bngVxLanIP, bngVxLanPrimaryMac, switchVxlanIp, primaryLinkSwitchMac, true);
-                        bngToAccess(deviceId, PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp), true);
+                        accessToBng(deviceId, PortNumber.portNumber(port), vni, udpPort, bngVxLanIP, bngVxLanPrimaryMac,
+                                switchVxlanIp, primaryLinkSwitchMac, true);
+                        bngToAccess(deviceId, PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp),
+                                true);
 
                     } catch (Exception e) {
                         log.warn("Exception", e);
@@ -313,13 +326,16 @@ public class NoviAggSwitchComponent {
 
                     if (!viaSecondaryIP.equals(viaPrimaryIP)) {
 
-                        MacAddress bngVxLanSecondaryMac = processor.getMac(Ip4Address.valueOf(viaSecondaryIP), tunnelId);
+                        MacAddress bngVxLanSecondaryMac = processor.getMac(Ip4Address.valueOf(viaSecondaryIP)
+                                , tunnelId);
                         if (bngVxLanSecondaryMac != null) {
                             log.info("MAC found, ready to add flows");
 
                             try {
-                                accessToBng(deviceId, PortNumber.portNumber(port), vni, udpPort, bngVxLanIP, bngVxLanSecondaryMac, switchVxlanIp, secondaryLinkSwitchMac, false);
-                                bngToAccess(deviceId, PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp), false);
+                                accessToBng(deviceId, PortNumber.portNumber(port), vni, udpPort, bngVxLanIP,
+                                        bngVxLanSecondaryMac, switchVxlanIp, secondaryLinkSwitchMac, false);
+                                bngToAccess(deviceId, PortNumber.portNumber(port), vni, Ip4Address.valueOf(bngVxlanIp),
+                                        false);
 
                             } catch (Exception e) {
                                 log.warn("Exception", e);
@@ -338,7 +354,8 @@ public class NoviAggSwitchComponent {
 
 
 
-    private void accessToBng(DeviceId deviceId, PortNumber port, int vni, int udpPort, Ip4Address bngVxlanIp, MacAddress bngVxlanMac, Ip4Address switchVxlanIp, MacAddress switchVxlanMac, boolean primary){
+    private void accessToBng(DeviceId deviceId, PortNumber port, int vni, int udpPort, Ip4Address bngVxlanIp,
+                             MacAddress bngVxlanMac, Ip4Address switchVxlanIp, MacAddress switchVxlanMac, boolean primary){
 
 
         PortNumber primaryPort;
@@ -360,7 +377,8 @@ public class NoviAggSwitchComponent {
 
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
-        treatment.extension(new NoviflowSetVxLan(switchVxlanMac,bngVxlanMac, switchVxlanIp, bngVxlanIp, udpPort, vni), deviceId);
+        treatment.extension(new NoviflowSetVxLan(switchVxlanMac,bngVxlanMac, switchVxlanIp, bngVxlanIp,
+                udpPort, vni), deviceId);
         if (primary) {
             treatment.setOutput(primaryPort);
         } else {
@@ -465,14 +483,17 @@ public class NoviAggSwitchComponent {
                     if (instruction.type() == Instruction.Type.EXTENSION) {
 
                         try {
-                            Instructions.ExtensionInstructionWrapper extensionInstruction = (Instructions.ExtensionInstructionWrapper) instruction;
+                            Instructions.ExtensionInstructionWrapper extensionInstruction
+                                    = (Instructions.ExtensionInstructionWrapper) instruction;
                             ExtensionTreatment extension = extensionInstruction.extensionInstruction();
 
-                            if (extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_SET_VXLAN.type())) {
+                            if (extension.type()
+                                    .equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_SET_VXLAN.type())) {
 
                                 flowRuleService.removeFlowRules(flow);
 
-                            } else if (extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_POP_VXLAN.type())) {
+                            } else if (extension.type()
+                                    .equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_POP_VXLAN.type())) {
 
                                 flowRuleService.removeFlowRules(flow);
 
@@ -542,12 +563,14 @@ public class NoviAggSwitchComponent {
 
 
                         try {
-                            Instructions.ExtensionInstructionWrapper extensionInstruction = (Instructions.ExtensionInstructionWrapper) instruction;
+                            Instructions.ExtensionInstructionWrapper extensionInstruction
+                                    = (Instructions.ExtensionInstructionWrapper) instruction;
                             ExtensionTreatment extension = extensionInstruction.extensionInstruction();
 
                             log.debug("Extension treatment : " + extension.toString());
 
-                            if (extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_SET_VXLAN.type())) {
+                            if (extension.type()
+                                    .equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_SET_VXLAN.type())) {
                                 log.debug("set vxlan extension found");
 
                                 NoviflowSetVxLan noviflowVxlan = (NoviflowSetVxLan) extension;
@@ -579,12 +602,14 @@ public class NoviAggSwitchComponent {
                                 }
 
 
-                            } else if (extension.type().equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_POP_VXLAN.type())) {
+                            } else if (extension.type()
+                                    .equals(ExtensionTreatmentType.ExtensionTreatmentTypes.NOVIFLOW_POP_VXLAN.type())) {
                                 log.debug("pop vxlan extension found");
 
                                 //look in the selector for the IP
 
-                                Ip4Address vxlanIp = ((IPCriterion) flow.selector().getCriterion(Criterion.Type.IPV4_SRC)).ip().getIp4Prefix().address();
+                                Ip4Address vxlanIp = ((IPCriterion) flow.selector()
+                                        .getCriterion(Criterion.Type.IPV4_SRC)).ip().getIp4Prefix().address();
 
                                 boolean needNew = true;
                                 for (VxLanTunnel tunnel : tunnels) {
@@ -796,7 +821,8 @@ public class NoviAggSwitchComponent {
                     //ARP intercepts
                     flowRuleService.removeFlowRules(flow);
                 } else if (flow.selector().getCriterion(Criterion.Type.IP_PROTO) != null){
-                    IPProtocolCriterion proto = (IPProtocolCriterion) flow.selector().getCriterion(Criterion.Type.IP_PROTO);
+                    IPProtocolCriterion proto =
+                            (IPProtocolCriterion) flow.selector().getCriterion(Criterion.Type.IP_PROTO);
                     if (proto.protocol() == 1 || proto.protocol() == 2) {
                         //ICMP or IGMP intercepts
                         flowRuleService.removeFlowRules(flow);
@@ -869,11 +895,15 @@ public class NoviAggSwitchComponent {
         log.info("New intercepts set up");
 
         //loopback
-        processor.addRoutingInfo(deviceId, config.getPrimaryLinkPort(), Ip4Prefix.valueOf(config.getLoopbackIP(), 24), config.getLoopbackIP(), MacAddress.valueOf("00:00:00:00:00:00"));
-        processor.addRoutingInfo(deviceId, config.getSecondaryLinkPort(), Ip4Prefix.valueOf(config.getLoopbackIP(), 24), config.getLoopbackIP(), MacAddress.valueOf("00:00:00:00:00:00"));
+        processor.addRoutingInfo(deviceId, config.getPrimaryLinkPort(), Ip4Prefix.valueOf(config.getLoopbackIP(), 24),
+                config.getLoopbackIP(), MacAddress.valueOf("00:00:00:00:00:00"));
+        processor.addRoutingInfo(deviceId, config.getSecondaryLinkPort(), Ip4Prefix.valueOf(config.getLoopbackIP(), 24),
+                config.getLoopbackIP(), MacAddress.valueOf("00:00:00:00:00:00"));
         //Uplinks
-        processor.addRoutingInfo(deviceId, config.getPrimaryLinkPort(), config.getPrimaryLinkSubnet(), config.getPrimaryLinkIp(), config.getPrimaryLinkMac());
-        processor.addRoutingInfo(deviceId, config.getSecondaryLinkPort(), config.getSecondaryLinkSubnet(), config.getSecondaryLinkIp(), config.getSecondaryLinkMac());
+        processor.addRoutingInfo(deviceId, config.getPrimaryLinkPort(), config.getPrimaryLinkSubnet(),
+                config.getPrimaryLinkIp(), config.getPrimaryLinkMac());
+        processor.addRoutingInfo(deviceId, config.getSecondaryLinkPort(), config.getSecondaryLinkSubnet(),
+                config.getSecondaryLinkIp(), config.getSecondaryLinkMac());
 
         log.info("Routing infos added");
 
@@ -906,9 +936,11 @@ public class NoviAggSwitchComponent {
 
                 int udpPort = rand.nextInt() + 2000;
 
-                accessToBng(deviceId, tunnel.getPort(), tunnel.getVni(), udpPort, tunnel.getDstIp(), tunnel.getPrimaryViaMac(), config.getLoopbackIP(), config.getPrimaryLinkMac(), true);
+                accessToBng(deviceId, tunnel.getPort(), tunnel.getVni(), udpPort, tunnel.getDstIp(),
+                        tunnel.getPrimaryViaMac(), config.getLoopbackIP(), config.getPrimaryLinkMac(), true);
                 bngToAccess(deviceId, tunnel.getPort(), tunnel.getVni(), tunnel.getDstIp(), true);
-                accessToBng(deviceId, tunnel.getPort(), tunnel.getVni(), udpPort, tunnel.getDstIp(), tunnel.getSecondaryViaMac(), config.getLoopbackIP(), config.getSecondaryLinkMac(), false);
+                accessToBng(deviceId, tunnel.getPort(), tunnel.getVni(), udpPort, tunnel.getDstIp(),
+                        tunnel.getSecondaryViaMac(), config.getLoopbackIP(), config.getSecondaryLinkMac(), false);
                 bngToAccess(deviceId, tunnel.getPort(), tunnel.getVni(), tunnel.getDstIp(), false);
             } else {
                 invalidTunnels++;
@@ -926,7 +958,8 @@ public class NoviAggSwitchComponent {
     }
 
     public void notifyRecovery(DeviceId deviceId, PortNumber port, MacAddress oldMac, MacAddress newDstMac) {
-        log.warn("Recovery detected :  device " + deviceId +", port " + port + " changing MAC form " + oldMac + " to " + newDstMac);
+        log.warn("Recovery detected :  device " + deviceId +", port " + port + " changing MAC form " + oldMac
+                + " to " + newDstMac);
         linkFailureDetection.event(deviceId, port, false, true, oldMac, newDstMac);
     }
 
@@ -972,7 +1005,8 @@ public class NoviAggSwitchComponent {
 
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
-        treatment.extension(new NoviflowSetVxLan(switchMac,nextHopMac, vxlanLoopback, vxlanDstIp, 10384, vni), deviceId);
+        treatment.extension(new NoviflowSetVxLan(switchMac,nextHopMac, vxlanLoopback, vxlanDstIp,
+                10384, vni), deviceId);
         treatment.setOutput(awsUplink);
 
         FlowRule.Builder rule = DefaultFlowRule.builder();
@@ -1056,7 +1090,8 @@ public class NoviAggSwitchComponent {
                 }
                 log.info("Applying new config");
 
-                //NoviAggSwitchComponent.getComponent().newConfig((NoviAggSwitchConfig) event.config().get(), (NoviAggSwitchConfig) event.prevConfig().get());
+                //NoviAggSwitchComponent.getComponent().newConfig((NoviAggSwitchConfig) event.config().get(),
+                // (NoviAggSwitchConfig) event.prevConfig().get());
             } else {
 
                 log.info("Config event " + event.configClass() + " != " + NoviAggSwitchConfig.class);

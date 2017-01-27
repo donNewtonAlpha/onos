@@ -22,7 +22,6 @@ import java.util.HashMap;
 import org.onlab.packet.Ip4Address;
 import org.onlab.packet.VlanId;
 import org.onosproject.core.ApplicationId;
-import org.onosproject.driver.extensions.NoviflowSetVxLan;
 import org.onosproject.net.DeviceId;
 import org.onosproject.core.GroupId;
 import org.onosproject.net.PortNumber;

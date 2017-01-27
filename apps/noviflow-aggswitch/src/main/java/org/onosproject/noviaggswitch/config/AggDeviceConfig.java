@@ -42,8 +42,10 @@ public class AggDeviceConfig {
     private PortNumber primaryLinkPort;
     private PortNumber secondaryLinkPort;
 
-    public AggDeviceConfig(DeviceId deviceId, Ip4Address loopbackIP, Ip4Address primaryLinkIp, int primaryLinkSubnetLength, Ip4Address secondaryLinkIp,
-                           int secondaryLinkSubnetLength, MacAddress primaryLinkMac, MacAddress secondaryLinkMac, PortNumber primaryLinkPort, PortNumber secondaryLinkPort) {
+    public AggDeviceConfig(DeviceId deviceId, Ip4Address loopbackIP, Ip4Address primaryLinkIp,
+                           int primaryLinkSubnetLength, Ip4Address secondaryLinkIp, int secondaryLinkSubnetLength,
+                           MacAddress primaryLinkMac, MacAddress secondaryLinkMac, PortNumber primaryLinkPort,
+                           PortNumber secondaryLinkPort) {
 
         this.deviceId = deviceId;
         this.loopbackIP = loopbackIP;
@@ -104,11 +106,13 @@ public class AggDeviceConfig {
         if(otherObject instanceof AggDeviceConfig) {
 
             AggDeviceConfig other = (AggDeviceConfig) otherObject;
-            return deviceId.equals(other.deviceId) && loopbackIP.equals(other.loopbackIP) && primaryLinkIp.equals(other.primaryLinkIp) &&
-                    secondaryLinkIp.equals(other.secondaryLinkIp) && primaryLinkSubnetLength == other.primaryLinkSubnetLength &&
-                    secondaryLinkSubnetLength == other.secondaryLinkSubnetLength && primaryLinkPort.equals(other.primaryLinkPort) &&
-                    secondaryLinkPort.equals(other.secondaryLinkPort) &&
-                    primaryLinkMac.equals(other.primaryLinkMac) && secondaryLinkMac.equals(other.secondaryLinkMac);
+            return deviceId.equals(other.deviceId) && loopbackIP.equals(other.loopbackIP)
+                    && primaryLinkIp.equals(other.primaryLinkIp) && secondaryLinkIp.equals(other.secondaryLinkIp)
+                    && primaryLinkSubnetLength == other.primaryLinkSubnetLength
+                    && secondaryLinkSubnetLength == other.secondaryLinkSubnetLength
+                    && primaryLinkPort.equals(other.primaryLinkPort)
+                    && secondaryLinkPort.equals(other.secondaryLinkPort)
+                    && primaryLinkMac.equals(other.primaryLinkMac) && secondaryLinkMac.equals(other.secondaryLinkMac);
 
         }
 

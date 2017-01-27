@@ -65,16 +65,17 @@ public class RestNoviBng extends AbstractWebResource {
     private static final String UPLOAD_SPEED = "uploadSpeed";
     private static final String DOWNLOAD_SPEED = "downstreamSpeed";
 
+
+    @POST
+    @Path("allocateIpBlock")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
     /**
      * Allocate a new Ip block.
      *
      * @param stream
      * @return 200 ok
      */
-    @POST
-    @Path("allocateIpBlock")
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
     public Response allocateIpBlock(InputStream stream) {
 
         try {
@@ -113,16 +114,17 @@ public class RestNoviBng extends AbstractWebResource {
         return Response.status(406).build();
     }
 
+
+    @POST
+    @Path("addSubscriber")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
     /**
      * Provision a subscriber.
      *
      * @param stream
      * @return 200 ok
      */
-    @POST
-    @Path("addSubscriber")
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
     public Response provisionSubscriber(InputStream stream) {
 
         try {
@@ -137,7 +139,7 @@ public class RestNoviBng extends AbstractWebResource {
 
 
 
-            log.info("subscriber provisioning requested for device " + deviceUri+ ", ip : " + subscriberIpString + ","
+            log.info("subscriber provisioning requested for device " + deviceUri + ", ip : " + subscriberIpString + ","
                     + " gateway : " + gatewayIpString + ", speed " + uploadSpeed + " kbps up and " + downloadSpeed +
                     " kbps down");
 
@@ -164,16 +166,18 @@ public class RestNoviBng extends AbstractWebResource {
     }
 
 
-    /**
-     * Add/modify the config for one device
-     *
-     * @param stream
-     * @return 200 ok
-     */
+
     @POST
     @Path("config")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
+    /**
+     * Add/modify the config for one device.
+     *
+     *
+     * @return 200 ok
+     * @param stream
+     */
     public Response config(InputStream stream) {
 
         try {

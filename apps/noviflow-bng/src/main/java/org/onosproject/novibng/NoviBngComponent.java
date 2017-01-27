@@ -17,7 +17,11 @@
 package org.onosproject.novibng;
 
 
-import org.apache.felix.scr.annotations.*;
+import org.apache.felix.scr.annotations.Reference;
+import org.apache.felix.scr.annotations.ReferenceCardinality;
+import org.apache.felix.scr.annotations.Activate;
+import org.apache.felix.scr.annotations.Deactivate;
+import org.apache.felix.scr.annotations.Component;
 
 
 
@@ -211,7 +215,7 @@ public class NoviBngComponent {
             int ip = ipBlock.address().toInt();
             Ip4Prefix subBlock1 = Ip4Prefix.valueOf(Ip4Address.valueOf(ip), ipBlock.prefixLength() + 1);
             Ip4Prefix subBlock2 = Ip4Prefix.valueOf(Ip4Address.valueOf(ip
-                    + (int)Math.pow(2, 32 - ipBlock.prefixLength())), ipBlock.prefixLength() + 1);
+                    + (int) Math.pow(2, 32 - ipBlock.prefixLength())), ipBlock.prefixLength() + 1);
 
             allocateIpBlock(deviceId, subBlock1, gatewayIp, gatewayMac);
             allocateIpBlock(deviceId, subBlock2, gatewayIp, gatewayMac);
@@ -275,6 +279,7 @@ public class NoviBngComponent {
                 log.error("Unable to add ip block in new tables !!!!!");
                 return;
             }
+
             tablesInfos.get(deviceId).add(newTable);
             tableSplit(newTable, ipBlock, deviceId);
 

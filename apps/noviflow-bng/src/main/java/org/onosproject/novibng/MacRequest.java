@@ -93,11 +93,11 @@ public class MacRequest {
         try {
             lock.acquire();
         } catch (Exception e) {
-            log.error("Lock exception : " , e);
+            log.error("Lock exception : ", e);
         }
     }
 
-    public void unlock(){
+    public void unlock() {
         lock.release(50);
     }
 
@@ -108,7 +108,7 @@ public class MacRequest {
     }
 
 
-    public synchronized void execute(PacketService packetService){
+    public synchronized void execute(PacketService packetService) {
 
         if (arpRequest != null) {
 
@@ -203,6 +203,10 @@ public class MacRequest {
         }
 
         return false;
+    }
+
+    public int hashCode() {
+        return ip.hashCode();
     }
 
 }
