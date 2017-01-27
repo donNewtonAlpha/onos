@@ -23,4 +23,5 @@ onos_app (
   category = 'Traffic Steering',
   url = 'http://onosproject.org',
   description = 'app to aggregate access devices to tunnel to a BNG.',
+  required_apps = [ 'org.onosproject.drivers' ],
 )
