@@ -117,10 +117,12 @@ public class BngDeviceConfig {
         if (otherObject instanceof BngDeviceConfig) {
 
             BngDeviceConfig other = (BngDeviceConfig) otherObject;
-            return deviceId.equals(other.deviceId) && loopbackIP.equals(other.loopbackIP) && primaryLinkIp.equals(other.primaryLinkIp) &&
-                    secondaryLinkIp.equals(other.secondaryLinkIp) && primaryLinkSubnetLength == other.primaryLinkSubnetLength &&
-                    secondaryLinkSubnetLength == other.secondaryLinkSubnetLength && primaryLinkPort.equals(other.primaryLinkPort) &&
-                    secondaryLinkPort.equals(other.secondaryLinkPort) &&
+            return deviceId.equals(other.deviceId) && loopbackIP.equals(other.loopbackIP)
+                    && primaryLinkIp.equals(other.primaryLinkIp) && secondaryLinkIp.equals(other.secondaryLinkIp)
+                    && primaryLinkSubnetLength == other.primaryLinkSubnetLength
+                    && secondaryLinkSubnetLength == other.secondaryLinkSubnetLength
+                    && primaryLinkPort.equals(other.primaryLinkPort)
+                    && secondaryLinkPort.equals(other.secondaryLinkPort) &&
                     primaryLinkMac.equals(other.primaryLinkMac) && secondaryLinkMac.equals(other.secondaryLinkMac);
 
         }

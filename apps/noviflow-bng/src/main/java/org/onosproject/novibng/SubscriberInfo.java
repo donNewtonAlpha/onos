@@ -19,7 +19,6 @@ package org.onosproject.novibng;
 import org.onlab.packet.Ip4Address;
 import org.onlab.packet.MacAddress;
 import org.onlab.packet.VlanId;
-import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.flow.FlowRule;
 

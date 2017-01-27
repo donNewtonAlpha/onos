@@ -57,6 +57,12 @@ public class NoviflowSetVxLan extends AbstractExtension implements ExtensionTrea
 
     /**
      * Constructs a new set VLAN ID instruction with given parameters.
+     * @param dstIp : destination IP of the tunnel;
+     * @param srcIp : source IP of the tunnel
+     * @param srcMac : mac of this side of the tunnel
+     * @param dstMac : mac of the next hop (underlay)
+     * @param udpPort : srouce udp port of the VxLan
+     * @param vxlanId : vni
      *
      */
     public NoviflowSetVxLan(MacAddress srcMac, MacAddress dstMac, Ip4Address srcIp,

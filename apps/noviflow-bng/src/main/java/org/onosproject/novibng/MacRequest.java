@@ -25,9 +25,6 @@ import org.onosproject.net.packet.PacketService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.concurrent.Semaphore;
 
 /**
@@ -93,7 +90,7 @@ public class MacRequest {
 
 
     public void lock() {
-        try{
+        try {
             lock.acquire();
         } catch (Exception e) {
             log.error("Lock exception : " , e);
@@ -115,7 +112,7 @@ public class MacRequest {
 
         if (arpRequest != null) {
 
-            delay ++;
+            delay++;
 
             if (mac == null) {
                 //Mac not yet known
@@ -125,7 +122,7 @@ public class MacRequest {
                     return;
                 }
 
-                if(failedAttempt % BACKOFF_PERIOD == 0) {
+                if (failedAttempt % BACKOFF_PERIOD == 0) {
                     period = 1 + failedAttempt / BACKOFF_PERIOD;
                     log.warn(ip + " still not reachable on device " + deviceId + " on port " + port);
                 }
@@ -137,7 +134,7 @@ public class MacRequest {
                 }
 
                 if (failedAttempt > LOSS_BEFORE_FAILURE) {
-                    if(!failureState) {
+                    if (!failureState) {
                         //Now in failure
                         NoviBngComponent.getComponent().notifyFailure(deviceId, port, mac);
                         failureState = true;
@@ -187,7 +184,7 @@ public class MacRequest {
 
             mac = responseMac;
             unlock();
-            log.info("requested MAC for " + ip +" found");
+            log.info("requested MAC for " + ip + " found");
         }
 
         failedAttempt = 0;
@@ -199,7 +196,7 @@ public class MacRequest {
 
 
 
-    public boolean equals (Object otherObject) {
+    public boolean equals(Object otherObject) {
         if (otherObject instanceof MacRequest) {
             MacRequest other = (MacRequest) otherObject;
             return ip.equals(other.getIp());
@@ -207,7 +204,5 @@ public class MacRequest {
 
         return false;
     }
-
-
 
 }

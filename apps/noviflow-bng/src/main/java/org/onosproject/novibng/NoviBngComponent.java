@@ -21,29 +21,44 @@ import org.apache.felix.scr.annotations.*;
 
 
 
-import org.onlab.packet.*;
+import org.onlab.packet.Ip4Address;
+import org.onlab.packet.Ip4Prefix;
+import org.onlab.packet.MacAddress;
+import org.onlab.packet.Ethernet;
+import org.onlab.packet.IPv4;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
-import org.onosproject.net.flow.*;
+import org.onosproject.net.flow.FlowRule;
+import org.onosproject.net.flow.FlowRuleService;
 import org.onosproject.net.flow.DefaultFlowRule;
 import org.onosproject.net.flow.DefaultTrafficSelector;
 import org.onosproject.net.flow.DefaultTrafficTreatment;
-import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.flow.TrafficSelector;
 import org.onosproject.net.flow.TrafficTreatment;
 import org.onosproject.net.flow.criteria.Criterion;
 import org.onosproject.net.flow.criteria.IPProtocolCriterion;
-import org.onosproject.net.group.*;
-import org.onosproject.net.meter.*;
-import org.onosproject.net.packet.*;
+import org.onosproject.net.group.Group;
+import org.onosproject.net.group.GroupService;
+import org.onosproject.net.meter.Meter;
+import org.onosproject.net.meter.MeterRequest;
+import org.onosproject.net.meter.DefaultMeterRequest;
+import org.onosproject.net.meter.Band;
+import org.onosproject.net.meter.DefaultBand;
+import org.onosproject.net.meter.MeterService;
+import org.onosproject.net.packet.PacketService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.onosproject.novibng.config.BngDeviceConfig;
 
-import java.util.*;
+import java.util.List;
+import java.util.LinkedList;
+import java.util.HashMap;
+import java.util.Collections;
+import java.util.Collection;
+import java.util.Set;
 
 
 /**
@@ -66,8 +81,8 @@ public class NoviBngComponent {
     protected GroupService groupService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected MeterService meterService;  
-    
+    protected MeterService meterService;
+
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected PacketService packetService;
 
@@ -158,7 +173,7 @@ public class NoviBngComponent {
 
             Set<DeviceId> deviceIds = devicesConfig.keySet();
 
-            for(DeviceId deviceId : deviceIds) {
+            for (DeviceId deviceId : deviceIds) {
 
                 Iterable<Group> appGroups = groupService.getGroups(deviceId, appId);
                 for (Group group : appGroups) {
@@ -194,8 +209,9 @@ public class NoviBngComponent {
         if (ipBlock.prefixLength() < 24) {
             //split the block
             int ip = ipBlock.address().toInt();
-            Ip4Prefix subBlock1 = Ip4Prefix.valueOf(Ip4Address.valueOf(ip) , ipBlock.prefixLength() + 1);
-            Ip4Prefix subBlock2 = Ip4Prefix.valueOf(Ip4Address.valueOf(ip + (int)Math.pow(2, 32 - ipBlock.prefixLength())), ipBlock.prefixLength() + 1);
+            Ip4Prefix subBlock1 = Ip4Prefix.valueOf(Ip4Address.valueOf(ip), ipBlock.prefixLength() + 1);
+            Ip4Prefix subBlock2 = Ip4Prefix.valueOf(Ip4Address.valueOf(ip
+                    + (int)Math.pow(2, 32 - ipBlock.prefixLength())), ipBlock.prefixLength() + 1);
 
             allocateIpBlock(deviceId, subBlock1, gatewayIp, gatewayMac);
             allocateIpBlock(deviceId, subBlock2, gatewayIp, gatewayMac);
@@ -266,7 +282,8 @@ public class NoviBngComponent {
         
     }
     
-    public void addSubscriber(Ip4Address subscriberIp, Ip4Address gatewayIp, int uploadSpeed, int downloadSpeed, DeviceId deviceId) {
+    public void addSubscriber(Ip4Address subscriberIp, Ip4Address gatewayIp, int uploadSpeed, int downloadSpeed,
+                              DeviceId deviceId) {
 
         //Check if the subscriber is already configured on this device
         if (subscribersInfo.get(deviceId).containsKey(subscriberIp)) {
@@ -285,7 +302,8 @@ public class NoviBngComponent {
                 if (gatewayInfo.containsIp(subscriberIp)) {
                     readyToProvision = true;
                 } else {
-                    log.error("Gateway " + gatewayIp + " is ready but the ip block for subscriber " + subscriberIp + " has not been provisioned");
+                    log.error("Gateway " + gatewayIp + " is ready but the ip block for subscriber " + subscriberIp
+                            + " has not been provisioned");
                     return;
                 }
             }
@@ -333,13 +351,14 @@ public class NoviBngComponent {
 
     }
 
-    public void addSubscriberFlows(Ip4Address subscriberIp, SubscriberInfo subscriberInfo, TablesInfo tableInfo, DeviceId deviceId) {
+    public void addSubscriberFlows(Ip4Address subscriberIp, SubscriberInfo subscriberInfo, TablesInfo tableInfo,
+                                   DeviceId deviceId) {
 
         //TODO : redundancy (link failure)
         GatewayInfo matchingGatewayInfo = null;
 
-        for (GatewayInfo gwInfo : gatewayInfos.get(deviceId)){
-            if (gwInfo.getGatewayIp().equals(subscriberInfo.getGatewayIp())){
+        for (GatewayInfo gwInfo : gatewayInfos.get(deviceId)) {
+            if (gwInfo.getGatewayIp().equals(subscriberInfo.getGatewayIp())) {
                 matchingGatewayInfo = gwInfo;
             }
         }
@@ -499,7 +518,7 @@ public class NoviBngComponent {
     public void tableSplit(TablesInfo tableInfo, Ip4Prefix ipBlock, DeviceId deviceId) {
 
 
-        for (int i = 0; i <TablesInfo.CONSECUTIVES_TABLES; i++) {
+        for (int i = 0; i < TablesInfo.CONSECUTIVES_TABLES; i++) {
 
             //Downstream flow
 
@@ -821,7 +840,8 @@ public class NoviBngComponent {
                     //ARP intercepts
                     flowRuleService.removeFlowRules(flow);
                 } else if (flow.selector().getCriterion(Criterion.Type.IP_PROTO) != null) {
-                    IPProtocolCriterion proto = (IPProtocolCriterion) flow.selector().getCriterion(Criterion.Type.IP_PROTO);
+                    IPProtocolCriterion proto = (IPProtocolCriterion) flow.selector()
+                            .getCriterion(Criterion.Type.IP_PROTO);
                     if (proto.protocol() == 1 || proto.protocol() == 2) {
                         //ICMP or IGMP intercepts
                         flowRuleService.removeFlowRules(flow);
@@ -913,11 +933,15 @@ public class NoviBngComponent {
         log.info("New intercepts set up");
 
         //loopback
-        processor.addRoutingInfo(deviceId, config.getPrimaryLinkPort(), Ip4Prefix.valueOf(config.getLoopbackIP(), 24), config.getLoopbackIP(), MacAddress.valueOf("00:00:00:00:00:00"));
-        processor.addRoutingInfo(deviceId, config.getSecondaryLinkPort(), Ip4Prefix.valueOf(config.getLoopbackIP(), 24), config.getLoopbackIP(), MacAddress.valueOf("00:00:00:00:00:00"));
+        processor.addRoutingInfo(deviceId, config.getPrimaryLinkPort(), Ip4Prefix.valueOf(config.getLoopbackIP(), 24),
+                config.getLoopbackIP(), MacAddress.valueOf("00:00:00:00:00:00"));
+        processor.addRoutingInfo(deviceId, config.getSecondaryLinkPort(), Ip4Prefix.valueOf(config.getLoopbackIP(), 24),
+                config.getLoopbackIP(), MacAddress.valueOf("00:00:00:00:00:00"));
         //Uplinks
-        processor.addRoutingInfo(deviceId, config.getPrimaryLinkPort(), config.getPrimaryLinkSubnet(), config.getPrimaryLinkIp(), config.getPrimaryLinkMac());
-        processor.addRoutingInfo(deviceId, config.getSecondaryLinkPort(), config.getSecondaryLinkSubnet(), config.getSecondaryLinkIp(), config.getSecondaryLinkMac());
+        processor.addRoutingInfo(deviceId, config.getPrimaryLinkPort(), config.getPrimaryLinkSubnet(),
+                config.getPrimaryLinkIp(), config.getPrimaryLinkMac());
+        processor.addRoutingInfo(deviceId, config.getSecondaryLinkPort(), config.getSecondaryLinkSubnet(),
+                config.getSecondaryLinkIp(), config.getSecondaryLinkMac());
 
         log.info("Routing infos added");
 
@@ -942,21 +966,22 @@ public class NoviBngComponent {
     //Link failure
 
     public void notifyFailure(DeviceId deviceId, PortNumber port, MacAddress oldMac) {
-        log.warn("Failure detected :  device " + deviceId +", port " + port);
+        log.warn("Failure detected :  device " + deviceId + ", port " + port);
         log.error("Link Failure detection not yet implemented : notifyFailure()");
         //TODO : link failure detection
         //linkFailureDetection.event(deviceId, port, true, false, oldMac, null);
     }
 
     public void notifyRecovery(DeviceId deviceId, PortNumber port, MacAddress oldMac, MacAddress newDstMac) {
-        log.warn("Recovery detected :  device " + deviceId +", port " + port + " changing MAC form " + oldMac + " to " + newDstMac);
+        log.warn("Recovery detected :  device " + deviceId + ", port " + port + " changing MAC form " + oldMac +
+                " to " + newDstMac);
         log.error("Link Failure detection not yet implemented : notifyRecovery()");
         //TODO: link failure detection
         //linkFailureDetection.event(deviceId, port, false, true, oldMac, newDstMac);
     }
 
     public void notifyRecovery(DeviceId deviceId, PortNumber port, MacAddress oldMac) {
-        log.warn("Recovery detected :  device " + deviceId +", port " + port);
+        log.warn("Recovery detected :  device " + deviceId + ", port " + port);
         log.error("Link Failure detection not yet implemented : notifyRecovery()");
         //TODO: link failure detection
         //linkFailureDetection.event(deviceId, port, false, false, oldMac, null);

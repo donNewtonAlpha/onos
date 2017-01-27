@@ -21,7 +21,12 @@ import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.flow.DefaultTrafficTreatment;
 import org.onosproject.net.flow.TrafficTreatment;
-import org.onosproject.net.packet.*;
+import org.onosproject.net.packet.PacketProcessor;
+import org.onosproject.net.packet.PacketService;
+import org.onosproject.net.packet.PacketContext;
+import org.onosproject.net.packet.InboundPacket;
+import org.onosproject.net.packet.OutboundPacket;
+import org.onosproject.net.packet.DefaultOutboundPacket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,7 +63,7 @@ public class NoviBngPacketProcessor implements PacketProcessor {
             @Override
             public void run() {
 
-                while(arpThreadActive) {
+                while (arpThreadActive) {
 
                     if (macRequests.size() > 0) {
 
@@ -81,7 +86,7 @@ public class NoviBngPacketProcessor implements PacketProcessor {
         t.start();
     }
 
-    public void stopARPingThread(){
+    public void stopARPingThread() {
         arpThreadActive = false;
     }
 
@@ -149,7 +154,7 @@ public class NoviBngPacketProcessor implements PacketProcessor {
 
                 }
             }
-        } catch(Exception e){
+        } catch (Exception e) {
             log.error("Exception during processing" , e);
         }
     }
@@ -273,13 +278,15 @@ public class NoviBngPacketProcessor implements PacketProcessor {
                 treatment.build(), ByteBuffer.wrap(ethPkt.serialize()));
 
         packetService.emit(outPacket);
-        log.info("ICMP reply response from " + Ip4Address.valueOf(ipPkt.getDestinationAddress()) + " to " + Ip4Address.valueOf(ipPkt.getSourceAddress()) + " sent on port " + port.toString());
+        log.info("ICMP reply response from " + Ip4Address.valueOf(ipPkt.getDestinationAddress()) + " to "
+                + Ip4Address.valueOf(ipPkt.getSourceAddress()) + " sent on port " + port.toString());
 
     }
 
 
 
-    public OutboundPacket getArpRequest(IpAddress targetAddress, IpAddress sourceAddress, MacAddress sourceMac, DeviceId deviceId, PortNumber dstPort, VlanId vlanId) {
+    public OutboundPacket getArpRequest(IpAddress targetAddress, IpAddress sourceAddress, MacAddress sourceMac,
+                                        DeviceId deviceId, PortNumber dstPort, VlanId vlanId) {
 
 
         ARP arpRequest = new ARP();
@@ -407,7 +414,7 @@ public class NoviBngPacketProcessor implements PacketProcessor {
         //Find matching routing info
         RoutingInfo matchingInfo = null;
         for (RoutingInfo info : routingInfos) {
-            if (info.getDeviceId().equals(deviceId) && info.getSubnet().contains(ip)){
+            if (info.getDeviceId().equals(deviceId) && info.getSubnet().contains(ip)) {
                 matchingInfo = info;
             }
         }
@@ -451,9 +458,9 @@ public class NoviBngPacketProcessor implements PacketProcessor {
 
         Iterator<MacRequest> it = macRequests.listIterator();
 
-        while(it.hasNext()) {
+        while (it.hasNext()) {
             MacRequest request = it.next();
-            if(request.getDeviceId().equals(deviceId)) {
+            if (request.getDeviceId().equals(deviceId)) {
                 request.unlock();
                 it.remove();
             }
@@ -505,7 +512,7 @@ public class NoviBngPacketProcessor implements PacketProcessor {
 
             boolean b = this.deviceId.equals(deviceId) && this.ip.equals(ip);
 
-            if(!port.equals(PortNumber.ANY)) {
+            if (!port.equals(PortNumber.ANY)) {
                 b = b && this.port.equals(port);
             }
 

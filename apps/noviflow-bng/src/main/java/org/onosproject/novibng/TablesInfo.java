@@ -37,7 +37,7 @@ public class TablesInfo {
     private List<Ip4Prefix> ipBlocks;
     private int subscribers;
 
-    public TablesInfo(int table){
+    public TablesInfo(int table) {
         rootTable = table;
         subscribers = 0;
         ipBlocks = new LinkedList<>();
@@ -74,7 +74,7 @@ public class TablesInfo {
         return false;
     }
 
-    public int getRootTable(){
+    public int getRootTable() {
         return rootTable;
     }
 

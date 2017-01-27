@@ -75,7 +75,7 @@ public class GatewayInfo {
 
     public void addIpBlock(Ip4Prefix newBlock) {
 
-        if(!this.containsIpBlock(newBlock)) {
+        if (!this.containsIpBlock(newBlock)) {
             ipBlocks.add(newBlock);
         }
     }

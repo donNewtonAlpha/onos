@@ -1,8 +1,22 @@
+/*
+ * Copyright 2016-present Open Networking Laboratory
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.onosproject.novibng.web;
 
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.onlab.packet.Ip4Address;
 import org.onlab.packet.Ip4Prefix;
@@ -14,13 +28,15 @@ import org.slf4j.Logger;
 import org.onosproject.novibng.NoviBngComponent;
 import org.onosproject.novibng.config.BngDeviceConfig;
 
-import javax.ws.rs.*;
+import javax.ws.rs.Path;
+import javax.ws.rs.POST;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.List;
-import java.util.Set;
+
 
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -52,6 +68,7 @@ public class RestNoviBng extends AbstractWebResource {
     /**
      * Allocate a new Ip block.
      *
+     * @param stream
      * @return 200 ok
      */
     @POST
@@ -71,10 +88,10 @@ public class RestNoviBng extends AbstractWebResource {
 
 
 
-            log.info("Ip block allocation requested for device " + deviceUri+ ", ip block : " + ipBlockString + "," +
+            log.info("Ip block allocation requested for device " + deviceUri + ", ip block : " + ipBlockString + "," +
                     " gateway : " + gatewayIpString + " (" + gatewayMacString + ")");
 
-            try{
+            try {
                 Ip4Address gatewayIp = Ip4Address.valueOf(gatewayIpString);
                 MacAddress gatewayMac = MacAddress.valueOf(gatewayMacString);
                 Ip4Prefix ipBlock = Ip4Prefix.valueOf(ipBlockString);
@@ -82,7 +99,7 @@ public class RestNoviBng extends AbstractWebResource {
 
                 NoviBngComponent.getComponent().allocateIpBlock(deviceId, ipBlock, gatewayIp, gatewayMac);
 
-            } catch(IllegalArgumentException e) {
+            } catch (IllegalArgumentException e) {
                 log.error("REST API allocate ip block error", e);
                 return Response.status(406).build();
             }
@@ -99,6 +116,7 @@ public class RestNoviBng extends AbstractWebResource {
     /**
      * Provision a subscriber.
      *
+     * @param stream
      * @return 200 ok
      */
     @POST
@@ -119,18 +137,19 @@ public class RestNoviBng extends AbstractWebResource {
 
 
 
-            log.info("subscriber provisioning requested for device " + deviceUri+ ", ip : " + subscriberIpString + "," +
-                    " gateway : " + gatewayIpString + ", speed " + uploadSpeed + " kbps up and " + downloadSpeed +
+            log.info("subscriber provisioning requested for device " + deviceUri+ ", ip : " + subscriberIpString + ","
+                    + " gateway : " + gatewayIpString + ", speed " + uploadSpeed + " kbps up and " + downloadSpeed +
                     " kbps down");
 
-            try{
+            try {
                 Ip4Address gatewayIp = Ip4Address.valueOf(gatewayIpString);
                 Ip4Address subscriberIp = Ip4Address.valueOf(subscriberIpString);
                 DeviceId deviceId = DeviceId.deviceId(deviceUri);
 
-                NoviBngComponent.getComponent().addSubscriber(subscriberIp, gatewayIp, uploadSpeed, downloadSpeed, deviceId);
+                NoviBngComponent.getComponent().addSubscriber(subscriberIp, gatewayIp,
+                        uploadSpeed, downloadSpeed, deviceId);
 
-            } catch(IllegalArgumentException e) {
+            } catch (IllegalArgumentException e) {
                 log.error("REST API allocate ip block error", e);
                 return Response.status(406).build();
             }
@@ -148,6 +167,7 @@ public class RestNoviBng extends AbstractWebResource {
     /**
      * Add/modify the config for one device
      *
+     * @param stream
      * @return 200 ok
      */
     @POST
@@ -173,13 +193,13 @@ public class RestNoviBng extends AbstractWebResource {
 
 
 
-            try{
+            try {
 
                 final String[] partsPrimary = primaryLinkSubnet.split("/");
                 final String[] partsSecondary = secondaryLinkSubnet.split("/");
                 if (partsPrimary.length != 2 || partsSecondary.length != 2) {
-                    String msg = "Malformed IPv4 prefix string: " + primaryLinkSubnet + " or " + secondaryLinkSubnet + ". " +
-                            "Address must take form \"x.x.x.x/y\"";
+                    String msg = "Malformed IPv4 prefix string: " + primaryLinkSubnet + " or "
+                            + secondaryLinkSubnet + ". " + "Address must take form \"x.x.x.x/y\"";
                     throw new IllegalArgumentException(msg);
                 }
 
@@ -193,15 +213,16 @@ public class RestNoviBng extends AbstractWebResource {
                 Ip4Address secondaryNextHopIp = Ip4Address.valueOf(secondaryNextHopString);
 
 
-                BngDeviceConfig newConfig = new BngDeviceConfig(DeviceId.deviceId(deviceUri), Ip4Address.valueOf(loopbackIp),
-                        primaryIp, primaryPrefixLength, secondaryIp, secondaryPrefixLength, MacAddress.valueOf(primaryLinkMac),
-                        MacAddress.valueOf(secondaryLinkMac), PortNumber.portNumber(primaryPort),
-                        PortNumber.portNumber(secondaryPort), primaryNextHopIp, secondaryNextHopIp);
+                BngDeviceConfig newConfig = new BngDeviceConfig(DeviceId.deviceId(deviceUri),
+                        Ip4Address.valueOf(loopbackIp), primaryIp, primaryPrefixLength, secondaryIp,
+                        secondaryPrefixLength, MacAddress.valueOf(primaryLinkMac), MacAddress.valueOf(secondaryLinkMac),
+                        PortNumber.portNumber(primaryPort), PortNumber.portNumber(secondaryPort), primaryNextHopIp,
+                        secondaryNextHopIp);
 
                 //TODO : check validity of config
 
                 NoviBngComponent.getComponent().checkNewConfig(newConfig);
-            } catch(IllegalArgumentException e) {
+            } catch (IllegalArgumentException e) {
                 log.error("REST API config error, likely invalid config", e);
                 return Response.status(406).entity("Invalid Config").build();
             }
