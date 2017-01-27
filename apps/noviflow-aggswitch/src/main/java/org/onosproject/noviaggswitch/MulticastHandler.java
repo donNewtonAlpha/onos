@@ -1,3 +1,19 @@
+/*
+ * Copyright 2016-present Open Networking Laboratory
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.onosproject.noviaggswitch;
 
 import java.nio.ByteBuffer;
@@ -75,11 +91,11 @@ public class MulticastHandler {
         //Check if the flow already exists
         FlowRule oldFlow = multicastFlows.get(feedIp);
         int mapping = 0;
-        if(oldFlow != null) {
+        if (oldFlow != null) {
             //flow already exists, extract its current mapping
             mapping = extractMappingFromFlow(oldFlow);
         }
-        if(mappingContainsPort(mapping, port)) {
+        if (mappingContainsPort(mapping, port)) {
             log.warn("This port already receives this feed");
             return;
         }
@@ -88,7 +104,7 @@ public class MulticastHandler {
         //Check if the matching group already exists
         GroupId matchingGroup = multicastGroups.get(mapping);
 
-        if(matchingGroup == null){
+        if (matchingGroup == null){
             //Need to create it
             matchingGroup = createGroup(mapping);
             multicastGroups.put(mapping, matchingGroup);
@@ -98,7 +114,7 @@ public class MulticastHandler {
 
         flowRuleService.applyFlowRules(newFlow);
 
-        if(oldFlow != null) {
+        if (oldFlow != null) {
 
             multicastFlows.replace(feedIp, newFlow);
             delayedRemoveFlow(oldFlow);
@@ -116,7 +132,7 @@ public class MulticastHandler {
         //Check if the flow already exists
         FlowRule oldFlow = multicastFlows.get(feedIp);
         int oldMapping = 0;
-        if(oldFlow != null) {
+        if (oldFlow != null) {
             //flow already exists, extract its current mapping
             oldMapping = extractMappingFromFlow(oldFlow);
         } else {
@@ -124,19 +140,19 @@ public class MulticastHandler {
             return;
         }
 
-        if(oldMapping == 0) {
+        if (oldMapping == 0) {
             log.error("Port mapping is 0 !!");
             return;
         }
 
-        if(!mappingContainsPort(oldMapping, port)) {
+        if (!mappingContainsPort(oldMapping, port)) {
             log.warn("This port does not receive this feed, impossible to remove it from the feed");
             return;
         }
 
         int mapping = removePortFromMapping(oldMapping, port);
 
-        if(mapping != 0) {
+        if (mapping != 0) {
 
             //Check if the matching group already exists
             GroupId matchingGroup = multicastGroups.get(mapping);
@@ -191,7 +207,7 @@ public class MulticastHandler {
         Iterable<Group> groups = groupService.getGroups(deviceId, appId);
         for (Group group : groups) {
 
-            if(group.id().equals(flowGroupId)) {
+            if (group.id().equals(flowGroupId)) {
                 //Group found, extract buckets
                 return extractMappingFromGroup(group);
             }
@@ -206,11 +222,11 @@ public class MulticastHandler {
         int mapping = 0;
 
         List<GroupBucket> buckets = group.buckets().buckets();
-        for(GroupBucket bucket : buckets) {
+        for (GroupBucket bucket : buckets) {
 
             List<Instruction> bucketInstructions = bucket.treatment().immediate();
-            for(Instruction bucketInstruction : bucketInstructions) {
-                if(bucketInstruction.type() == Instruction.Type.OUTPUT) {
+            for (Instruction bucketInstruction : bucketInstructions) {
+                if (bucketInstruction.type() == Instruction.Type.OUTPUT) {
                     mapping = addPortToMapping(mapping, ((Instructions.OutputInstruction)bucketInstruction).port());
                 }
             }
@@ -254,7 +270,7 @@ public class MulticastHandler {
         List<GroupBucket> buckets = new LinkedList<>();
 
 
-        for(PortNumber port : ports) {
+        for (PortNumber port : ports) {
 
             TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
             treatment.setOutput(port);
@@ -280,10 +296,10 @@ public class MulticastHandler {
 
         List<GroupId> groupsInUse = new LinkedList<>();
 
-        for(FlowRule flow : multicastFlows.values()) {
+        for (FlowRule flow : multicastFlows.values()) {
 
             GroupId groupId = extractGrpoupIdFromFlow(flow);
-            if(!groupsInUse.contains(groupId)) {
+            if (!groupsInUse.contains(groupId)) {
                 groupsInUse.add(groupId);
             }
 
@@ -309,9 +325,9 @@ public class MulticastHandler {
 
         List<PortNumber> ports = new LinkedList<>();
 
-        for(int i = 0; i < 31; i++) {
+        for (int i = 0; i < 31; i++) {
 
-            if((portMapping >> i)%2 == 1) {
+             if ((portMapping >> i)%2 == 1) {
                 //this port is included
                 ports.add(PortNumber.portNumber(i));
             }
@@ -324,7 +340,7 @@ public class MulticastHandler {
     private int getMappingFromPorts(List<PortNumber> ports) {
 
         int mapping = 0;
-        for(PortNumber port :ports) {
+        for (PortNumber port :ports) {
             mapping = mapping + 2^((int)port.toLong());
         }
 
@@ -336,8 +352,8 @@ public class MulticastHandler {
 
         int watchers = 0;
 
-        for(int i = 0; i < 31; i++) {
-            if((portMapping >> i)%2 == 1) {
+        for (int i = 0; i < 31; i++) {
+            if ((portMapping >> i)%2 == 1) {
                 //this port is included
                 watchers ++;
             }
@@ -357,7 +373,7 @@ public class MulticastHandler {
 
     private boolean mappingContainsPort(int mapping, PortNumber port) {
 
-        if((mapping >> (int)port.toLong()) % 2 == 1) {
+        if ((mapping >> (int)port.toLong()) % 2 == 1) {
             return true;
         }
         return false;
@@ -383,7 +399,7 @@ public class MulticastHandler {
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
-                if(add) {
+                if (add) {
                     flowRuleService.applyFlowRules(flow);
                 } else {
                     flowRuleService.removeFlowRules(flow);

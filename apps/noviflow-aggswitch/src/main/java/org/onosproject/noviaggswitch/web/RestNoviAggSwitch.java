@@ -1,3 +1,19 @@
+/*
+ * Copyright 2016-present Open Networking Laboratory
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.onosproject.noviaggswitch.web;
 
 
@@ -104,12 +120,11 @@ public class RestNoviAggSwitch extends AbstractWebResource {
             ObjectNode jsonTree = (ObjectNode) mapper().readTree(stream);
             String deviceUri = jsonTree.findValue("deviceId").asText();
 
-
-            try{
+            try {
 
                 DeviceId deviceId = DeviceId.deviceId(deviceUri);
                 NoviAggSwitchComponent.getComponent().awsCloudShitHook(deviceId);
-            } catch(IllegalArgumentException e) {
+            } catch (IllegalArgumentException e) {
                 log.error("REST API create tunnel error", e);
                 return Response.status(406).build();
             }
@@ -141,7 +156,7 @@ public class RestNoviAggSwitch extends AbstractWebResource {
 
             log.info("Vxlan tunnel removal requested for IP : " + ip + ", vni : " + vni);
 
-            try{
+            try {
                 Ip4Address vxlanIP = Ip4Address.valueOf(ip);
                 DeviceId deviceId = DeviceId.deviceId(deviceUri);
                 NoviAggSwitchComponent.getComponent().removeTunnel(deviceId, vxlanIP, vni);
@@ -168,7 +183,7 @@ public class RestNoviAggSwitch extends AbstractWebResource {
             ObjectNode jsonTree = (ObjectNode) mapper().readTree(stream);
             String deviceUri = jsonTree.findValue("deviceId").asText("");
 
-            if(deviceUri.equals("")) {
+            if (deviceUri.equals("")) {
                 NoviAggSwitchComponent.getComponent().removeAllTunnels();
             } else {
                 DeviceId deviceId = DeviceId.deviceId(deviceUri);
@@ -200,7 +215,7 @@ public class RestNoviAggSwitch extends AbstractWebResource {
             ArrayNode devices = result.putArray("devices");
 
             Set<DeviceId> aggDevices = NoviAggSwitchComponent.getComponent().getAggDevices();
-            for(DeviceId deviceId : aggDevices) {
+            for (DeviceId deviceId : aggDevices) {
 
 
 
@@ -315,7 +330,7 @@ public class RestNoviAggSwitch extends AbstractWebResource {
 
 
 
-            try{
+            try {
 
                 final String[] partsPrimary = primaryLinkSubnet.split("/");
                 final String[] partsSecondary = secondaryLinkSubnet.split("/");

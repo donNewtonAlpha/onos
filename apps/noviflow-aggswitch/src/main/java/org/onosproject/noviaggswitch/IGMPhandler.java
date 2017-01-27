@@ -1,3 +1,19 @@
+/*
+ * Copyright 2016-present Open Networking Laboratory
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.onosproject.noviaggswitch;
 
 import org.onlab.packet.*;
@@ -34,9 +50,9 @@ public class IGMPhandler {
 
             List<IGMPGroup> igmpGroups = igmpPacket.getGroups();
 
-            for(IGMPGroup group : igmpGroups) {
+            for (IGMPGroup group : igmpGroups) {
 
-                if(group instanceof IGMPMembership) {
+                if (group instanceof IGMPMembership) {
 
                     IGMPMembership membership = (IGMPMembership) group;
                     log.info("IGMP membership : " + membership.toString());
@@ -45,7 +61,7 @@ public class IGMPhandler {
                     //Lock to ensure thread safe behavior
                     mh.lock();
 
-                    if(isAdditionQuery(membership)) {
+                    if (isAdditionQuery(membership)) {
                         log.info("It is an addition");
                         mh.addAccessNodeToFeed(membership.getGaddr().getIp4Address(), from.port());
                     } else {
@@ -60,7 +76,7 @@ public class IGMPhandler {
             }
 
 
-        } catch(Exception e){
+        } catch (Exception e) {
             log.error("Exception during processing" , e);
         }
 
@@ -70,8 +86,8 @@ public class IGMPhandler {
 
     private static boolean isAdditionQuery(IGMPMembership membership) {
 
-        if(membership.getRecordType() == IGMPMembership.MODE_IS_INCLUDE || membership.getRecordType() == IGMPMembership.CHANGE_TO_INCLUDE_MODE) {
-            if(membership.getSources().size() > 0) {
+        if (membership.getRecordType() == IGMPMembership.MODE_IS_INCLUDE || membership.getRecordType() == IGMPMembership.CHANGE_TO_INCLUDE_MODE) {
+            if (membership.getSources().size() > 0) {
 
                 log.info("IGMP membership with INCLUDE or CHANGE_TO_INCLUDE and " + membership.getSources().size() + " sources");
                 return true;
@@ -79,7 +95,7 @@ public class IGMPhandler {
             } else {
                 return false;
             }
-        } else if(membership.getRecordType() == IGMPMembership.MODE_IS_EXCLUDE || membership.getRecordType() == IGMPMembership.CHANGE_TO_EXCLUDE_MODE) {
+        } else if (membership.getRecordType() == IGMPMembership.MODE_IS_EXCLUDE || membership.getRecordType() == IGMPMembership.CHANGE_TO_EXCLUDE_MODE) {
 
                 log.info("IGMP membership with EXCLUDE or CHANGE_TO_EXCLUDE and " + membership.getSources().size() + " sources");
                 return true;

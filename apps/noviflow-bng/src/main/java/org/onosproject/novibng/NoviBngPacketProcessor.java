@@ -1,3 +1,19 @@
+/*
+ * Copyright 2016-present Open Networking Laboratory
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.onosproject.novibng;
 
 import org.onlab.packet.*;
@@ -108,7 +124,7 @@ public class NoviBngPacketProcessor implements PacketProcessor {
 
                 IPacket ipPayload = ipPkt.getPayload();
 
-                if(ipPayload instanceof ICMP) {
+                if (ipPayload instanceof ICMP) {
 
                     log.debug("ICMP packet received");
 
@@ -141,10 +157,10 @@ public class NoviBngPacketProcessor implements PacketProcessor {
     private void checkNewSub(DeviceId deviceId, PortNumber inPort, Ip4Address subIp, Ethernet pkt) {
 
         SubscriberInfo subInfo = NoviBngComponent.getComponent().subscribersInfo.get(deviceId).get(subIp);
-        if(subInfo == null) {
+        if (subInfo == null) {
             return;
         }
-        if(subInfo.isStandby()){
+        if (subInfo.isStandby()) {
             subInfo.setPort(inPort);
             subInfo.setCTag(VlanId.vlanId(pkt.getVlanID()));
             subInfo.setMac(pkt.getSourceMAC());
@@ -159,6 +175,7 @@ public class NoviBngPacketProcessor implements PacketProcessor {
 
 
     private void handleArpRequest(DeviceId deviceId, PortNumber inPort, Ethernet ethPkt) {
+
         ARP arpRequest = (ARP) ethPkt.getPayload();
         Ip4Address targetProtocolAddress = Ip4Address.valueOf(
                 arpRequest.getTargetProtocolAddress());
@@ -171,14 +188,14 @@ public class NoviBngPacketProcessor implements PacketProcessor {
         boolean matchingInfoFound = false;
         for(RoutingInfo info : routingInfos) {
 
-            if(info.match(deviceId, inPort, targetProtocolAddress)) {
+            if (info.match(deviceId, inPort, targetProtocolAddress)) {
                 matchingInfoFound = true;
                 sendArpResponse(ethPkt, arpRequest, info.getMac(), info.getDeviceId(), inPort);
             }
 
         }
 
-        if(!matchingInfoFound) {
+        if (!matchingInfoFound) {
             log.error("handleArpRequest, matching routing info was NOT FOUND");
         }
 
@@ -195,8 +212,8 @@ public class NoviBngPacketProcessor implements PacketProcessor {
         log.debug("ARP reply received from " + hostIpAddress + " : " + mac);
 
 
-        for(MacRequest request : macRequests) {
-            if(request.getIp().equals(hostIpAddress)) {
+        for (MacRequest request : macRequests) {
+            if (request.getIp().equals(hostIpAddress)) {
                request.success(mac);
             }
         }
@@ -209,9 +226,9 @@ public class NoviBngPacketProcessor implements PacketProcessor {
 
         Ip4Address pingedIpAddress = Ip4Address.valueOf(ipPkt.getDestinationAddress());
 
-        for(RoutingInfo info : routingInfos) {
+        for (RoutingInfo info : routingInfos) {
 
-            if(info.match(deviceId, inPort, pingedIpAddress)) {
+            if (info.match(deviceId, inPort, pingedIpAddress)) {
                 log.debug("This ping request is for this switch");
                 sendICMPreply(ethPkt, info.getMac(), info.getDeviceId(), inPort);
             }
@@ -349,7 +366,7 @@ public class NoviBngPacketProcessor implements PacketProcessor {
 
         Iterator<RoutingInfo> it = routingInfos.listIterator();
 
-        while(it.hasNext()) {
+        while (it.hasNext()) {
             RoutingInfo info = it.next();
             if (info.getDeviceId().equals(deviceId)) {
                 log.info("Remove one RoutingInfo , ip : " + info.getIp() + " for device " + deviceId);
@@ -364,17 +381,17 @@ public class NoviBngPacketProcessor implements PacketProcessor {
 
         //Check if we already have some MacRequest for this Ip
 
-        for(MacRequest request : macRequests) {
+        for (MacRequest request : macRequests) {
 
-            if(request.getDeviceId().equals(deviceId) && request.getIp().equals(ip)) {
+            if (request.getDeviceId().equals(deviceId) && request.getIp().equals(ip)) {
                 //A request already exist, add this tunnelId to the requesting tunnels
-                if(request.getMac() != null) {
+                if (request.getMac() != null) {
                     return request.getMac();
                 } else {
                     //This request is already trying to get the Mac address for this Ip, waiting for result
                     request.lock();
 
-                    if(request.getMac() == null) {
+                    if (request.getMac() == null) {
                         return  null;
                     }
 
@@ -389,13 +406,13 @@ public class NoviBngPacketProcessor implements PacketProcessor {
 
         //Find matching routing info
         RoutingInfo matchingInfo = null;
-        for(RoutingInfo info : routingInfos) {
-            if(info.getDeviceId().equals(deviceId) && info.getSubnet().contains(ip)){
+        for (RoutingInfo info : routingInfos) {
+            if (info.getDeviceId().equals(deviceId) && info.getSubnet().contains(ip)){
                 matchingInfo = info;
             }
         }
 
-        if(matchingInfo != null) {
+        if (matchingInfo != null) {
 
             MacRequest request = new MacRequest(matchingInfo.getDeviceId(), matchingInfo.getPort(), ip);
             macRequests.add(request);
@@ -407,7 +424,7 @@ public class NoviBngPacketProcessor implements PacketProcessor {
 
             request.lock();
 
-            if(request.getMac() == null) {
+            if (request.getMac() == null) {
                 return  null;
             }
 
@@ -424,7 +441,7 @@ public class NoviBngPacketProcessor implements PacketProcessor {
     }
 
     public void clearMacRequests() {
-        for(MacRequest mr : macRequests) {
+        for (MacRequest mr : macRequests) {
             mr.unlock();
         }
         macRequests.clear();

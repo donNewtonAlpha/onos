@@ -14,14 +14,7 @@
  * limitations under the License.
  */
 
-package org.onosproject.driver.extensions.ofmessages;
-
 /**
- * Created by nick on 4/11/16.
+ * Module to control optical path.
  */
-public interface OFActionNoviflowExperimenter {
-
-    public boolean isSetVxLan();
-
-
-}
+package org.onosproject.noviaggswitch.web;

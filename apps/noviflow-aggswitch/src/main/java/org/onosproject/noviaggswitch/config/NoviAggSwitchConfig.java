@@ -1,3 +1,19 @@
+/*
+ * Copyright 2016-present Open Networking Laboratory
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.onosproject.noviaggswitch.config;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -78,7 +94,7 @@ public class NoviAggSwitchConfig extends Config<ApplicationId> {
         List<DeviceId> deviceIds = new LinkedList<>();
         List<ObjectNode> devices = devices();
 
-        for(ObjectNode device :  devices) {
+        for (ObjectNode device :  devices) {
             deviceIds.add(deviceId(device));
         }
 
@@ -88,8 +104,8 @@ public class NoviAggSwitchConfig extends Config<ApplicationId> {
     private ObjectNode getDeviceById(DeviceId deviceId) {
 
         List<ObjectNode> devices = devices();
-        for(ObjectNode device : devices) {
-            if(deviceId(device).equals(deviceId)) {
+        for (ObjectNode device : devices) {
+            if (deviceId(device).equals(deviceId)) {
                 return device;
             }
         }
@@ -101,9 +117,9 @@ public class NoviAggSwitchConfig extends Config<ApplicationId> {
 
         String ip = device.get(LOOPBACK_IP).asText("");
         Ip4Address loopbackIp = null;
-        try{
+        try {
             loopbackIp = Ip4Address.valueOf(ip);
-        } catch(Exception e){
+        } catch (Exception e){
             log.debug("Invalid loopback Ip");
         }
         return loopbackIp;
@@ -112,7 +128,7 @@ public class NoviAggSwitchConfig extends Config<ApplicationId> {
     private Ip4Prefix primaryLinkIp(ObjectNode device){
         String ip = device.get(PRIMARY_LINK_IP).asText("");
         Ip4Prefix primaryLinkIp = null;
-        try{
+        try {
             primaryLinkIp = Ip4Prefix.valueOf(ip);
         } catch(Exception e){
             log.debug("Invalid primary link Ip");
@@ -123,7 +139,7 @@ public class NoviAggSwitchConfig extends Config<ApplicationId> {
     private Ip4Prefix secondaryLinkIp(ObjectNode device){
         String ip = device.get(SECONDARY_LINK_IP).asText("");
         Ip4Prefix linkIp = null;
-        try{
+        try {
             linkIp = Ip4Prefix.valueOf(ip);
         } catch(Exception e){
             log.debug("Invalid secondary link Ip");
@@ -134,7 +150,7 @@ public class NoviAggSwitchConfig extends Config<ApplicationId> {
     private MacAddress primaryLinkMac(ObjectNode device){
         String mac = device.get(PRIMARY_LINK_MAC).asText("");
         MacAddress primaryLinkMac = null;
-        try{
+        try {
             primaryLinkMac = MacAddress.valueOf(mac);
         } catch(Exception e){
             log.debug("Invalid primary link mac");
@@ -145,7 +161,7 @@ public class NoviAggSwitchConfig extends Config<ApplicationId> {
     private MacAddress secondaryLinkMac(ObjectNode device){
         String mac = device.get(SECONDARY_LINK_MAC).asText("");
         MacAddress secondaryLinkMac = null;
-        try{
+        try {
             secondaryLinkMac = MacAddress.valueOf(mac);
         } catch(Exception e){
             log.debug("Invalid secondary link mac");
@@ -156,12 +172,12 @@ public class NoviAggSwitchConfig extends Config<ApplicationId> {
     private PortNumber primaryLinkPort(ObjectNode device){
         int port = device.get(PRIMARY_LINK_PORT).asInt(0);
         PortNumber link = null;
-        try{
+        try {
             link = PortNumber.portNumber(port);
         } catch(Exception e){
             log.debug("Invalid primary link port");
         }
-        if(port != 0) {
+        if (port != 0) {
             return link;
         } else {
             return null;
@@ -171,12 +187,12 @@ public class NoviAggSwitchConfig extends Config<ApplicationId> {
     private PortNumber secondaryLinkPort(ObjectNode device){
         int port = device.get(SECONDARY_LINK_PORT).asInt(0);
         PortNumber link = null;
-        try{
+        try {
             link = PortNumber.portNumber(port);
         } catch(Exception e){
             log.debug("Invalid secondary link port");
         }
-        if(port != 0) {
+        if (port != 0) {
             return link;
         } else {
             return null;
@@ -224,14 +240,14 @@ public class NoviAggSwitchConfig extends Config<ApplicationId> {
 
     public boolean hasChanged(NoviAggSwitchConfig oldConfig, DeviceId deviceId) {
 
-        if(oldConfig == null) {
+        if (oldConfig == null) {
             return true;
         }
 
         ObjectNode newDevice = getDeviceById(deviceId);
         ObjectNode oldDevice = oldConfig.getDeviceById(deviceId);
 
-        if(newDevice == null || oldDevice == null) {
+        if (newDevice == null || oldDevice == null) {
             return true;
         }
 

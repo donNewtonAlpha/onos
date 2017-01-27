@@ -1,3 +1,18 @@
+/*
+ * Copyright 2016-present Open Networking Laboratory
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.onosproject.novibng;
 
@@ -176,7 +191,7 @@ public class NoviBngComponent {
     public void allocateIpBlock(DeviceId deviceId, Ip4Prefix ipBlock, Ip4Address gatewayIp, MacAddress gatewayMac) {
 
 
-        if(ipBlock.prefixLength() < 24) {
+        if (ipBlock.prefixLength() < 24) {
             //split the block
             int ip = ipBlock.address().toInt();
             Ip4Prefix subBlock1 = Ip4Prefix.valueOf(Ip4Address.valueOf(ip) , ipBlock.prefixLength() + 1);
@@ -191,15 +206,15 @@ public class NoviBngComponent {
         //Configure gateway
         List<GatewayInfo> deviceGateways = gatewayInfos.get(deviceId);
         boolean addNewGateway = true;
-        for(GatewayInfo info : deviceGateways) {
+        for (GatewayInfo info : deviceGateways) {
 
-            if(info.getGatewayIp().equals(gatewayIp)) {
+            if (info.getGatewayIp().equals(gatewayIp)) {
                 addNewGateway = false;
                 info.addIpBlock(ipBlock);
             }
 
         }
-        if(addNewGateway) {
+        if (addNewGateway) {
             //Add the gateway to the list of gateway needing to respond, and track which gateway for which block
             GatewayInfo newGatewayInfo = new GatewayInfo(gatewayIp, gatewayMac);
             newGatewayInfo.addIpBlock(ipBlock);
@@ -216,14 +231,14 @@ public class NoviBngComponent {
         int tableMax = 0;
         boolean blockAssigned = false;
 
-        for(TablesInfo tablesInfo : tablesInfos.get(deviceId)) {
-            if(tablesInfo.containsBlock(ipBlock)) {
+        for (TablesInfo tablesInfo : tablesInfos.get(deviceId)) {
+            if (tablesInfo.containsBlock(ipBlock)) {
                 blockAssigned = true;
             }
         }
 
-        for(TablesInfo tableInfo : tablesInfos.get(deviceId)) {
-            if(!blockAssigned) {
+        for (TablesInfo tableInfo : tablesInfos.get(deviceId)) {
+            if (!blockAssigned) {
 
                 if (tableInfo.tryAddIpBlock(ipBlock)) {
                     //Block assigned
@@ -237,10 +252,10 @@ public class NoviBngComponent {
             }
         }
 
-        if(!blockAssigned) {
+        if (!blockAssigned) {
             //All tables are full, need a new table set
             TablesInfo newTable = new TablesInfo(tableMax + TablesInfo.CONSECUTIVES_TABLES);
-            if(!newTable.tryAddIpBlock(ipBlock)){
+            if (!newTable.tryAddIpBlock(ipBlock)) {
                 log.error("Unable to add ip block in new tables !!!!!");
                 return;
             }
@@ -254,7 +269,7 @@ public class NoviBngComponent {
     public void addSubscriber(Ip4Address subscriberIp, Ip4Address gatewayIp, int uploadSpeed, int downloadSpeed, DeviceId deviceId) {
 
         //Check if the subscriber is already configured on this device
-        if(subscribersInfo.get(deviceId).containsKey(subscriberIp)){
+        if (subscribersInfo.get(deviceId).containsKey(subscriberIp)) {
             log.info("Subscriber " + subscriberIp + " already configured on device " + deviceId);
             //Send to modifySubscriber instead
             modifySubscriber(subscriberIp, gatewayIp, uploadSpeed, downloadSpeed);
@@ -264,10 +279,10 @@ public class NoviBngComponent {
         //Check if gateway and ip block are enabled
         boolean readyToProvision = false;
 
-        for(GatewayInfo gatewayInfo : gatewayInfos.get(deviceId)) {
-            if(gatewayInfo.getGatewayIp().equals(gatewayIp)) {
+        for (GatewayInfo gatewayInfo : gatewayInfos.get(deviceId)) {
+            if (gatewayInfo.getGatewayIp().equals(gatewayIp)) {
                 //gateway OK, check Ip block
-                if(gatewayInfo.containsIp(subscriberIp)) {
+                if (gatewayInfo.containsIp(subscriberIp)) {
                     readyToProvision = true;
                 } else {
                     log.error("Gateway " + gatewayIp + " is ready but the ip block for subscriber " + subscriberIp + " has not been provisioned");
@@ -276,21 +291,21 @@ public class NoviBngComponent {
             }
         }
 
-        if(!readyToProvision) {
+        if (!readyToProvision) {
             log.error("Gateway " + gatewayIp + " is not provisioned");
             return;
         }
 
         //Find which table deal with this
         TablesInfo matchingTableInfo = null;
-        for(TablesInfo tableInfo : tablesInfos.get(deviceId)) {
+        for (TablesInfo tableInfo : tablesInfos.get(deviceId)) {
 
-            if(tableInfo.containsIp(subscriberIp)) {
+            if (tableInfo.containsIp(subscriberIp)) {
                 matchingTableInfo = tableInfo;
             }
         }
 
-        if(matchingTableInfo == null) {
+        if (matchingTableInfo == null) {
             log.error("No table configured for " + subscriberIp + " !! Yet gateway and ip block OK !?!?!!");
             return;
         }
@@ -323,18 +338,18 @@ public class NoviBngComponent {
         //TODO : redundancy (link failure)
         GatewayInfo matchingGatewayInfo = null;
 
-        for(GatewayInfo gwInfo : gatewayInfos.get(deviceId)){
-            if(gwInfo.getGatewayIp().equals(subscriberInfo.getGatewayIp())){
+        for (GatewayInfo gwInfo : gatewayInfos.get(deviceId)){
+            if (gwInfo.getGatewayIp().equals(subscriberInfo.getGatewayIp())){
                 matchingGatewayInfo = gwInfo;
             }
         }
 
-        if(matchingGatewayInfo == null) {
+        if (matchingGatewayInfo == null) {
             log.error("No matching gateway info were found for " + subscriberInfo.getGatewayIp() + " !!?!?!?!?!");
             return;
         }
 
-        for(int i = 0; i < TablesInfo.CONSECUTIVES_TABLES; i++) {
+        for (int i = 0; i < TablesInfo.CONSECUTIVES_TABLES; i++) {
 
             //Downstream flow
 
@@ -364,7 +379,7 @@ public class NoviBngComponent {
             treatmentDownstream.setEthDst(subscriberInfo.getMac());
             treatmentDownstream.setQueue(i);
             treatmentDownstream.setOutput(subscriberInfo.getPort());
-            if(i < TablesInfo.CONSECUTIVES_TABLES - 1) {
+            if (i < TablesInfo.CONSECUTIVES_TABLES - 1) {
                 treatmentDownstream.transition(tableInfo.getRootTable() + i + 1);
             }
 
@@ -431,7 +446,7 @@ public class NoviBngComponent {
             treatmentUpstream.setEthDst(processor.getMac(devicesConfig.get(deviceId).getPrimaryNextHopIp(), deviceId));
             treatmentUpstream.setQueue(i);
             treatmentUpstream.setOutput(devicesConfig.get(deviceId).getPrimaryLinkPort());
-            if(i < TablesInfo.CONSECUTIVES_TABLES - 1) {
+            if (i < TablesInfo.CONSECUTIVES_TABLES - 1) {
                 treatmentUpstream.transition(tableInfo.getRootTable() + i + 1);
             }
 
@@ -484,7 +499,7 @@ public class NoviBngComponent {
     public void tableSplit(TablesInfo tableInfo, Ip4Prefix ipBlock, DeviceId deviceId) {
 
 
-        for(int i = 0; i <TablesInfo.CONSECUTIVES_TABLES; i++) {
+        for (int i = 0; i <TablesInfo.CONSECUTIVES_TABLES; i++) {
 
             //Downstream flow
 
@@ -802,12 +817,12 @@ public class NoviBngComponent {
 
             if (flow.deviceId().equals(deviceId)) {
 
-                if(flow.selector().getCriterion(Criterion.Type.ARP_TPA) != null) {
+                if (flow.selector().getCriterion(Criterion.Type.ARP_TPA) != null) {
                     //ARP intercepts
                     flowRuleService.removeFlowRules(flow);
-                } else if (flow.selector().getCriterion(Criterion.Type.IP_PROTO) != null){
+                } else if (flow.selector().getCriterion(Criterion.Type.IP_PROTO) != null) {
                     IPProtocolCriterion proto = (IPProtocolCriterion) flow.selector().getCriterion(Criterion.Type.IP_PROTO);
-                    if(proto.protocol() == 1 || proto.protocol() == 2) {
+                    if (proto.protocol() == 1 || proto.protocol() == 2) {
                         //ICMP or IGMP intercepts
                         flowRuleService.removeFlowRules(flow);
                     }
@@ -826,10 +841,10 @@ public class NoviBngComponent {
 
         BngDeviceConfig oldConfig = devicesConfig.get(aggConfig.getDeviceId());
 
-        if(oldConfig != null) {
+        if (oldConfig != null) {
             //A config already exist for this device
             //Check if different
-            if(aggConfig.equals(oldConfig)) {
+            if (aggConfig.equals(oldConfig)) {
                 log.info("This config for device " + aggConfig.getDeviceId() + " has not changed");
                 return;
             } else {
@@ -860,17 +875,17 @@ public class NoviBngComponent {
 
         //For now do not clear it everytime : ??
         //Only initiate it for the first time
-        if(!subscribersInfo.containsKey(deviceId)) {
+        if (!subscribersInfo.containsKey(deviceId)) {
             subscribersInfo.put(deviceId, new HashMap<>());
         }
         
-        if(!tablesInfos.containsKey(deviceId)) {
+        if (!tablesInfos.containsKey(deviceId)) {
             List<TablesInfo> deviceTablesInfo = new LinkedList<>();
             deviceTablesInfo.add(new TablesInfo(1));
             tablesInfos.put(deviceId, deviceTablesInfo);
         }
 
-        if(!gatewayInfos.containsKey(deviceId)) {
+        if (!gatewayInfos.containsKey(deviceId)) {
             gatewayInfos.put(deviceId, new LinkedList<>());
         }
 

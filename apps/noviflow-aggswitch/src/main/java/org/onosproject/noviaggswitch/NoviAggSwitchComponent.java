@@ -1,3 +1,18 @@
+/*
+ * Copyright 2016-present Open Networking Laboratory
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.onosproject.noviaggswitch;
 
@@ -213,7 +228,7 @@ public class NoviAggSwitchComponent {
 
             Set<DeviceId> deviceIds = devicesConfig.keySet();
 
-            for(DeviceId deviceId : deviceIds) {
+            for (DeviceId deviceId : deviceIds) {
 
                 Iterable<Group> appGroups = groupService.getGroups(deviceId, appId);
                 for (Group group : appGroups) {
@@ -273,7 +288,7 @@ public class NoviAggSwitchComponent {
 
 
                 List<VxLanTunnel> tunnels = getTunnels(deviceId);
-                for(VxLanTunnel tunnel : tunnels) {
+                for (VxLanTunnel tunnel : tunnels) {
                     if (tunnel.match(bngVxLanIP, vni)) {
                         log.warn("Tunnel already exists !");
                     }
@@ -283,7 +298,7 @@ public class NoviAggSwitchComponent {
 
                 //PrimaryPath
                 MacAddress bngVxLanPrimaryMac = processor.getMac(Ip4Address.valueOf(viaPrimaryIP), tunnelId);
-                if(bngVxLanPrimaryMac != null) {
+                if (bngVxLanPrimaryMac != null) {
                     log.info("MAC found, ready to add flows");
 
                     try {
@@ -299,7 +314,7 @@ public class NoviAggSwitchComponent {
                     if (!viaSecondaryIP.equals(viaPrimaryIP)) {
 
                         MacAddress bngVxLanSecondaryMac = processor.getMac(Ip4Address.valueOf(viaSecondaryIP), tunnelId);
-                        if(bngVxLanSecondaryMac != null) {
+                        if (bngVxLanSecondaryMac != null) {
                             log.info("MAC found, ready to add flows");
 
                             try {
@@ -346,7 +361,7 @@ public class NoviAggSwitchComponent {
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
         treatment.extension(new NoviflowSetVxLan(switchVxlanMac,bngVxlanMac, switchVxlanIp, bngVxlanIp, udpPort, vni), deviceId);
-        if(primary) {
+        if (primary) {
             treatment.setOutput(primaryPort);
         } else {
             treatment.setOutput(secondaryPort);
@@ -355,7 +370,7 @@ public class NoviAggSwitchComponent {
         FlowRule.Builder rule = DefaultFlowRule.builder();
         rule.withSelector(selector.build());
         rule.withTreatment(treatment.build());
-        if(primary) {
+        if (primary) {
             rule.withPriority(ENCAPSULATION_PRIORITY);
         } else {
             rule.withPriority(ENCAPSULATION_PRIORITY/2);
@@ -385,7 +400,7 @@ public class NoviAggSwitchComponent {
         }
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
-        if(primary) {
+        if (primary) {
             selector.matchInPort(primaryPort);
         } else {
             selector.matchInPort(secondaryPort);
@@ -400,7 +415,7 @@ public class NoviAggSwitchComponent {
         FlowRule.Builder rule = DefaultFlowRule.builder();
         rule.withSelector(selector.build());
         rule.withTreatment(treatment.build());
-        if(primary) {
+        if (primary) {
             rule.withPriority(DECAPSULATION_PRIORITY);
         } else {
             rule.withPriority(DECAPSULATION_PRIORITY/2);
@@ -417,7 +432,7 @@ public class NoviAggSwitchComponent {
     public void removeTunnel(DeviceId deviceId, Ip4Address vxlanIP, int vni) {
 
         List<VxLanTunnel> tunnels = getTunnels(deviceId);
-        for(VxLanTunnel tunnel : tunnels) {
+        for (VxLanTunnel tunnel : tunnels) {
             if (tunnel.match(vxlanIP, vni)) {
                 for (FlowRule flow : tunnel.getFlows()) {
                     flowRuleService.removeFlowRules(flow);
@@ -432,7 +447,7 @@ public class NoviAggSwitchComponent {
     public void removeAllTunnels() {
 
         Set<DeviceId> devices = multicastHandlers.keySet();
-        for(DeviceId deviceId : devices) {
+        for (DeviceId deviceId : devices) {
             removeAllTunnels(deviceId);
         }
     }
@@ -442,7 +457,7 @@ public class NoviAggSwitchComponent {
         Iterable<FlowRule> flows = flowRuleService.getFlowRulesById(appId);
         for (FlowRule flow : flows) {
 
-            if(flow.deviceId().equals(deviceId)) {
+            if (flow.deviceId().equals(deviceId)) {
 
                 List<Instruction> instructions = flow.treatment().immediate();
                 for (Instruction instruction : instructions) {
@@ -518,7 +533,7 @@ public class NoviAggSwitchComponent {
 
         for (FlowRule flow : flows) {
 
-            if(flow.deviceId().equals(deviceId)) {
+            if (flow.deviceId().equals(deviceId)) {
 
                 List<Instruction> instructions = flow.treatment().immediate();
                 for (Instruction instruction : instructions) {
@@ -601,8 +616,8 @@ public class NoviAggSwitchComponent {
         int valid = 0;
         int invalid = 0;
 
-        for(VxLanTunnel tunnel : tunnels) {
-            if(tunnel.isValid()) {
+        for (VxLanTunnel tunnel : tunnels) {
+            if (tunnel.isValid()) {
                 valid++;
             } else {
                 invalid++;
@@ -777,12 +792,12 @@ public class NoviAggSwitchComponent {
 
             if (flow.deviceId().equals(deviceId)) {
 
-                if(flow.selector().getCriterion(Criterion.Type.ARP_TPA) != null) {
+                if (flow.selector().getCriterion(Criterion.Type.ARP_TPA) != null) {
                     //ARP intercepts
                     flowRuleService.removeFlowRules(flow);
                 } else if (flow.selector().getCriterion(Criterion.Type.IP_PROTO) != null){
                     IPProtocolCriterion proto = (IPProtocolCriterion) flow.selector().getCriterion(Criterion.Type.IP_PROTO);
-                    if(proto.protocol() == 1 || proto.protocol() == 2) {
+                    if (proto.protocol() == 1 || proto.protocol() == 2) {
                         //ICMP or IGMP intercepts
                         flowRuleService.removeFlowRules(flow);
                     }
@@ -796,10 +811,10 @@ public class NoviAggSwitchComponent {
 
         AggDeviceConfig oldConfig = devicesConfig.get(aggConfig.getDeviceId());
 
-        if(oldConfig != null) {
+        if (oldConfig != null) {
             //A config already exist for this device
             //Check if different
-            if(aggConfig.equals(oldConfig)) {
+            if (aggConfig.equals(oldConfig)) {
                 log.info("This config for device " + aggConfig.getDeviceId() + " has not changed");
                 return;
             } else {
@@ -886,7 +901,7 @@ public class NoviAggSwitchComponent {
 
         for (VxLanTunnel tunnel : tunnels) {
 
-            if(tunnel.isValid()) {
+            if (tunnel.isValid()) {
                 validTunnels ++;
 
                 int udpPort = rand.nextInt() + 2000;
@@ -1020,7 +1035,7 @@ public class NoviAggSwitchComponent {
             log.info(event.toString());
 
 
-            if(event.configClass().equals(NoviAggSwitchConfig.class)) {
+            if (event.configClass().equals(NoviAggSwitchConfig.class)) {
 
                 switch(event.type()){
                     case CONFIG_REGISTERED:
@@ -1052,7 +1067,6 @@ public class NoviAggSwitchComponent {
 
 
         public ConfigFactory<ApplicationId, NoviAggSwitchConfig> getCfgAppFactory() {
-
             return cfgFactory;
         }
 

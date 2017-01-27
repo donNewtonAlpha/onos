@@ -1,3 +1,19 @@
+/*
+ * Copyright 2016-present Open Networking Laboratory
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.onosproject.novibng;
 
 import org.onlab.packet.Ip4Address;
@@ -97,11 +113,11 @@ public class MacRequest {
 
     public synchronized void execute(PacketService packetService){
 
-        if(arpRequest != null){
+        if (arpRequest != null) {
 
             delay ++;
 
-            if(mac == null) {
+            if (mac == null) {
                 //Mac not yet known
                 if (delay % period == 0) {
                     sendRequest(packetService);
@@ -116,18 +132,18 @@ public class MacRequest {
             } else {
                 //MAC already known, checking for reachability and changes
 
-                if(delay > CYCLE) {
+                if (delay > CYCLE) {
                     sendRequest(packetService);
                 }
 
-                if(failedAttempt > LOSS_BEFORE_FAILURE) {
+                if (failedAttempt > LOSS_BEFORE_FAILURE) {
                     if(!failureState) {
                         //Now in failure
                         NoviBngComponent.getComponent().notifyFailure(deviceId, port, mac);
                         failureState = true;
                     } else {
                         //Still in failure
-                        if(failedAttempt % CYCLE == 0) {
+                        if (failedAttempt % CYCLE == 0) {
                             log.warn(ip + " still not reachable on device " + deviceId + " on port " + port);
                         }
                     }
@@ -147,7 +163,7 @@ public class MacRequest {
 
         log.info("Mac response success for " + ip + " : " + responseMac);
 
-        if(mac != null) {
+        if (mac != null) {
             if (failedAttempt > LOSS_BEFORE_FAILURE) {
                 //Recovery situation
                 if (responseMac.equals(mac)) {
@@ -184,7 +200,7 @@ public class MacRequest {
 
 
     public boolean equals (Object otherObject) {
-        if(otherObject instanceof MacRequest) {
+        if (otherObject instanceof MacRequest) {
             MacRequest other = (MacRequest) otherObject;
             return ip.equals(other.getIp());
         }

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2016-present Open Networking Laboratory
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.onosproject.noviaggswitch;
 
 import org.onlab.packet.*;
@@ -117,7 +133,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
                 IPacket ipPayload = ipPkt.getPayload();
 
-                if(ipPayload instanceof ICMP) {
+                if (ipPayload instanceof ICMP) {
 
                     log.debug("ICMP packet received");
 
@@ -154,17 +170,17 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
                 arpRequest.getSenderProtocolAddress()));
         // Check if this is an ARP for the switch
         boolean matchingInfoFound = false;
-        for(RoutingInfo info : routingInfos) {
+        for (RoutingInfo info : routingInfos) {
 
-            if(info.getDeviceId().equals(deviceId) && info.getPort().equals(inPort) && targetProtocolAddress.equals(info.getIp())){
-
+            if (info.getDeviceId().equals(deviceId) && info.getPort().equals(inPort)
+                    && targetProtocolAddress.equals(info.getIp())) {
                 matchingInfoFound = true;
                 sendArpResponse(ethPkt, arpRequest, info.getMac(), info.getDeviceId(), inPort);
             }
 
         }
 
-        if(!matchingInfoFound) {
+        if (!matchingInfoFound) {
             log.error("handleArpRequest, matching routing info was NOT FOUND");
         }
 
@@ -218,9 +234,10 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
         Ip4Address pingedIpAddress = Ip4Address.valueOf(ipPkt.getDestinationAddress());
 
-        for(RoutingInfo info : routingInfos) {
+        for (RoutingInfo info : routingInfos) {
 
-            if(info.getDeviceId().equals(deviceId) && info.getPort().equals(inPort) && pingedIpAddress.equals(info.getIp())){
+            if (info.getDeviceId().equals(deviceId) && info.getPort().equals(inPort)
+                    && pingedIpAddress.equals(info.getIp())) {
                 log.debug("This ping request is for this switch");
                 sendICMPreply(ethPkt, info.getMac(), info.getDeviceId(), inPort);
             }
@@ -291,7 +308,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
                 .setSourceMACAddress(sourceMac)
                 .setEtherType(Ethernet.TYPE_ARP).setPayload(arpRequest);
 
-        if(!vlanId.equals(VlanId.NONE)){
+        if (!vlanId.equals(VlanId.NONE)) {
             eth.setVlanID(vlanId.toShort());
         }
 
@@ -358,7 +375,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
         Iterator<RoutingInfo> it = routingInfos.listIterator();
 
-        while(it.hasNext()) {
+        while (it.hasNext()) {
             RoutingInfo info = it.next();
             if (info.getDeviceId().equals(deviceId)) {
                 log.info("Remove one RoutingInfo , ip : " + info.getIp() + " for device " + deviceId);
@@ -385,18 +402,18 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
         //Check if we already have some MacRequest for this Ip
 
-        for(MacRequest request : macRequests) {
+        for (MacRequest request : macRequests) {
 
-            if(request.getIp().equals(ip)) {
+            if (request.getIp().equals(ip)) {
                 //A request already exist, add this tunnelId to the requesting tunnels
                 request.addTunnelId(tunnelId);
-                if(request.getMac() != null) {
+                if (request.getMac() != null) {
                     return request.getMac();
                 } else {
                     //This request is already trying to get the Mac address for this Ip, waiting for result
                     request.lock();
 
-                    if(request.getMac() == null) {
+                    if (request.getMac() == null) {
                         return  null;
                     }
 
@@ -411,13 +428,13 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
         //Find matching routing info
         RoutingInfo matchingInfo = null;
-        for(RoutingInfo info : routingInfos) {
-            if(info.getSubnet().contains(ip)){
+        for (RoutingInfo info : routingInfos) {
+            if (info.getSubnet().contains(ip)) {
                 matchingInfo = info;
             }
         }
 
-        if(matchingInfo != null) {
+        if (matchingInfo != null) {
 
             MacRequest request = new MacRequest(matchingInfo.getDeviceId(), matchingInfo.getPort(), ip);
             request.addTunnelId(tunnelId);
@@ -430,7 +447,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
             request.lock();
 
-            if(request.getMac() == null) {
+            if (request.getMac() == null) {
                 return  null;
             }
 
@@ -461,7 +478,7 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
     }
 
     public void clearMacRequests() {
-        for(MacRequest mr : macRequests) {
+        for (MacRequest mr : macRequests) {
             mr.unlock();
         }
         macRequests.clear();
@@ -471,9 +488,9 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
 
         Iterator<MacRequest> it = macRequests.listIterator();
 
-        while(it.hasNext()) {
+        while (it.hasNext()) {
             MacRequest request = it.next();
-            if(request.getDeviceId().equals(deviceId)) {
+            if (request.getDeviceId().equals(deviceId)) {
                 request.unlock();
                 it.remove();
             }
@@ -484,15 +501,15 @@ public class NoviAggSwitchPacketProcessor implements PacketProcessor {
     public void removeRequestingTunnel(VxlanTunnelId tunnelId) {
 
         //Remove this tunnel from the "subscription" list in the mac requests
-        for(MacRequest request : macRequests) {
+        for (MacRequest request : macRequests) {
             request.removeRequestingTunnel(tunnelId);
         }
 
         //Check if a Mac request needs to be removed (no more subscripting tunnels)
         Iterator<MacRequest> it = macRequests.listIterator();
-        while(it.hasNext()) {
+        while (it.hasNext()) {
             MacRequest request = it.next();
-            if(request.isToBeRemoved()) {
+            if (request.isToBeRemoved()) {
                 it.remove();
             }
         }
