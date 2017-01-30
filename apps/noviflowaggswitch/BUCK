@@ -7,7 +7,7 @@ COMPILE_DEPS = [
   '//lib:javax.ws.rs-api',
   '//lib:jersey-server',
   '//utils/rest:onlab-rest',
-  '//drivers/default:onos-drivers',
+  '//drivers/default:onos-drivers-default',
 ]
 
 TEST_DEPS = [
