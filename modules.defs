@@ -167,7 +167,7 @@ ONOS_APPS = [
     '//apps/patchpanel:onos-apps-patchpanel-oar',
     '//apps/castor:onos-apps-castor-oar',
     '//apps/yms:onos-apps-yms-oar',
-    '//apps/noviflow-bng:onos-apps-novibng-oar',
+    '//apps/noviflowbng:onos-apps-noviflowbng-oar',
     #'//apps/noviflow-aggswitch:onos-apps-noviaggswitch-oar',
 ]
 
