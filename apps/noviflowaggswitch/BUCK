@@ -7,6 +7,7 @@ COMPILE_DEPS = [
   '//lib:javax.ws.rs-api',
   '//lib:jersey-server',
   '//utils/rest:onlab-rest',
+  '//drivers/default:onos-drivers',
 ]
 
 TEST_DEPS = [
@@ -20,7 +21,7 @@ osgi_jar_with_tests (
 
 onos_app (
   title = 'NoviFlow aggswitch',
-  category = 'Traffic Steering',
+  category = 'VNF',
   url = 'http://onosproject.org',
   description = 'app to aggregate access devices to tunnel to a BNG.',
   required_apps = [ 'org.onosproject.drivers' ],

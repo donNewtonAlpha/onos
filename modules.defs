@@ -168,7 +168,7 @@ ONOS_APPS = [
     '//apps/castor:onos-apps-castor-oar',
     '//apps/yms:onos-apps-yms-oar',
     '//apps/noviflowbng:onos-apps-noviflowbng-oar',
-    #'//apps/noviflow-aggswitch:onos-apps-noviaggswitch-oar',
+    '//apps/noviflowaggswitch:onos-apps-noviflowaggswitch-oar',
 ]
 
 APP_JARS = [
