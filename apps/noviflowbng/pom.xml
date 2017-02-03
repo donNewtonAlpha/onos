@@ -32,6 +32,13 @@
     <properties>
         <onos.version>1.9.0-SNAPSHOT</onos.version>
         <onos.app.name>org.onosproject.novibng</onos.app.name>
+        <web.context>/onos/novibng</web.context>
+        <api.version>1.0.0</api.version>
+        <api.title>ONOS NoviBng REST API</api.title>
+        <api.description>
+            APIs for interacting with the Noviflow BNG application.
+        </api.description>
+        <api.package>org.onosproject.novibng.web</api.package>
     </properties>
 
     <dependencies>

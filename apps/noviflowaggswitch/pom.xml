@@ -32,7 +32,8 @@
     <properties>
         <onos.version>1.9.0-SNAPSHOT</onos.version>
         <onos.app.name>org.onosproject.noviaggswitch</onos.app.name>
-        <onos.app.origin>SDN Arena, Inc.</onos.app.origin>
+        <onos.app.origin>ATT Foundry</onos.app.origin>
+        <checkstyle.skip>true</checkstyle.skip>
         <web.context>/onos/noviaggswitch</web.context>
         <api.version>1.0.0</api.version>
         <api.title>ONOS NoviAggSwitch REST API</api.title>
