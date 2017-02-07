@@ -216,7 +216,7 @@ public class NoviBngComponent {
                         24,
                         MacAddress.valueOf("54:32:10:54:32:10"),
                         MacAddress.valueOf("98:76:54:98:76:54"),
-                        PortNumber.portNumber(1),
+                        PortNumber.portNumber(2),
                         PortNumber.portNumber(8),
                         Ip4Address.valueOf("10.10.1.3"),
                         Ip4Address.valueOf("20.20.1.3"));
