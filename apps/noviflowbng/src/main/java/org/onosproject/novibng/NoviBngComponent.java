@@ -33,6 +33,7 @@ import org.onlab.packet.IPv4;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.net.DeviceId;
+import org.onosproject.net.Port;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.flow.FlowRuleService;
@@ -158,6 +159,8 @@ public class NoviBngComponent {
         //Gateway infos
         gatewayInfos = new HashMap<>();
 
+        hardCoded();
+
         log.info("NoviFlow BNG activated");
 
     }
@@ -198,6 +201,38 @@ public class NoviBngComponent {
         }
 
         log.info("Stopped");
+    }
+
+    private void hardCoded() {
+
+        DeviceId deviceId = DeviceId.deviceId("of:0000111111111111");
+
+        BngDeviceConfig config = new BngDeviceConfig(
+                deviceId,
+                    Ip4Address.valueOf("10.50.1.1"),
+                        Ip4Address.valueOf("10.10.1.2"),
+                        24,
+                        Ip4Address.valueOf("20.20.1.2"),
+                        24,
+                        MacAddress.valueOf("54:32:10:54:32:10"),
+                        MacAddress.valueOf("98:76:54:98:76:54"),
+                        PortNumber.portNumber(7),
+                        PortNumber.portNumber(8),
+                        Ip4Address.valueOf("29.29.0.1"),
+                        Ip4Address.valueOf("29.29.1.2"));
+
+        checkNewConfig(config);
+
+        log.info("hardcoded config pushed");
+
+        allocateIpBlock(deviceId, Ip4Prefix.valueOf("10.20.1.0/24"), Ip4Address.valueOf("10.20.1.254"), MacAddress.valueOf("12:23:34:45:56:67"));
+
+        log.info("hardcoded ip block allocated");
+
+        addSubscriber(Ip4Address.valueOf("10.20.1.2"), Ip4Address.valueOf("10.20.1.254"), 1000, 1000, deviceId);
+
+        log.info("hardcoded subscriber set up");
+
     }
 
    /* private Ip4Address tagsToIpMatching(SubscriberInfo info) {
@@ -242,7 +277,7 @@ public class NoviBngComponent {
             arpIntercept(gatewayIp, deviceId);
             icmpIntercept(gatewayIp, deviceId);
             processor.addRoutingInfo(deviceId, PortNumber.ANY, ipBlock, gatewayIp, gatewayMac);
-            //TODO: Not optimal, there may be problem with processor.getMac()
+            //TODO: there may be problem with processor.getMac()
 
         }
 
@@ -283,6 +318,13 @@ public class NoviBngComponent {
 
     }
 
+    public void removeIpBlock(Ip4Prefix ipBlock, DeviceId deviceId) {
+        //TODO:
+        // remove block from gatewayInfo
+        //remove gateway in no more block
+        //Remove all subscriber of this block
+    }
+
     public void addSubscriber(Ip4Address subscriberIp, Ip4Address gatewayIp, int uploadSpeed, int downloadSpeed,
                               DeviceId deviceId) {
 
@@ -290,7 +332,7 @@ public class NoviBngComponent {
         if (subscribersInfo.get(deviceId).containsKey(subscriberIp)) {
             log.info("Subscriber " + subscriberIp + " already configured on device " + deviceId);
             //Send to modifySubscriber instead
-            modifySubscriber(subscriberIp, gatewayIp, uploadSpeed, downloadSpeed);
+            modifySubscriber(subscriberIp, gatewayIp, uploadSpeed, downloadSpeed, deviceId);
 
         }
 
@@ -337,11 +379,20 @@ public class NoviBngComponent {
 
     }
 
-    public void modifySubscriber(Ip4Address subscriberIp, Ip4Address gatewayIp, int uploadSpeed, int downloadSpeed) {
+    public void modifySubscriber(Ip4Address subscriberIp, Ip4Address gatewayIp, int uploadSpeed, int downloadSpeed, DeviceId deviceId) {
         //TODO:
         //verify if there is a difference with previous configuration
         //remove former config
         //add new config
+
+
+    }
+
+    public void removeSubscriber(Ip4Address subscriberIp, DeviceId deviceId) {
+        //TODO:
+        //remove flows
+        //remove config
+
 
 
     }
@@ -669,26 +720,26 @@ public class NoviBngComponent {
     //Config
 
 
-    public void checkNewConfig(BngDeviceConfig aggConfig) {
+    public void checkNewConfig(BngDeviceConfig config) {
 
-        BngDeviceConfig oldConfig = devicesConfig.get(aggConfig.getDeviceId());
+        BngDeviceConfig oldConfig = devicesConfig.get(config.getDeviceId());
 
         if (oldConfig != null) {
             //A config already exist for this device
             //Check if different
-            if (aggConfig.equals(oldConfig)) {
-                log.info("This config for device " + aggConfig.getDeviceId() + " has not changed");
+            if (config.equals(oldConfig)) {
+                log.info("This config for device " + config.getDeviceId() + " has not changed");
                 return;
             } else {
-                log.info("Config for device " + aggConfig.getDeviceId() + " has been modified");
-                newConfig(aggConfig);
-                devicesConfig.replace(aggConfig.getDeviceId(), aggConfig);
+                log.info("Config for device " + config.getDeviceId() + " has been modified");
+                newConfig(config);
+                devicesConfig.replace(config.getDeviceId(), config);
             }
         } else {
             // Config did not exist
-            log.info("New config for device " + aggConfig.getDeviceId());
-            newConfig(aggConfig);
-            devicesConfig.put(aggConfig.getDeviceId(), aggConfig);
+            log.info("New config for device " + config.getDeviceId());
+            newConfig(config);
+            devicesConfig.put(config.getDeviceId(), config);
 
         }
 
@@ -719,6 +770,18 @@ public class NoviBngComponent {
 
         if (!gatewayInfos.containsKey(deviceId)) {
             gatewayInfos.put(deviceId, new LinkedList<>());
+        }
+
+        //Reapply previously known gateways
+
+        for (GatewayInfo gwInfo : gatewayInfos.get(deviceId)) {
+
+            arpIntercept(gwInfo.getGatewayIp(), deviceId);
+            icmpIntercept(gwInfo.getGatewayIp(), deviceId);
+            for (Ip4Prefix ipBlock : gwInfo.getIpBlocks()) {
+                processor.addRoutingInfo(deviceId, PortNumber.ANY, ipBlock, gwInfo.getGatewayIp(), gwInfo.getGatewayMac());
+            }
+
         }
 
 /*        //TODO : multicast

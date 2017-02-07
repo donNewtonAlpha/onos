@@ -19,6 +19,7 @@ package org.onosproject.novibng;
 import org.onlab.packet.Ip4Address;
 import org.onlab.packet.Ip4Prefix;
 import org.onlab.packet.MacAddress;
+import org.onosproject.net.Link;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -78,5 +79,9 @@ public class GatewayInfo {
         if (!this.containsIpBlock(newBlock)) {
             ipBlocks.add(newBlock);
         }
+    }
+
+    public List<Ip4Prefix> getIpBlocks() {
+        return ipBlocks;
     }
 }
