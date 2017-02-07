@@ -569,6 +569,7 @@ public class NoviBngComponent {
             //Downstream flow
 
             TrafficSelector.Builder selectorDownStream = DefaultTrafficSelector.builder();
+            selectorDownStream.matchEthType(Ethernet.TYPE_IPV4);
             selectorDownStream.matchIPDscp(TablesInfo.DSCP_LEVELS[i]);
             selectorDownStream.matchIPDst(ipBlock);
 
