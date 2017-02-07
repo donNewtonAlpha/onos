@@ -274,7 +274,7 @@ public class NoviBngComponent {
             newGatewayInfo.addIpBlock(ipBlock);
             gatewayInfos.get(deviceId).add(newGatewayInfo);
             //add the flows (ARP, PING) for the gateway
-            arpIntercept(gatewayIp, deviceId);
+            arpRequestIntercept(gatewayIp, deviceId);
             icmpIntercept(gatewayIp, deviceId);
             processor.addRoutingInfo(deviceId, PortNumber.ANY, ipBlock, gatewayIp, gatewayMac);
             //TODO: there may be problem with processor.getMac()
@@ -619,12 +619,35 @@ public class NoviBngComponent {
 
     //Intercepts
 
-    private void arpIntercept(Ip4Address respondFor, DeviceId deviceId) {
+    private void arpRequestIntercept(Ip4Address respondFor, DeviceId deviceId) {
 
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchEthType(Ethernet.TYPE_ARP);
         selector.matchArpTpa(respondFor);
+
+
+        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
+        treatment.punt();
+
+        FlowRule.Builder rule = DefaultFlowRule.builder();
+        rule.withSelector(selector.build());
+        rule.withTreatment(treatment.build());
+        rule.withPriority(ARP_INTERCEPT_PRIORITY);
+        rule.forTable(0);
+        rule.fromApp(appId);
+        rule.forDevice(deviceId);
+        rule.makePermanent();
+
+        flowRuleService.applyFlowRules(rule.build());
+    }
+
+    private void arpResponseIntercept(MacAddress requestingMac, DeviceId deviceId) {
+
+
+        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+        selector.matchEthType(Ethernet.TYPE_ARP);
+        selector.matchEthDst(requestingMac);
 
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
@@ -777,7 +800,7 @@ public class NoviBngComponent {
 
         for (GatewayInfo gwInfo : gatewayInfos.get(deviceId)) {
 
-            arpIntercept(gwInfo.getGatewayIp(), deviceId);
+            arpRequestIntercept(gwInfo.getGatewayIp(), deviceId);
             icmpIntercept(gwInfo.getGatewayIp(), deviceId);
             for (Ip4Prefix ipBlock : gwInfo.getIpBlocks()) {
                 processor.addRoutingInfo(deviceId, PortNumber.ANY, ipBlock, gwInfo.getGatewayIp(), gwInfo.getGatewayMac());
@@ -798,8 +821,10 @@ public class NoviBngComponent {
         //New Knowledge
 
         //IPs the agg switch is responding to ARP
-        arpIntercept(config.getPrimaryLinkIp(), deviceId);
-        arpIntercept(config.getSecondaryLinkIp(), deviceId);
+        arpRequestIntercept(config.getPrimaryLinkIp(), deviceId);
+        arpResponseIntercept(config.getPrimaryLinkMac(), deviceId);
+        arpRequestIntercept(config.getSecondaryLinkIp(), deviceId);
+        arpResponseIntercept(config.getSecondaryLinkMac(), deviceId);
 
         //IPs the agg switch is responding to ping
         icmpIntercept(config.getLoopbackIP(), deviceId);

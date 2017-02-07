@@ -104,7 +104,7 @@ public class MacRequest {
     private void sendRequest(PacketService packetService) {
         failedAttempt++;
         packetService.emit(arpRequest);
-        log.info("ARP request for " + ip.toString() + " sent");
+        log.info("ARP request for " + ip.toString() + " sent on port " + port);
     }
 
 
