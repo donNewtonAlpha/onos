@@ -115,7 +115,7 @@ public class NoviBngComponent {
     private HashMap<DeviceId, BngDeviceConfig> devicesConfig;
 
     public HashMap<DeviceId, HashMap<Ip4Address, SubscriberInfo>> subscribersInfo;
-    private HashMap<DeviceId, List<TablesInfo>> tablesInfos;
+    private HashMap<DeviceId, TablesInfo> tablesInfos;
     private HashMap<DeviceId, List<GatewayInfo>> gatewayInfos;
 
     private static NoviBngComponent instance = null;
@@ -209,7 +209,7 @@ public class NoviBngComponent {
     public void allocateIpBlock(DeviceId deviceId, Ip4Prefix ipBlock, Ip4Address gatewayIp, MacAddress gatewayMac) {
 
 
-        if (ipBlock.prefixLength() < 24) {
+       /* if (ipBlock.prefixLength() < 24) {
             //split the block
             int ip = ipBlock.address().toInt();
             Ip4Prefix subBlock1 = Ip4Prefix.valueOf(Ip4Address.valueOf(ip), ipBlock.prefixLength() + 1);
@@ -219,7 +219,7 @@ public class NoviBngComponent {
             allocateIpBlock(deviceId, subBlock1, gatewayIp, gatewayMac);
             allocateIpBlock(deviceId, subBlock2, gatewayIp, gatewayMac);
             return;
-        }
+        }*/
 
 
         //Configure gateway
@@ -247,40 +247,37 @@ public class NoviBngComponent {
         }
 
 
-        int tableMax = 0;
+        //int tableMax = 0;
         boolean blockAssigned = false;
 
-        for (TablesInfo tablesInfo : tablesInfos.get(deviceId)) {
-            if (tablesInfo.containsBlock(ipBlock)) {
-                blockAssigned = true;
-            }
+        TablesInfo tableInfo = tablesInfos.get(deviceId);
+        if (tableInfo.containsBlock(ipBlock)) {
+            blockAssigned = true;
         }
 
-        for (TablesInfo tableInfo : tablesInfos.get(deviceId)) {
-            if (!blockAssigned) {
 
-                if (tableInfo.tryAddIpBlock(ipBlock)) {
-                    //Block assigned
-                    blockAssigned = true;
-                    tableSplit(tableInfo, ipBlock, deviceId);
-                } else {
-                    if (tableInfo.getRootTable() > tableMax) {
-                        tableMax = tableInfo.getRootTable();
-                    }
-                }
+
+
+        if (!blockAssigned) {
+
+            if (tableInfo.tryAddIpBlock(ipBlock)) {
+                //Block assigned
+                blockAssigned = true;
+                tableSplit(tableInfo, ipBlock, deviceId);
             }
+
         }
 
         if (!blockAssigned) {
-            //All tables are full, need a new table set
-            TablesInfo newTable = new TablesInfo(tableMax + TablesInfo.CONSECUTIVES_TABLES);
-            if (!newTable.tryAddIpBlock(ipBlock)) {
-                log.error("Unable to add ip block in new tables !!!!!");
+            //All tables are full
+            //TablesInfo newTable = new TablesInfo(tableMax + TablesInfo.CONSECUTIVES_TABLES);
+            //if (!newTable.tryAddIpBlock(ipBlock)) {
+                log.error("Unable to add ip block in tables !!!!!");
                 return;
-            }
+            //}
 
-            tablesInfos.get(deviceId).add(newTable);
-            tableSplit(newTable, ipBlock, deviceId);
+            //tablesInfos.get(deviceId).add(newTable);
+            //tableSplit(ipBlock, deviceId);
 
         }
 
@@ -319,15 +316,9 @@ public class NoviBngComponent {
         }
 
         //Find which table deal with this
-        TablesInfo matchingTableInfo = null;
-        for (TablesInfo tableInfo : tablesInfos.get(deviceId)) {
+        TablesInfo tableInfo = tablesInfos.get(deviceId);
 
-            if (tableInfo.containsIp(subscriberIp)) {
-                matchingTableInfo = tableInfo;
-            }
-        }
-
-        if (matchingTableInfo == null) {
+        if (tableInfo == null) {
             log.error("No table configured for " + subscriberIp + " !! Yet gateway and ip block OK !?!?!!");
             return;
         }
@@ -338,7 +329,7 @@ public class NoviBngComponent {
         subInfo.setGatewayIp(gatewayIp);
         subInfo.setDownloadSpeed(downloadSpeed);
         subInfo.setUploadSpeed(uploadSpeed);
-        subInfo.setTableInfo(matchingTableInfo);
+        subInfo.setTableInfo(tableInfo);
 
         subInfo.addFlow(subIntercept(subscriberIp, deviceId));
 
@@ -705,6 +696,8 @@ public class NoviBngComponent {
 
     private void newConfig(BngDeviceConfig config) {
 
+        //TODO : be careful of new config on old config, gateway will probably reset
+
 
         DeviceId deviceId = config.getDeviceId();
         log.info("Ready to remove old config for " + deviceId);
@@ -721,9 +714,7 @@ public class NoviBngComponent {
         }
 
         if (!tablesInfos.containsKey(deviceId)) {
-            List<TablesInfo> deviceTablesInfo = new LinkedList<>();
-            deviceTablesInfo.add(new TablesInfo(1));
-            tablesInfos.put(deviceId, deviceTablesInfo);
+            tablesInfos.put(deviceId, new TablesInfo());
         }
 
         if (!gatewayInfos.containsKey(deviceId)) {

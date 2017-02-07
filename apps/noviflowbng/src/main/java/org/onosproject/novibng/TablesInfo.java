@@ -27,19 +27,19 @@ import java.util.List;
  */
 public class TablesInfo {
 
-    public static final int MAX_SUBSCRIBERS = 1024;
-    public static final int CONSECUTIVES_TABLES = 4;
+    public static final int MAX_SUBSCRIBERS = 2048;
+    public static final int CONSECUTIVES_TABLES = 3;
 
     public static final byte[] DSCP_LEVELS = {1, 2, 3};
 
 
-    private int rootTable;
     private List<Ip4Prefix> ipBlocks;
     private int subscribers;
+    private int rootTable;
 
-    public TablesInfo(int table) {
-        rootTable = table;
+    public TablesInfo() {
         subscribers = 0;
+        rootTable = 2;
         ipBlocks = new LinkedList<>();
     }
 
