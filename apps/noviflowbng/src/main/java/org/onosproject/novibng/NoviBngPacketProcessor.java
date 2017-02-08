@@ -180,8 +180,11 @@ public class NoviBngPacketProcessor implements PacketProcessor {
             subInfo.setCTag(VlanId.vlanId(pkt.getVlanID()));
             subInfo.setMac(pkt.getSourceMAC());
 
-            //Removing the intercept for this sub
-            NoviBngComponent.getComponent().flowRuleService.removeFlowRules(subInfo.getFlows().remove(0));
+            //Removing the intercept for this sub : the intercept is the gateway arp intecept
+            // so we do not remove it (for now)
+            //NoviBngComponent.getComponent().flowRuleService.removeFlowRules(subInfo.getFlows().remove(0));
+
+            log.info("Subscriber " + subIp + " detected, trying to add its flows ...");
 
             NoviBngComponent.getComponent().addSubscriberFlows(subIp, subInfo, subInfo.getTableInfo(), deviceId);
 

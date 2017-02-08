@@ -190,7 +190,7 @@ public class NoviBngComponent {
                 Collection<Meter> meters = meterService.getMeters(deviceId);
                 for (Meter meter : meters) {
                     if (meter.appId().equals(appId)) {
-                        meterService.withdraw(DefaultMeterRequest.builder().remove(), meter.id());
+                        meterService.withdraw(DefaultMeterRequest.builder().forDevice(deviceId).remove(), meter.id());
                     }
                 }
             }
@@ -373,9 +373,11 @@ public class NoviBngComponent {
         subInfo.setUploadSpeed(uploadSpeed);
         subInfo.setTableInfo(tableInfo);
 
-        subInfo.addFlow(subIntercept(subscriberIp, deviceId));
+        //subInfo.addFlow(subIntercept(subscriberIp, deviceId));
 
         subscribersInfo.get(deviceId).put(subscriberIp, subInfo);
+
+        log.info("New subscriber " + subscriberIp + " on standby");
 
     }
 
@@ -689,7 +691,7 @@ public class NoviBngComponent {
 
     }
 
-    private FlowRule subIntercept(Ip4Address catchIp, DeviceId deviceId) {
+    /*private FlowRule subIntercept(Ip4Address catchIp, DeviceId deviceId) {
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchIPSrc(catchIp.toIpPrefix());
@@ -713,7 +715,7 @@ public class NoviBngComponent {
 
         return flow;
 
-    }
+    }*/
 
     private void clearIntercepts(DeviceId deviceId) {
 
