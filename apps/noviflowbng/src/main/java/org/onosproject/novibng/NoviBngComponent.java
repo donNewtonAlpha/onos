@@ -642,12 +642,12 @@ public class NoviBngComponent {
         flowRuleService.applyFlowRules(rule.build());
     }
 
-    private void arpResponseIntercept(MacAddress requestingMac, DeviceId deviceId) {
+    /*private void arpResponseIntercept(MacAddress requestingMac, DeviceId deviceId) {
 
 
         TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
         selector.matchEthType(Ethernet.TYPE_ARP);
-        selector.matchEthDst(requestingMac);
+        selector.matchA(requestingMac);
 
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
@@ -663,7 +663,7 @@ public class NoviBngComponent {
         rule.makePermanent();
 
         flowRuleService.applyFlowRules(rule.build());
-    }
+    }*/
 
     private void icmpIntercept(Ip4Address respondFor, DeviceId deviceId) {
 
@@ -822,9 +822,9 @@ public class NoviBngComponent {
 
         //IPs the agg switch is responding to ARP
         arpRequestIntercept(config.getPrimaryLinkIp(), deviceId);
-        arpResponseIntercept(config.getPrimaryLinkMac(), deviceId);
+        //arpResponseIntercept(config.getPrimaryLinkMac(), deviceId);
         arpRequestIntercept(config.getSecondaryLinkIp(), deviceId);
-        arpResponseIntercept(config.getSecondaryLinkMac(), deviceId);
+        //arpResponseIntercept(config.getSecondaryLinkMac(), deviceId);
 
         //IPs the agg switch is responding to ping
         icmpIntercept(config.getLoopbackIP(), deviceId);
