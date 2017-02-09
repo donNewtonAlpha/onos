@@ -284,6 +284,10 @@ public class NoviBngPacketProcessor implements PacketProcessor {
                 .setEtherType(Ethernet.TYPE_IPV4)
                 .setPayload(ipResponse);
 
+        ping.resetChecksum();
+        ipPkt.resetChecksum();
+        ethPkt.resetChecksum();
+
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
         treatment.setOutput(port);
@@ -323,6 +327,9 @@ public class NoviBngPacketProcessor implements PacketProcessor {
             eth.setVlanID(vlanId.toShort());
         }
 
+        arpRequest.resetChecksum();
+        eth.resetChecksum();
+
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
         treatment.setOutput(dstPort);
         OutboundPacket outPacket = new DefaultOutboundPacket(deviceId,
@@ -361,6 +368,9 @@ public class NoviBngPacketProcessor implements PacketProcessor {
                 .setPayload(arpReply);
 
         //log.info("ARP integrated to Ethernet packet, ready to send");
+
+        arpReply.resetChecksum();
+        eth.resetChecksum();
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
         treatment.setOutput(dstPort);
