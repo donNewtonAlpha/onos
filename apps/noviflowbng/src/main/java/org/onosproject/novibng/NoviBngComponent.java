@@ -206,6 +206,7 @@ public class NoviBngComponent {
     private void hardCoded() {
 
         DeviceId deviceId = DeviceId.deviceId("of:0000111111111111");
+        Ip4Address nextHopIp = Ip4Address.valueOf("10.10.1.3");
 
         BngDeviceConfig config = new BngDeviceConfig(
                 deviceId,
@@ -218,7 +219,7 @@ public class NoviBngComponent {
                         MacAddress.valueOf("98:76:54:98:76:54"),
                         PortNumber.portNumber(2),
                         PortNumber.portNumber(8),
-                        Ip4Address.valueOf("10.10.1.3"),
+                        nextHopIp,
                         Ip4Address.valueOf("20.20.1.3"));
 
         checkNewConfig(config);
@@ -229,8 +230,11 @@ public class NoviBngComponent {
 
         log.info("hardcoded ip block allocated");
 
-        addSubscriber(Ip4Address.valueOf("10.20.1.2"), Ip4Address.valueOf("10.20.1.254"), 1000, 1000, deviceId);
+        Ip4Address subIp = Ip4Address.valueOf("10.20.1.2");
 
+        addSubscriber(subIp, Ip4Address.valueOf("10.20.1.254"), 1000, 1000, deviceId);
+
+        //log.info("Mac for " + nextHopIp + " : " + processor.getMac(nextHopIp, deviceId));
         log.info("hardcoded subscriber set up");
 
     }
@@ -430,16 +434,17 @@ public class NoviBngComponent {
             downstreamBand.ofType(Band.Type.DROP);
             downstreamMeter.withBands(Collections.singleton(downstreamBand.build()));
 
-            Meter finalDownstreamMeter = meterService.submit(downstreamMeter.add());
+            //Meter finalDownstreamMeter = meterService.submit(downstreamMeter.add());
 
 
             TrafficSelector.Builder selectorDownStream = DefaultTrafficSelector.builder();
+            selectorDownStream.matchEthType(Ethernet.TYPE_IPV4);
             selectorDownStream.matchIPDscp(TablesInfo.DSCP_LEVELS[i]);
             selectorDownStream.matchIPDst(subscriberIp.toIpPrefix());
 
 
             TrafficTreatment.Builder treatmentDownstream = DefaultTrafficTreatment.builder();
-            treatmentDownstream.meter(finalDownstreamMeter.id());
+            //treatmentDownstream.meter(finalDownstreamMeter.id());
             //routing
             treatmentDownstream.setVlanId(subscriberInfo.getCTag());
             treatmentDownstream.setEthSrc(matchingGatewayInfo.getGatewayMac());
@@ -467,10 +472,11 @@ public class NoviBngComponent {
             if (i > 0 && i < (TablesInfo.CONSECUTIVES_TABLES - 1)) {
 
                 TrafficSelector.Builder selectorDownStream2 = DefaultTrafficSelector.builder();
+                selectorDownStream2.matchEthType(Ethernet.TYPE_IPV4);
                 selectorDownStream2.matchIPDst(subscriberIp.toIpPrefix());
 
                 TrafficTreatment.Builder treatmentDownstream2 = DefaultTrafficTreatment.builder();
-                treatmentDownstream2.meter(finalDownstreamMeter.id());
+                //treatmentDownstream2.meter(finalDownstreamMeter.id());
                 treatmentDownstream2.transition(tableInfo.getRootTable() + i + 1);
 
                 FlowRule.Builder ruleDownstream2 = DefaultFlowRule.builder();
@@ -499,15 +505,16 @@ public class NoviBngComponent {
             upstreamBand.ofType(Band.Type.DROP);
             uptreamMeter.withBands(Collections.singleton(upstreamBand.build()));
 
-            Meter finalUpstreamMeter = meterService.submit(downstreamMeter.add());
+            //Meter finalUpstreamMeter = meterService.submit(downstreamMeter.add());
 
             TrafficSelector.Builder selectorUpstream = DefaultTrafficSelector.builder();
+            selectorUpstream.matchEthType(Ethernet.TYPE_IPV4);
             selectorUpstream.matchIPDscp(TablesInfo.DSCP_LEVELS[i]);
             selectorUpstream.matchIPSrc(subscriberIp.toIpPrefix());
 
 
             TrafficTreatment.Builder treatmentUpstream = DefaultTrafficTreatment.builder();
-            treatmentUpstream.meter(finalUpstreamMeter.id());
+            //treatmentUpstream.meter(finalUpstreamMeter.id());
             treatmentUpstream.popVlan();
             treatmentUpstream.setEthSrc(matchingGatewayInfo.getGatewayMac());
             treatmentUpstream.setEthDst(processor.getMac(devicesConfig.get(deviceId).getPrimaryNextHopIp(), deviceId));
@@ -535,11 +542,12 @@ public class NoviBngComponent {
             if (i > 0 && i < (TablesInfo.CONSECUTIVES_TABLES - 1)) {
 
                 TrafficSelector.Builder selectorUpstream2 = DefaultTrafficSelector.builder();
+                selectorUpstream2.matchEthType(Ethernet.TYPE_IPV4);
                 selectorUpstream2.matchIPSrc(subscriberIp.toIpPrefix());
 
 
                 TrafficTreatment.Builder treatmentUpstream2 = DefaultTrafficTreatment.builder();
-                treatmentUpstream2.meter(finalUpstreamMeter.id());
+                //treatmentUpstream2.meter(finalUpstreamMeter.id());
                 treatmentUpstream2.transition(tableInfo.getRootTable() + i + 1);
 
                 FlowRule.Builder ruleUpstream2 = DefaultFlowRule.builder();
