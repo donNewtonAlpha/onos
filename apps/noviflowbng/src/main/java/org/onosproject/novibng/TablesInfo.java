@@ -39,7 +39,7 @@ public class TablesInfo {
 
     public TablesInfo() {
         subscribers = 0;
-        rootTable = 2;
+        rootTable = 1;
         ipBlocks = new LinkedList<>();
     }
 
