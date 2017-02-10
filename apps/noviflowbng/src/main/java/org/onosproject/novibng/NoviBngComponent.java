@@ -406,6 +406,16 @@ public class NoviBngComponent {
     public void addSubscriberFlows(Ip4Address subscriberIp, SubscriberInfo subscriberInfo, TablesInfo tableInfo,
                                    DeviceId deviceId) {
 
+        if (subscriberInfo.getFlows().size() > 0) {
+            log.warn("subcriberInfo flows for subscriber " + subscriberIp + " contained " + subscriberInfo.getFlows().size() + " flow(s)");
+            for(FlowRule flow : subscriberInfo.getFlows()) {
+                log.warn(flow.toString());
+            }
+
+            subscriberInfo.getFlows().clear();
+        }
+
+
         //TODO : redundancy (link failure)
         GatewayInfo matchingGatewayInfo = null;
 
@@ -446,6 +456,7 @@ public class NoviBngComponent {
             TrafficTreatment.Builder treatmentDownstream = DefaultTrafficTreatment.builder();
             //treatmentDownstream.meter(finalDownstreamMeter.id());
             //routing
+            treatmentDownstream.pushVlan();
             treatmentDownstream.setVlanId(subscriberInfo.getCTag());
             treatmentDownstream.setEthSrc(matchingGatewayInfo.getGatewayMac());
             treatmentDownstream.setEthDst(subscriberInfo.getMac());
@@ -466,7 +477,7 @@ public class NoviBngComponent {
 
             FlowRule flowDownstream = ruleDownstream.build();
 
-            flowRuleService.applyFlowRules(flowDownstream);
+            //flowRuleService.applyFlowRules(flowDownstream);
             subscriberInfo.addFlow(flowDownstream);
 
             if (i > 0 && i < (TablesInfo.CONSECUTIVES_TABLES - 1)) {
@@ -490,7 +501,7 @@ public class NoviBngComponent {
 
                 FlowRule flowDownstream2 = ruleDownstream2.build();
 
-                flowRuleService.applyFlowRules(flowDownstream2);
+                //flowRuleService.applyFlowRules(flowDownstream2);
                 subscriberInfo.addFlow(flowDownstream2);
             }
 
@@ -536,7 +547,7 @@ public class NoviBngComponent {
 
             FlowRule flowUpstream = ruleUpstream.build();
 
-            flowRuleService.applyFlowRules(flowUpstream);
+            //flowRuleService.applyFlowRules(flowUpstream);
             subscriberInfo.addFlow(flowUpstream);
 
             if (i > 0 && i < (TablesInfo.CONSECUTIVES_TABLES - 1)) {
@@ -561,11 +572,19 @@ public class NoviBngComponent {
 
                 FlowRule flowUpstream2 = ruleUpstream2.build();
 
-                flowRuleService.applyFlowRules(flowUpstream2);
+                //flowRuleService.applyFlowRules(flowUpstream2);
                 subscriberInfo.addFlow(flowUpstream2);
 
             }
         }
+
+        log.info("All flows for subscriber " + subscriberIp + " are ready to be added");
+
+        for (FlowRule flow : subscriberInfo.getFlows()) {
+            flowRuleService.applyFlowRules(flow);
+        }
+
+        log.info("Flows added for subscriber " + subscriberIp);
     }
 
 
