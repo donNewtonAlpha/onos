@@ -90,6 +90,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -99,6 +101,8 @@ import static org.onosproject.ovsdb.controller.OvsdbConstant.*;
  * An representation of an ovsdb client.
  */
 public class DefaultOvsdbClient implements OvsdbProviderService, OvsdbClientService {
+
+    private static final int TRANSACTCONFIG_TIMEOUT = 3; //sec
 
     private final Logger log = LoggerFactory.getLogger(DefaultOvsdbClient.class);
 
@@ -356,7 +360,7 @@ public class DefaultOvsdbClient implements OvsdbProviderService, OvsdbClientServ
             OvsdbSet setPorts = (OvsdbSet) bridge.getPortsColumn().data();
             @SuppressWarnings("unchecked")
             Set<Uuid> ports = setPorts.set();
-            if (ports == null || ports.size() == 0) {
+            if (ports == null || ports.isEmpty()) {
                 log.warn("The port uuid is null");
                 return null;
             }
@@ -677,9 +681,9 @@ public class DefaultOvsdbClient implements OvsdbProviderService, OvsdbClientServ
         mirrorBuilder.externalIds(mirror.externalIds());
         mirror = mirrorBuilder.build();
 
-        if (mirror.monitorDstPorts().size() == 0 &&
-                mirror.monitorSrcPorts().size() == 0 &&
-                mirror.monitorVlans().size() == 0) {
+        if (mirror.monitorDstPorts().isEmpty() &&
+                mirror.monitorSrcPorts().isEmpty() &&
+                mirror.monitorVlans().isEmpty()) {
             log.warn("Invalid monitoring data");
             return false;
         }
@@ -958,8 +962,11 @@ public class DefaultOvsdbClient implements OvsdbProviderService, OvsdbClientServ
 
         List<OperationResult> results;
         try {
-            results = transactConfig(DATABASENAME, operations).get();
+            results = transactConfig(DATABASENAME, operations)
+                    .get(TRANSACTCONFIG_TIMEOUT, TimeUnit.SECONDS);
             return results.get(0).getUuid().value();
+        } catch (TimeoutException e) {
+            log.warn("TimeoutException thrown while to get result");
         } catch (InterruptedException e) {
             log.warn("Interrupted while waiting to get result");
             Thread.currentThread().interrupt();
@@ -969,6 +976,7 @@ public class DefaultOvsdbClient implements OvsdbProviderService, OvsdbClientServ
 
         return null;
     }
+
 
     /**
      * Handles port insert.
@@ -1332,7 +1340,7 @@ public class DefaultOvsdbClient implements OvsdbProviderService, OvsdbClientServ
         OvsdbSet datapathIdSet = (OvsdbSet) bridge.getDatapathIdColumn().data();
         @SuppressWarnings("unchecked")
         Set<String> datapathIds = datapathIdSet.set();
-        if (datapathIds == null || datapathIds.size() == 0) {
+        if (datapathIds == null || datapathIds.isEmpty()) {
             return null;
         }
         String datapathId = (String) datapathIds.toArray()[0];
@@ -1347,7 +1355,7 @@ public class DefaultOvsdbClient implements OvsdbProviderService, OvsdbClientServ
         OvsdbSet ofPortSet = (OvsdbSet) intf.getOpenFlowPortColumn().data();
         @SuppressWarnings("unchecked")
         Set<Integer> ofPorts = ofPortSet.set();
-        if (ofPorts == null || ofPorts.size() <= 0) {
+        if (ofPorts == null || ofPorts.isEmpty()) {
             log.debug("The ofport is null in {}", intf.getName());
             return -1;
         }

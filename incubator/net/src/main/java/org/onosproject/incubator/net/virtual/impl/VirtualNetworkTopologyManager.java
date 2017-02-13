@@ -17,10 +17,9 @@
 package org.onosproject.incubator.net.virtual.impl;
 
 import org.onosproject.common.DefaultTopology;
-import org.onosproject.event.AbstractListenerManager;
-import org.onosproject.incubator.net.virtual.VirtualNetwork;
+import org.onosproject.incubator.net.virtual.NetworkId;
 import org.onosproject.incubator.net.virtual.VirtualNetworkService;
-import org.onosproject.incubator.net.virtual.VnetService;
+import org.onosproject.incubator.net.virtual.event.AbstractVirtualListenerManager;
 import org.onosproject.net.ConnectPoint;
 import org.onosproject.net.Device;
 import org.onosproject.net.DeviceId;
@@ -29,6 +28,7 @@ import org.onosproject.net.Link;
 import org.onosproject.net.Path;
 import org.onosproject.net.topology.ClusterId;
 import org.onosproject.net.topology.DefaultGraphDescription;
+import org.onosproject.net.topology.LinkWeigher;
 import org.onosproject.net.topology.LinkWeight;
 import org.onosproject.net.topology.Topology;
 import org.onosproject.net.topology.TopologyCluster;
@@ -44,15 +44,15 @@ import java.util.stream.Collectors;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static org.onosproject.incubator.net.virtual.DefaultVirtualLink.PID;
+import static org.onosproject.net.topology.AdapterLinkWeigher.adapt;
 
 /**
  * Topology service implementation built on the virtual network service.
  */
 public class VirtualNetworkTopologyManager
-        extends AbstractListenerManager<TopologyEvent, TopologyListener>
-        implements TopologyService, VnetService {
+        extends AbstractVirtualListenerManager<TopologyEvent, TopologyListener>
+        implements TopologyService {
 
-    private static final String NETWORK_NULL = "Network ID cannot be null";
     private static final String TOPOLOGY_NULL = "Topology cannot be null";
     private static final String DEVICE_ID_NULL = "Device ID cannot be null";
     private static final String CLUSTER_ID_NULL = "Cluster ID cannot be null";
@@ -60,28 +60,23 @@ public class VirtualNetworkTopologyManager
     private static final String CONNECTION_POINT_NULL = "Connection point cannot be null";
     private static final String LINK_WEIGHT_NULL = "Link weight cannot be null";
 
-    private final VirtualNetwork network;
-    private final VirtualNetworkService manager;
-
     /**
      * Creates a new VirtualNetworkTopologyService object.
      *
      * @param virtualNetworkManager virtual network manager service
-     * @param network               virtual network
+     * @param networkId a virtual network identifier
      */
     public VirtualNetworkTopologyManager(VirtualNetworkService virtualNetworkManager,
-                                         VirtualNetwork network) {
-        checkNotNull(network, NETWORK_NULL);
-        this.network = network;
-        this.manager = virtualNetworkManager;
+                                         NetworkId networkId) {
+        super(virtualNetworkManager, networkId);
     }
 
     @Override
     public Topology currentTopology() {
-        Iterable<Device> devices = manager.getVirtualDevices(network().id())
+        Iterable<Device> devices = manager.getVirtualDevices(networkId())
                 .stream()
                 .collect(Collectors.toSet());
-        Iterable<Link> links = manager.getVirtualLinks(network().id())
+        Iterable<Link> links = manager.getVirtualLinks(networkId())
                 .stream()
                 .collect(Collectors.toSet());
 
@@ -143,15 +138,23 @@ public class VirtualNetworkTopologyManager
     }
 
     @Override
-    public Set<Path> getPaths(Topology topology, DeviceId src, DeviceId dst, LinkWeight weight) {
-        checkNotNull(src, DEVICE_ID_NULL);
-        checkNotNull(dst, DEVICE_ID_NULL);
-        checkNotNull(weight, LINK_WEIGHT_NULL);
-        return defaultTopology(topology).getPaths(src, dst, weight);
+    public Set<Path> getPaths(Topology topology, DeviceId src, DeviceId dst,
+                              LinkWeight weight) {
+        return getPaths(topology, src, dst, adapt(weight));
     }
 
     @Override
-    public Set<DisjointPath> getDisjointPaths(Topology topology, DeviceId src, DeviceId dst) {
+    public Set<Path> getPaths(Topology topology, DeviceId src, DeviceId dst,
+                              LinkWeigher weigher) {
+        checkNotNull(src, DEVICE_ID_NULL);
+        checkNotNull(dst, DEVICE_ID_NULL);
+        checkNotNull(weigher, LINK_WEIGHT_NULL);
+        return defaultTopology(topology).getPaths(src, dst, weigher);
+    }
+
+    @Override
+    public Set<DisjointPath> getDisjointPaths(Topology topology, DeviceId src,
+                                              DeviceId dst) {
         checkNotNull(src, DEVICE_ID_NULL);
         checkNotNull(dst, DEVICE_ID_NULL);
         return defaultTopology(topology).getDisjointPaths(src, dst);
@@ -160,14 +163,22 @@ public class VirtualNetworkTopologyManager
     @Override
     public Set<DisjointPath> getDisjointPaths(Topology topology, DeviceId src,
                                               DeviceId dst, LinkWeight weight) {
-        checkNotNull(src, DEVICE_ID_NULL);
-        checkNotNull(dst, DEVICE_ID_NULL);
-        checkNotNull(weight, LINK_WEIGHT_NULL);
-        return defaultTopology(topology).getDisjointPaths(src, dst, weight);
+        return getDisjointPaths(topology, src, dst, adapt(weight));
     }
 
     @Override
-    public Set<DisjointPath> getDisjointPaths(Topology topology, DeviceId src, DeviceId dst,
+    public Set<DisjointPath> getDisjointPaths(Topology topology, DeviceId src,
+                                              DeviceId dst,
+                                              LinkWeigher weigher) {
+        checkNotNull(src, DEVICE_ID_NULL);
+        checkNotNull(dst, DEVICE_ID_NULL);
+        checkNotNull(weigher, LINK_WEIGHT_NULL);
+        return defaultTopology(topology).getDisjointPaths(src, dst, weigher);
+    }
+
+    @Override
+    public Set<DisjointPath> getDisjointPaths(Topology topology, DeviceId src,
+                                              DeviceId dst,
                                               Map<Link, Object> riskProfile) {
         checkNotNull(src, DEVICE_ID_NULL);
         checkNotNull(dst, DEVICE_ID_NULL);
@@ -175,12 +186,22 @@ public class VirtualNetworkTopologyManager
     }
 
     @Override
-    public Set<DisjointPath> getDisjointPaths(Topology topology, DeviceId src, DeviceId dst,
-                                              LinkWeight weight, Map<Link, Object> riskProfile) {
+    public Set<DisjointPath> getDisjointPaths(Topology topology, DeviceId src,
+                                              DeviceId dst, LinkWeight weight,
+                                              Map<Link, Object> riskProfile) {
+        return getDisjointPaths(topology, src, dst, adapt(weight), riskProfile);
+    }
+
+    @Override
+    public Set<DisjointPath> getDisjointPaths(Topology topology, DeviceId src,
+                                              DeviceId dst,
+                                              LinkWeigher weigher,
+                                              Map<Link, Object> riskProfile) {
         checkNotNull(src, DEVICE_ID_NULL);
         checkNotNull(dst, DEVICE_ID_NULL);
-        checkNotNull(weight, LINK_WEIGHT_NULL);
-        return defaultTopology(topology).getDisjointPaths(src, dst, weight, riskProfile);
+        checkNotNull(weigher, LINK_WEIGHT_NULL);
+        return defaultTopology(topology).getDisjointPaths(src, dst, weigher,
+                riskProfile);
     }
 
     @Override
@@ -193,10 +214,5 @@ public class VirtualNetworkTopologyManager
     public boolean isBroadcastPoint(Topology topology, ConnectPoint connectPoint) {
         checkNotNull(connectPoint, CONNECTION_POINT_NULL);
         return defaultTopology(topology).isBroadcastPoint(connectPoint);
-    }
-
-    @Override
-    public VirtualNetwork network() {
-        return network;
     }
 }

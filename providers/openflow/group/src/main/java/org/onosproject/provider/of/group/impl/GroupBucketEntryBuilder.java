@@ -89,7 +89,7 @@ public class GroupBucketEntryBuilder {
                     break;
                 case SELECT:
                     groupBucket =
-                            DefaultGroupBucket.createSelectGroupBucket(treatment);
+                            DefaultGroupBucket.createSelectGroupBucket(treatment, (short) bucket.getWeight());
                     break;
                 case FF:
                     PortNumber port =
@@ -119,7 +119,7 @@ public class GroupBucketEntryBuilder {
         TrafficTreatment.Builder builder = DefaultTrafficTreatment.builder();
 
         // If this is a drop rule
-        if (actions.size() == 0) {
+        if (actions.isEmpty()) {
             builder.drop();
             return builder.build();
         }

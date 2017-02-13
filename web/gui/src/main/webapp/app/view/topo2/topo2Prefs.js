@@ -29,7 +29,7 @@
         porthl: 1,
         bg: 0,
         spr: 0,
-        ovidx: 1,   // default to traffic overlay
+        ovid: 'traffic',   // default to traffic overlay
         toolbar: 0
     };
 
@@ -50,9 +50,8 @@
     }
 
     angular.module('ovTopo2')
-    .factory('Topo2PrefsService',
-    ['PrefsService',
-
+    .factory('Topo2PrefsService', [
+        'PrefsService',
         function (_ps_) {
 
             ps = _ps_;

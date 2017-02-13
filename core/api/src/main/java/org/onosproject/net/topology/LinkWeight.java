@@ -15,11 +15,19 @@
  */
 package org.onosproject.net.topology;
 
-import org.onlab.graph.EdgeWeight;
-
 /**
  * Entity capable of determining cost or weight of a specified topology
  * graph edge.
+ * @deprecated in Junco (1.9.0), use {@link LinkWeigher} instead
  */
-public interface LinkWeight extends EdgeWeight<TopologyVertex, TopologyEdge> {
+@Deprecated
+public interface LinkWeight {
+
+    /**
+     * Returns the weight of the given edge.
+     *
+     * @param edge edge to be weighed
+     * @return edge weight
+     */
+    double weight(TopologyEdge edge);
 }

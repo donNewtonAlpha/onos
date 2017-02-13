@@ -74,6 +74,7 @@ import org.onosproject.net.HostId;
 import org.onosproject.net.HostLocation;
 import org.onosproject.net.Link;
 import org.onosproject.net.LinkKey;
+import org.onosproject.net.MarkerResource;
 import org.onosproject.net.OchPort;
 import org.onosproject.net.OchSignal;
 import org.onosproject.net.OchSignalType;
@@ -86,6 +87,7 @@ import org.onosproject.net.OtuSignalType;
 import org.onosproject.net.Port;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.TributarySlot;
+import org.onosproject.net.behaviour.protection.ProtectedTransportEndpointDescription;
 import org.onosproject.net.device.DefaultDeviceDescription;
 import org.onosproject.net.device.DefaultPortDescription;
 import org.onosproject.net.device.DefaultPortStatistics;
@@ -181,11 +183,14 @@ import org.onosproject.net.intent.OpticalOduIntent;
 import org.onosproject.net.intent.OpticalPathIntent;
 import org.onosproject.net.intent.PathIntent;
 import org.onosproject.net.intent.PointToPointIntent;
+import org.onosproject.net.intent.ProtectedTransportIntent;
+import org.onosproject.net.intent.ProtectionEndpointIntent;
 import org.onosproject.net.intent.SinglePointToMultiPointIntent;
 import org.onosproject.net.intent.constraint.AnnotationConstraint;
 import org.onosproject.net.intent.constraint.BandwidthConstraint;
 import org.onosproject.net.intent.constraint.BooleanConstraint;
 import org.onosproject.net.intent.constraint.EncapsulationConstraint;
+import org.onosproject.net.intent.constraint.HashedPathSelectionConstraint;
 import org.onosproject.net.intent.constraint.LatencyConstraint;
 import org.onosproject.net.intent.constraint.LinkTypeConstraint;
 import org.onosproject.net.intent.constraint.ObstacleConstraint;
@@ -483,6 +488,7 @@ public final class KryoNamespaces {
                     DefaultTableStatisticsEntry.class,
                     EncapsulationConstraint.class,
                     EncapsulationType.class,
+                    HashedPathSelectionConstraint.class,
                     // Flow Objectives
                     DefaultForwardingObjective.class,
                     ForwardingObjective.Flag.class,
@@ -555,6 +561,10 @@ public final class KryoNamespaces {
             .register(new ImmutableByteSequenceSerializer(), ImmutableByteSequence.class)
             .register(PathIntent.ProtectionType.class)
             .register(ProtectionConstraint.class)
+            .register(ProtectedTransportEndpointDescription.class)
+            .register(ProtectionEndpointIntent.class)
+            .register(ProtectedTransportIntent.class)
+            .register(MarkerResource.class)
             .build("API");
 
     /**

@@ -1,6 +1,6 @@
 // path painter topology overlay - client side
 //
-// This is the glue that binds our business logic (in ppTopovDemo.js)
+// This is the glue that binds our business logic (in ppTopov.js)
 // to the overlay framework.
 
 (function () {
@@ -17,7 +17,7 @@
         // NOTE: this must match the ID defined in AppUiTopovOverlay
         overlayId: 'pp-overlay',
         glyphId: 'm_topo',
-        tooltip: 'Path Painter Topo Overlay',
+        tooltip: 'Path Painter Overlay',
 
         activate: function () {
             $log.debug("Path painter topology overlay ACTIVATED");
@@ -125,8 +125,7 @@
             // Must return true to consume ESC, false otherwise.
             escape: function () {
                 selectionCallback();
-                pps.setSrc();
-                pps.setDst();
+                return pps.clear();
             },
 
             // hooks for when the selection changes...

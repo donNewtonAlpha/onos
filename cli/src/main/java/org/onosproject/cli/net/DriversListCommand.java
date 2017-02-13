@@ -68,13 +68,14 @@ public class DriversListCommand extends AbstractShellCommand {
     private void printDriver(Driver driver) {
         if (outputJson()) {
             json(driver);
-        } else {
-            Driver parent = driver.parent();
-            print(FMT, driver.name(), parent != null ? parent.name() : "none",
-                    driver.manufacturer(), driver.hwVersion(), driver.swVersion());
-            driver.behaviours().forEach(b -> print(FMT_B, b.getCanonicalName(),
-                    driver.implementation(b).getCanonicalName()));
-            driver.properties().forEach((k, v) -> print(FMT_P, k, v));
+        } else if (driver.parents() != null) {
+            driver.parents().forEach(parent -> {
+                print(FMT, driver.name(), parent != null ? parent.name() : "none",
+                           driver.manufacturer(), driver.hwVersion(), driver.swVersion());
+                driver.behaviours().forEach(b -> print(FMT_B, b.getCanonicalName(),
+                                                       driver.implementation(b).getCanonicalName()));
+                driver.properties().forEach((k, v) -> print(FMT_P, k, v));
+            });
         }
     }
 

@@ -23,9 +23,12 @@ import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.apache.felix.scr.annotations.Service;
 import org.onlab.osgi.DefaultServiceDirectory;
+import org.onlab.osgi.ServiceDirectory;
 import org.onlab.packet.IpAddress;
 import org.onlab.packet.MacAddress;
 import org.onlab.packet.VlanId;
+import org.onosproject.core.ApplicationId;
+import org.onosproject.core.CoreService;
 import org.onosproject.incubator.net.tunnel.TunnelId;
 import org.onosproject.incubator.net.virtual.DefaultVirtualLink;
 import org.onosproject.incubator.net.virtual.NetworkId;
@@ -60,6 +63,7 @@ import org.onosproject.net.intent.IntentListener;
 import org.onosproject.net.intent.IntentService;
 import org.onosproject.net.intent.IntentState;
 import org.onosproject.net.link.LinkService;
+import org.onosproject.net.packet.PacketService;
 import org.onosproject.net.provider.AbstractListenerProviderRegistry;
 import org.onosproject.net.provider.AbstractProviderService;
 import org.onosproject.net.topology.PathService;
@@ -90,16 +94,25 @@ public class VirtualNetworkManager
     private static final String DEVICE_NULL = "Device ID cannot be null";
     private static final String LINK_POINT_NULL = "Link end-point cannot be null";
 
+    private static final String VIRTUAL_NETWORK_APP_ID_STRING =
+            "org.onosproject.virtual-network";
+
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected VirtualNetworkStore store;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected IntentService intentService;
 
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected CoreService coreService;
+
     private final InternalVirtualIntentListener intentListener =
             new InternalVirtualIntentListener();
 
     private VirtualNetworkStoreDelegate delegate = this::post;
+
+    private ServiceDirectory serviceDirectory = new DefaultServiceDirectory();
+    private ApplicationId appId;
 
     // TODO: figure out how to coordinate "implementation" of a virtual network in a cluster
 
@@ -127,6 +140,7 @@ public class VirtualNetworkManager
         store.setDelegate(delegate);
         eventDispatcher.addSink(VirtualNetworkEvent.class, listenerRegistry);
         intentService.addListener(intentListener);
+        appId = coreService.registerApplication(VIRTUAL_NETWORK_APP_ID_STRING);
         log.info("Started");
     }
 
@@ -294,6 +308,11 @@ public class VirtualNetworkManager
     }
 
     @Override
+    public ServiceDirectory getServiceDirectory() {
+        return serviceDirectory;
+    }
+
+    @Override
     public Set<VirtualNetwork> getVirtualNetworks(TenantId tenantId) {
         checkNotNull(tenantId, TENANT_NULL);
         return store.getNetworks(tenantId);
@@ -347,6 +366,11 @@ public class VirtualNetworkManager
         return (T) service;
     }
 
+    @Override
+    public ApplicationId getVirtualNetworkApplicationId(NetworkId networkId) {
+        return appId;
+    }
+
     /**
      * Returns the Vnet service matching the service key.
      *
@@ -379,23 +403,24 @@ public class VirtualNetworkManager
     private VnetService create(ServiceKey serviceKey) {
         VirtualNetwork network = getVirtualNetwork(serviceKey.networkId());
         checkNotNull(network, NETWORK_NULL);
+
         VnetService service;
         if (serviceKey.serviceClass.equals(DeviceService.class)) {
-            service = new VirtualNetworkDeviceManager(this, network);
+            service = new VirtualNetworkDeviceManager(this, network.id());
         } else if (serviceKey.serviceClass.equals(LinkService.class)) {
-            service = new VirtualNetworkLinkManager(this, network);
+            service = new VirtualNetworkLinkManager(this, network.id());
         } else if (serviceKey.serviceClass.equals(TopologyService.class)) {
-            service = new VirtualNetworkTopologyManager(this, network);
+            service = new VirtualNetworkTopologyManager(this, network.id());
         } else if (serviceKey.serviceClass.equals(IntentService.class)) {
-            service = new VirtualNetworkIntentManager(
-                    this, network, new DefaultServiceDirectory());
+            service = new VirtualNetworkIntentManager(this, network.id());
         } else if (serviceKey.serviceClass.equals(HostService.class)) {
-            service = new VirtualNetworkHostManager(this, network);
+            service = new VirtualNetworkHostManager(this, network.id());
         } else if (serviceKey.serviceClass.equals(PathService.class)) {
-            service = new VirtualNetworkPathManager(this, network);
+            service = new VirtualNetworkPathManager(this, network.id());
         } else if (serviceKey.serviceClass.equals(FlowRuleService.class)) {
-            service = new VirtualNetworkFlowRuleManager(this, network,
-                                                        new DefaultServiceDirectory());
+            service = new VirtualNetworkFlowRuleManager(this, network.id());
+        } else if (serviceKey.serviceClass.equals(PacketService.class)) {
+            service = new VirtualNetworkPacketManager(this, network.id());
         } else {
             return null;
         }

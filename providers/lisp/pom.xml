@@ -22,7 +22,7 @@
     <parent>
         <groupId>org.onosproject</groupId>
         <artifactId>onos-providers</artifactId>
-        <version>1.9.0-SNAPSHOT</version>
+        <version>1.10.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>onos-lisp-providers</artifactId>
@@ -31,9 +31,10 @@
     <description>ONOS LISP protocol adapters</description>
 
     <modules>
-        <module>device</module>
         <module>app</module>
+        <module>device</module>
         <module>message</module>
+        <module>mapping</module>
     </modules>
 
     <dependencies>
@@ -42,6 +43,11 @@
             <artifactId>onos-api</artifactId>
             <classifier>tests</classifier>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.onosproject</groupId>
+            <artifactId>onos-mapping-api</artifactId>
+            <version>${project.version}</version>
         </dependency>
     </dependencies>
 

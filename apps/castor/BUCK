@@ -7,12 +7,13 @@ COMPILE_DEPS = [
   '//core/store/serializers:onos-core-serializers',
   '//incubator/api:onos-incubator-api',
   '//apps/routing-api:onos-apps-routing-api',
+  '//apps/intentsync:onos-apps-intentsync',
 ]
 
 BUNDLES = [
   '//apps/castor:onos-apps-castor',
   '//apps/routing-api:onos-apps-routing-api',
-  '//apps/routing:onos-apps-routing',
+  '//apps/routing/common:onos-apps-routing-common',
 ]
 
 TEST_DEPS = [
@@ -37,4 +38,5 @@ onos_app (
   url = 'http://onosproject.org',
   included_bundles = BUNDLES,
   description = 'Castor application',
+  required_apps = [ 'org.onosproject.intentsynchronizer' ],
 )

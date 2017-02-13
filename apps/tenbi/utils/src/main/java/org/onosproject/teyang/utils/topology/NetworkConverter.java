@@ -15,8 +15,12 @@
  */
 package org.onosproject.teyang.utils.topology;
 
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
+
+import java.util.List;
+import java.util.Map;
+
 import org.onosproject.net.DeviceId;
 import org.onosproject.tetopology.management.api.KeyId;
 import org.onosproject.tetopology.management.api.TeTopologyEvent;
@@ -59,38 +63,41 @@ import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.network.topo
         .networks.network.DefaultAugmentedNdNetwork.AugmentedNdNetworkBuilder;
 import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.network.topology.rev20151208.ietfnetworktopology
         .networks.network.augmentedndnetwork.Link;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20170110.ietftetopology
         .IetfTeTopologyEvent;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology.IetfTeTopologyEventSubject;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology.TeLinkEvent;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology.TeNodeEvent;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology.networks
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20170110.ietftetopology.IetfTeTopologyEventSubject;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20170110.ietftetopology.TeLinkEvent;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20170110.ietftetopology.TeNodeEvent;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20170110.ietftetopology.networks
         .network.AugmentedNwNetwork;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology.networks
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20170110.ietftetopology.networks
         .network.DefaultAugmentedNwNetwork;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology.networks
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20170110.ietftetopology.networks
         .network.networktypes.AugmentedNwNetworkTypes;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology.networks
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20170110.ietftetopology.networks
         .network.networktypes.DefaultAugmentedNwNetworkTypes;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20170110.ietftetopology
         .tetopologyaugment.DefaultTe;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20170110.ietftetopology
         .tetopologyaugment.Te;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20170110.ietftetopology.tetopologyaugment.te.Config;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20170110.ietftetopology.tetopologyaugment.te.DefaultConfig;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20170110.ietftetopology
         .tetopologytype.DefaultTeTopology;
-import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20160708.ietftetopology
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.topology.rev20170110.ietftetopology
         .tetopologytype.TeTopology;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.types.rev20160705.ietftetypes.Cost;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.types.rev20160705.ietftetypes.Delay;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.types.rev20160705.ietftetypes.NotOptimized;
 import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.types.rev20160705.ietftetypes.TeGlobalId;
+import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.types.rev20160705.ietftetypes.TeOptimizationCriterion;
 import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.types.rev20160705.ietftetypes.TeTopologyId;
 import org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.te.types.rev20160705.ietftetypes.tetopologyeventtype.TeTopologyEventTypeEnum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
-import java.util.Map;
-
-import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 
 /**
@@ -223,10 +230,11 @@ public final class NetworkConverter {
      *
      * @param yangNetworks      Networks YANG object
      * @param yangNetworkStates NetworkStates YANG object
+     * @param deviceId the device Id
      * @return teSubsystem TE Topology subsystem networks object
      */
     public static org.onosproject.tetopology.management.api.Networks yang2TeSubsystemNetworks(
-            Networks yangNetworks, NetworksState yangNetworkStates) {
+            Networks yangNetworks, NetworksState yangNetworkStates, DeviceId deviceId) {
         checkNotNull(yangNetworks, E_NULL_YANG_NETWORKS);
         checkNotNull(yangNetworks.network(), E_NULL_YANG_NETWORK_LIST);
         checkNotNull(yangNetworkStates, E_NULL_YANG_NETWORKSSTATE);
@@ -240,9 +248,9 @@ public final class NetworkConverter {
             if (stateNetwork == null) {
                 log.info("networkId {} can't be found in yangNetworkStates",
                           network.networkId());
-                teNetwork = yang2TeSubsystemNetwork(network, yangNetworks);
+                teNetwork = yang2TeSubsystemNetwork(network, yangNetworks, deviceId);
             } else {
-                teNetwork = yang2TeSubsystemNetwork(network, stateNetwork, yangNetworks);
+                teNetwork = yang2TeSubsystemNetwork(network, stateNetwork, yangNetworks, deviceId);
             }
             networks.add(teNetwork);
         }
@@ -279,11 +287,12 @@ public final class NetworkConverter {
     }
 
     private static NetworkBuilder te2YangLinks(NetworkBuilder builder,
-                                               Map<KeyId, NetworkLink> teLinks) {
+                                               Map<KeyId, NetworkLink> teLinks,
+                                               TeTopologyService teTopologyService) {
         List<Link> linkList = Lists.newArrayList();
 
         for (org.onosproject.tetopology.management.api.link.NetworkLink link : teLinks.values()) {
-            linkList.add(LinkConverter.teSubsystem2YangLink(link));
+            linkList.add(LinkConverter.teSubsystem2YangLink(link, teTopologyService));
         }
         AugmentedNdNetworkBuilder ndAugment = DefaultAugmentedNdNetwork.builder();
         ndAugment.link(linkList);
@@ -307,17 +316,42 @@ public final class NetworkConverter {
     }
 
     private static NetworkBuilder te2YangTopologyIds(NetworkBuilder builder,
-                                                     org.onosproject.tetopology.management.api.TeTopologyId
-                                                             teTopologyId) {
+                                                     org.onosproject.tetopology.management.api
+                                                             .TeTopologyId teTopologyId,
+                                                     TeTopologyService teTopologyService,
+                                                     KeyId networkKeyId) {
+
+        //teBuilder. //OPTIMIZATIONCRITERION for Config/State
         Te.TeBuilder teBuilder = DefaultTe.builder();
-        teBuilder.clientId(new TeGlobalId(teTopologyId.clientId()));
-        teBuilder.providerId(new TeGlobalId(teTopologyId.providerId()));
-        if (teTopologyId.topologyId() != null) {
-            teBuilder.teTopologyId(new TeTopologyId(teTopologyId.topologyId()));
+        Config.ConfigBuilder configBuilder = DefaultConfig.builder();
+        org.onosproject.tetopology.management.api.Network nt = teTopologyService.network(networkKeyId);
+        TeTopologyKey teTopoKey = new TeTopologyKey(nt.teTopologyId().providerId(),
+                                                    nt.teTopologyId().clientId(),
+                                                    Long.valueOf(nt.teTopologyId().topologyId()));
+        switch (teTopologyService.teTopology(teTopoKey).optimization()) {
+        case LEAST_COST:
+            configBuilder = configBuilder.optimizationCriterion(Cost.class);
+            break;
+        case SHORTEST_DELAY:
+            configBuilder = configBuilder.optimizationCriterion(Delay.class);
+            break;
+        case NOT_OPTIMIZED:
+            configBuilder = configBuilder.optimizationCriterion(NotOptimized.class);
+            break;
+        default:
+            configBuilder = configBuilder.optimizationCriterion(TeOptimizationCriterion.class);
+            break;
         }
+
+        teBuilder = teBuilder.config(configBuilder.build());
 
         AugmentedNwNetwork.AugmentedNwNetworkBuilder nwAugment = DefaultAugmentedNwNetwork
                 .builder();
+        nwAugment.clientId(new TeGlobalId(teTopologyId.clientId()));
+        nwAugment.providerId(new TeGlobalId(teTopologyId.providerId()));
+        if (teTopologyId.topologyId() != null) {
+            nwAugment.teTopologyId(new TeTopologyId(teTopologyId.topologyId()));
+        }
         nwAugment.te(teBuilder.build());
         builder.addYangAugmentedInfo(nwAugment.build(),
                                      AugmentedNwNetwork.class);
@@ -367,12 +401,14 @@ public final class NetworkConverter {
 
         // Add links - link is the augmentation
         if (teSubsystem.links() != null) {
-            builder = te2YangLinks(builder, teSubsystem.links());
+            builder = te2YangLinks(builder, teSubsystem.links(), teTopologyService);
         }
 
         // TE Topology IDs
         if (teSubsystem.teTopologyId() != null) {
-            builder = te2YangTopologyIds(builder, teSubsystem.teTopologyId());
+            builder = te2YangTopologyIds(builder, teSubsystem.teTopologyId(),
+                                         teTopologyService,
+                                         teSubsystem.networkId());
         }
 
         return builder.build();
@@ -421,7 +457,7 @@ public final class NetworkConverter {
                                                 org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.
                                                 yang.ietf.network.rev20151208.ietfnetwork.networksstate.
                                                 Network yangNetworkState,
-                                                Networks yangNetworks) {
+                                                Networks yangNetworks, DeviceId deviceId) {
         checkNotNull(yangNetwork, E_NULL_YANG_NETWORK);
         checkNotNull(yangNetwork.networkId(), E_NULL_YANG_NETWORKID);
         String networkId = yangNetwork.networkId().uri().string();
@@ -432,7 +468,6 @@ public final class NetworkConverter {
         Map<KeyId, NetworkLink> teLinks = null;
         org.onosproject.tetopology.management.api.TeTopologyId teTopologyId = null;
         boolean serverProvided = false;
-        DeviceId ownerId = null;
 
         // Supporting networks
         if (yangNetwork.supportingNetwork() != null) {
@@ -449,7 +484,7 @@ public final class NetworkConverter {
             for (Node node : yangNetwork.node()) {
                 // Convert the Yang Node to a TE node.
                 teNodes.put(KeyId.keyId(node.nodeId().uri().string()),
-                            NodeConverter.yang2TeSubsystemNode(node, yangNetwork));
+                            NodeConverter.yang2TeSubsystemNode(node, yangNetwork, yangNetworks));
             }
         }
 
@@ -471,9 +506,9 @@ public final class NetworkConverter {
                     (AugmentedNwNetwork) yangNetwork.yangAugmentedInfo(AugmentedNwNetwork.class);
             teTopologyId =
                     new org.onosproject.tetopology.management.api.TeTopologyId(
-                            augmentTeIds.te().providerId().uint32(),
-                            augmentTeIds.te().clientId().uint32(),
-                            augmentTeIds.te().teTopologyId().string());
+                            augmentTeIds.providerId().uint32(),
+                            augmentTeIds.clientId().uint32(),
+                            augmentTeIds.teTopologyId().string());
         }
 
         if (yangNetworkState != null) {
@@ -483,7 +518,7 @@ public final class NetworkConverter {
         org.onosproject.tetopology.management.api.DefaultNetwork network =
                 new org.onosproject.tetopology.management.api.DefaultNetwork(networkKeyId, supportingNetworkIds,
                                                                              teNodes, teLinks, teTopologyId,
-                                                                             serverProvided, ownerId);
+                                                                             serverProvided, deviceId);
         return network;
     }
 
@@ -492,11 +527,13 @@ public final class NetworkConverter {
      *
      * @param yangNetwork Network YANG object
      * @param yangNetworks Networks YANG object
+     * @param deviceId The identifier of RESTCONF server device
      * @return network TE Topology subsystem networks object
      */
     public static org.onosproject.tetopology.management.api.Network yang2TeSubsystemNetwork(Network yangNetwork,
-                                                                                            Networks yangNetworks) {
-        return yang2TeDefaultNetwork(yangNetwork, null, yangNetworks);
+                                                                                            Networks yangNetworks,
+                                                                                            DeviceId deviceId) {
+        return yang2TeDefaultNetwork(yangNetwork, null, yangNetworks, deviceId);
     }
 
     /**
@@ -505,16 +542,17 @@ public final class NetworkConverter {
      * @param yangNetwork Network YANG object
      * @param yangNetworkState NetworkState YANG object
      * @param yangNetworks Networks YANG object
+     * @param deviceId The identifier of RESTCONF server device
      * @return teSubsystem TE Topology subsystem networks object
      */
     public static org.onosproject.tetopology.management.api.Network yang2TeSubsystemNetwork(Network yangNetwork,
             org.onosproject.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.network.rev20151208.ietfnetwork
-                    .networksstate.Network yangNetworkState, Networks yangNetworks) {
+                    .networksstate.Network yangNetworkState, Networks yangNetworks, DeviceId deviceId) {
         checkNotNull(yangNetworkState, E_NULL_YANG_NETWORKSSTATE_NETWORK);
         checkNotNull(yangNetworkState.networkRef(), E_NULL_YANG_NETWORKSSTATE_NETWORKREF);
 
         org.onosproject.tetopology.management.api.DefaultNetwork teNetwork =
-                yang2TeDefaultNetwork(yangNetwork, yangNetworkState, yangNetworks);
+                yang2TeDefaultNetwork(yangNetwork, yangNetworkState, yangNetworks, deviceId);
 
         String networkref = yangNetworkState.networkRef().toString();
         checkState(teNetwork.networkId().toString().equals(networkref),
@@ -528,9 +566,11 @@ public final class NetworkConverter {
      * corresponding YANG Object (YO) format.
      *
      * @param event TE Topology event from the core
+     * @param teTopologyService TE Topology Service object
      * @return YANG Object converted from event
      */
-    public static IetfTeTopologyEvent teTopoEvent2YangIetfTeTopoEvent(TeTopologyEvent event) {
+    public static IetfTeTopologyEvent teTopoEvent2YangIetfTeTopoEvent(TeTopologyEvent event,
+                                                                      TeTopologyService teTopologyService) {
         IetfTeTopologyEvent yangEvent = null;
         IetfTeTopologyEventSubject eventSubject = new IetfTeTopologyEventSubject();
 
@@ -538,7 +578,8 @@ public final class NetworkConverter {
         if (yangEventType == IetfTeTopologyEvent.Type.TE_LINK_EVENT) {
             NetworkLinkEventSubject eventData = (NetworkLinkEventSubject) event.subject();
             TeTopologyEventTypeEnum linkEventType = teTopoEventType2YangTeTopoEventType(event.type());
-            TeLinkEvent yangLinkEvent = LinkConverter.teNetworkLink2yangTeLinkEvent(linkEventType, eventData);
+            TeLinkEvent yangLinkEvent = LinkConverter
+                    .teNetworkLink2yangTeLinkEvent(linkEventType, eventData, teTopologyService);
             eventSubject.teLinkEvent(yangLinkEvent);
             yangEvent = new IetfTeTopologyEvent(IetfTeTopologyEvent.Type.TE_LINK_EVENT, eventSubject);
         } else if (yangEventType == IetfTeTopologyEvent.Type.TE_NODE_EVENT) {
@@ -567,7 +608,7 @@ public final class NetworkConverter {
                 returnType = IetfTeTopologyEvent.Type.TE_NODE_EVENT;
                 break;
             default:
-                log.error("teTopoEventType2YangIetfTopoEventType: unknown type: {}", type);
+                log.warn("teTopoEventType2YangIetfTopoEventType: unknown type: {}", type);
         }
 
         return returnType;
@@ -590,9 +631,7 @@ public final class NetworkConverter {
                 returnType = TeTopologyEventTypeEnum.UPDATE;
                 break;
             default:
-                // log.warn("teTopoEventType2YangIetfTopoEventType: unsupported
-                // type: {}",
-                // type);
+                log.warn("teTopoEventType2YangteTopoEventType: unsupported type: {}", type);
             break;
         }
 

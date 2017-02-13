@@ -15,7 +15,7 @@
  */
 package org.onosproject.incubator.net.virtual.impl;
 
-import org.onosproject.incubator.net.virtual.VirtualNetwork;
+import org.onosproject.incubator.net.virtual.NetworkId;
 import org.onosproject.incubator.net.virtual.VirtualNetworkService;
 import org.onosproject.incubator.net.virtual.VnetService;
 import org.onosproject.net.DisjointPath;
@@ -23,15 +23,13 @@ import org.onosproject.net.ElementId;
 import org.onosproject.net.Link;
 import org.onosproject.net.Path;
 import org.onosproject.net.host.HostService;
-import org.onosproject.net.topology.LinkWeight;
+import org.onosproject.net.topology.LinkWeigher;
 import org.onosproject.net.topology.PathService;
 import org.onosproject.net.topology.AbstractPathService;
 import org.onosproject.net.topology.TopologyService;
 
 import java.util.Map;
 import java.util.Set;
-
-import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Path service implementation built on the virtual network service.
@@ -40,43 +38,41 @@ public class VirtualNetworkPathManager
         extends AbstractPathService
         implements PathService, VnetService {
 
-    private static final String NETWORK_NULL = "Network ID cannot be null";
-
-    private final VirtualNetwork network;
+    private final NetworkId networkId;
 
     /**
      * Creates a new virtual network path service object.
      *
      * @param virtualNetworkManager virtual network manager service
-     * @param network               virtual network
+     * @param networkId a virtual network identifier
      */
 
     public VirtualNetworkPathManager(VirtualNetworkService virtualNetworkManager,
-                                     VirtualNetwork network) {
-        checkNotNull(network, NETWORK_NULL);
-        this.network = network;
-        topologyService = virtualNetworkManager.get(network.id(), TopologyService.class);
-        hostService = virtualNetworkManager.get(network.id(), HostService.class);
+                                     NetworkId networkId) {
+        this.networkId = networkId;
+
+        topologyService = virtualNetworkManager.get(networkId(), TopologyService.class);
+        hostService = virtualNetworkManager.get(networkId(), HostService.class);
     }
 
     @Override
     public Set<Path> getPaths(ElementId src, ElementId dst) {
-        return getPaths(src, dst, null);
+        return super.getPaths(src, dst, (LinkWeigher) null);
     }
 
     @Override
     public Set<DisjointPath> getDisjointPaths(ElementId src, ElementId dst) {
-        return getDisjointPaths(src, dst, (LinkWeight) null);
+        return getDisjointPaths(src, dst, (LinkWeigher) null);
     }
 
     @Override
     public Set<DisjointPath> getDisjointPaths(ElementId src, ElementId dst,
                                               Map<Link, Object> riskProfile) {
-        return getDisjointPaths(src, dst, null, riskProfile);
+        return getDisjointPaths(src, dst, (LinkWeigher) null, riskProfile);
     }
 
     @Override
-    public VirtualNetwork network() {
-        return network;
+    public NetworkId networkId() {
+        return this.networkId;
     }
 }

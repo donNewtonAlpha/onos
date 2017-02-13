@@ -23,18 +23,16 @@ import org.onosproject.kafkaintegration.api.dto.OnosEvent;
 public interface KafkaEventStorageService {
 
     /**
-     * Inserts the Generated event into the local cache.
+     * Inserts the Onos Event into Distributed Work Queue.
      *
      * @param e the ONOS Event
-     * @return true if the insertion was successful
      */
-    boolean insertCacheEntry(OnosEvent e);
+    void publishEvent(OnosEvent event);
 
     /**
-     * Updates the counter with the most recently published event's sequence
-     * number.
+     * Removes the Onos Event from the Distributed Work Queue.
      *
-     * @param sequenceNumber the updated value of sequence number.
+     * @return the Onos Event
      */
-    void updateLastPublishedEntry(Long sequenceNumber);
+    OnosEvent consumeEvent();
 }

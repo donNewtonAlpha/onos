@@ -165,7 +165,7 @@ public class AtomixWorkQueueTest extends AtomixTestBase {
         byte[] item1 = DEFAULT_PAYLOAD;
         queue2.addOne(item1).join();
 
-        Uninterruptibles.awaitUninterruptibly(latch1, 500, TimeUnit.MILLISECONDS);
+        assertTrue(Uninterruptibles.awaitUninterruptibly(latch1, 5000, TimeUnit.MILLISECONDS));
         queue1.stopProcessing();
 
         byte[] item2 = DEFAULT_PAYLOAD;

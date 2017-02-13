@@ -671,19 +671,21 @@ public class OpenFlowDeviceProvider extends AbstractProvider implements DevicePr
          *
          * @param portName the port name
          * @param portMac the port mac
-         * @return annotation containing the port name if one is found,
-         *         null otherwise
+         * @return annotation containing port name and/or port MAC if any of
+         *          the two is found, empty otherwise
          */
         private SparseAnnotations makePortAnnotation(String portName, String portMac) {
-            SparseAnnotations annotations = null;
+            DefaultAnnotations.Builder builder = DefaultAnnotations.builder();
             String pName = Strings.emptyToNull(portName);
             String pMac = Strings.emptyToNull(portMac);
-            if (portName != null) {
-                annotations = DefaultAnnotations.builder()
-                        .set(AnnotationKeys.PORT_NAME, pName)
-                        .set(AnnotationKeys.PORT_MAC, pMac).build();
+            if (pName != null) {
+                builder.set(AnnotationKeys.PORT_NAME, pName);
             }
-            return annotations;
+            if (pMac != null) {
+                builder.set(AnnotationKeys.PORT_MAC, pMac);
+            }
+            //Returns an empty annotation if both pName and pMac are null
+            return builder.build();
         }
 
         /**
@@ -713,7 +715,7 @@ public class OpenFlowDeviceProvider extends AbstractProvider implements DevicePr
          */
         private PortDescription buildPortDescription(PortDescPropertyType ptype, OFPortOptical port,
                 OpenFlowOpticalSwitch opsw) {
-            checkArgument(port.getDesc().size() >= 1);
+            checkArgument(!port.getDesc().isEmpty());
 
             // Minimally functional fixture. This needs to be fixed as we add better support.
             PortNumber portNo = PortNumber.portNumber(port.getPortNo().getPortNumber());
@@ -790,7 +792,7 @@ public class OpenFlowDeviceProvider extends AbstractProvider implements DevicePr
             // Use the alias name if it's available
             String name = port.getName();
             List<OFCalientPortDescProp> props = port.getProperties();
-            if (props != null && props.size() > 0) {
+            if (props != null && !props.isEmpty()) {
                 OFCalientPortDescPropOptical propOptical = (OFCalientPortDescPropOptical) props.get(0);
                 if (propOptical != null) {
                     name = propOptical.getInAlias();

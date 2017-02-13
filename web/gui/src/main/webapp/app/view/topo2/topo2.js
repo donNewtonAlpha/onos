@@ -79,22 +79,21 @@
     // === Controller Definition -----------------------------------------
 
     angular.module('ovTopo2', ['onosUtil', 'onosSvg', 'onosRemote'])
-    .controller('OvTopo2Ctrl',
-        ['$scope', '$log', '$location',
-        'FnService', 'MastService', 'KeyService',
+    .controller('OvTopo2Ctrl', [
+        '$scope', '$log', '$location', 'FnService', 'MastService', 'KeyService',
         'GlyphService', 'MapService', 'SvgUtilService', 'FlashService',
         'WebSocketService', 'PrefsService', 'ThemeService',
         'Topo2EventService', 'Topo2ForceService', 'Topo2InstanceService',
         'Topo2BreadcrumbService', 'Topo2KeyCommandService', 'Topo2MapService',
         'Topo2MapConfigService', 'Topo2ZoomService',
-        'Topo2SummaryPanelService', 'Topo2DeviceDetailsPanel',
+        'Topo2SummaryPanelService', 'Topo2DeviceDetailsPanel', 'Topo2SpriteLayerService',
 
         function (_$scope_, _$log_, _$loc_,
             _fs_, _mast_, _ks_,
             _gs_, _ms_, _sus_, _flash_,
             _wss_, _ps_, _th_,
             _t2es_, _t2fs_, _t2is_, _t2bcs_, _t2kcs_, _t2ms_, _t2mcs_,
-            _t2zs_, summaryPanel, detailsPanel
+            _t2zs_, summaryPanel, detailsPanel, t2sls
         ) {
 
             var params = _$loc_.search(),
@@ -193,9 +192,7 @@
                 }
             );
 
-            // initialize the force layout, ready to render the topology
-            forceG = zoomLayer.append('g').attr('id', 'topo-force');
-
+            t2sls.init(svg, zoomLayer);
             t2fs.init(svg, forceG, uplink, dim, zoomer);
             t2bcs.init();
             t2kcs.init(t2fs);
@@ -215,7 +212,7 @@
             // tps.initPanels();
 
             // restoreConfigFromPrefs();
-            // ttbs.setDefaultOverlay(prefsState.ovidx);
+            // ttbs.setDefaultOverlay(prefsState.ovid);
 
             // $log.debug('registered overlays...', tov.list());
 

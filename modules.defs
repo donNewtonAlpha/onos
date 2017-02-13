@@ -52,6 +52,8 @@ CORE = UTILS + API + [
     '//protocols/lisp/api:onos-protocols-lisp-api',
     '//protocols/lisp/ctl:onos-protocols-lisp-ctl',
     '//protocols/lisp/msg:onos-protocols-lisp-msg',
+    '//protocols/tl1/api:onos-protocols-tl1-api',
+    '//protocols/tl1/ctl:onos-protocols-tl1-ctl',
 
     '//drivers/utilities:onos-drivers-utilities',
 
@@ -68,6 +70,7 @@ CORE = UTILS + API + [
     '//providers/isis/cfg:onos-providers-isis-cfg',
     '//providers/isis/topology:onos-providers-isis-topology',
     '//providers/lisp/device:onos-providers-lisp-device',
+    '//providers/tl1/device:onos-providers-tl1-device',
 
     '//web/api:onos-rest',
     '//web/gui:onos-gui',
@@ -88,6 +91,7 @@ ONOS_DRIVERS = [
     '//drivers/optical:onos-drivers-optical-oar',
     '//drivers/ovsdb:onos-drivers-ovsdb-oar',
     '//drivers/juniper:onos-drivers-juniper-oar',
+    '//drivers/lisp:onos-drivers-lisp-oar',
 ]
 
 ONOS_PROVIDERS = [
@@ -112,6 +116,7 @@ ONOS_PROVIDERS = [
     '//providers/snmp:onos-providers-snmp-oar',
     '//providers/link:onos-providers-link-oar',
     '//providers/lisp:onos-providers-lisp-oar',
+    '//providers/tl1:onos-providers-tl1-oar',
 ]
 
 ONOS_APPS = [
@@ -129,6 +134,7 @@ ONOS_APPS = [
     '//apps/gangliametrics:onos-apps-gangliametrics-oar',
     '//apps/graphitemetrics:onos-apps-graphitemetrics-oar',
     '//apps/flowanalyzer:onos-apps-flowanalyzer-oar',
+    '//apps/intentsync:onos-apps-intentsync-oar',
     '//apps/influxdbmetrics:onos-apps-influxdbmetrics-oar',
     '//apps/metrics:onos-apps-metrics-oar',
     '//apps/mfwd:onos-apps-mfwd-oar',
@@ -158,17 +164,24 @@ ONOS_APPS = [
     '//apps/virtualbng:onos-apps-virtualbng-oar',
     '//apps/vpls:onos-apps-vpls-oar',
     '//apps/vrouter:onos-apps-vrouter-oar',
+    '//apps/routing/fibinstaller:onos-apps-routing-fibinstaller-oar',
+    '//apps/routing/cpr:onos-apps-routing-cpr-oar',
+    '//apps/routing/fpm:onos-apps-routing-fpm-oar',
     '//apps/vtn:onos-apps-vtn-oar',
     '//apps/faultmanagement:onos-apps-faultmanagement-oar',
     '//apps/openstacknode:onos-apps-openstacknode-oar',
     '//apps/cpman/app:onos-apps-cpman-app-oar',
     '//apps/xosclient:onos-apps-xosclient-oar',
     '//apps/scalablegateway:onos-apps-scalablegateway-oar',
-    '//apps/patchpanel:onos-apps-patchpanel-oar',
     '//apps/castor:onos-apps-castor-oar',
     '//apps/yms:onos-apps-yms-oar',
     '//apps/noviflowbng:onos-apps-noviflowbng-oar',
     '//apps/noviflowaggswitch:onos-apps-noviflowaggswitch-oar',
+    '//apps/ofagent:onos-apps-ofagent-oar',
+    '//apps/mappingmanagement:onos-apps-mappingmanagement-oar',
+    '//apps/config:onos-apps-config-oar'
+
+
 ]
 
 APP_JARS = [
@@ -180,7 +193,7 @@ APP_JARS = [
     '//apps/fwd:onos-apps-fwd',
     '//apps/iptopology-api:onos-apps-iptopology-api',
     '//apps/openstacknode:onos-apps-openstacknode',
-    '//apps/routing:onos-apps-routing',
+    '//apps/routing/common:onos-apps-routing-common',
     '//apps/vtn/vtnrsc:onos-apps-vtn-vtnrsc',
     '//apps/vtn/sfcmgr:onos-apps-vtn-sfcmgr',
     '//apps/vtn/vtnmgr:onos-apps-vtn-vtnmgr',

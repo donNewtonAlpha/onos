@@ -20,9 +20,13 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.onlab.junit.TestUtils;
+import org.onlab.osgi.TestServiceDirectory;
+import org.onlab.rest.BaseResource;
 import org.onosproject.common.event.impl.TestEventDispatcher;
+import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.core.CoreServiceAdapter;
+import org.onosproject.core.DefaultApplicationId;
 import org.onosproject.core.IdGenerator;
 import org.onosproject.incubator.net.virtual.NetworkId;
 import org.onosproject.incubator.net.virtual.TenantId;
@@ -40,6 +44,7 @@ import org.onosproject.net.PortNumber;
 import org.onosproject.net.TestDeviceParams;
 import org.onosproject.net.intent.FakeIntentManager;
 import org.onosproject.net.intent.TestableIntentService;
+import org.onosproject.net.topology.LinkWeigher;
 import org.onosproject.net.topology.LinkWeight;
 import org.onosproject.net.topology.Topology;
 import org.onosproject.net.topology.TopologyCluster;
@@ -65,21 +70,26 @@ public class VirtualNetworkTopologyManagerTest extends TestDeviceParams {
     private DistributedVirtualNetworkStore virtualNetworkManagerStore;
     private CoreService coreService;
     private TestableIntentService intentService = new FakeIntentManager();
+    private TestServiceDirectory testDirectory;
 
     @Before
     public void setUp() throws Exception {
         virtualNetworkManagerStore = new DistributedVirtualNetworkStore();
-
         coreService = new VirtualNetworkTopologyManagerTest.TestCoreService();
-        virtualNetworkManagerStore.setCoreService(coreService);
-        TestUtils.setField(coreService, "coreService", new VirtualNetworkTopologyManagerTest.TestCoreService());
+        TestUtils.setField(virtualNetworkManagerStore, "coreService", coreService);
         TestUtils.setField(virtualNetworkManagerStore, "storageService", new TestStorageService());
         virtualNetworkManagerStore.activate();
 
+        BaseResource.setServiceDirectory(testDirectory);
         manager = new VirtualNetworkManager();
         manager.store = virtualNetworkManagerStore;
         manager.intentService = intentService;
+        manager.coreService = coreService;
         NetTestTools.injectEventDispatcher(manager, new TestEventDispatcher());
+
+        testDirectory = new TestServiceDirectory();
+        TestUtils.setField(manager, "serviceDirectory", testDirectory);
+
         manager.activate();
     }
 
@@ -385,7 +395,8 @@ public class VirtualNetworkTopologyManagerTest extends TestDeviceParams {
         VirtualDevice dstVirtualDevice = getVirtualDevice(virtualNetwork.id(), DID2);
 
         // test the getPaths() method using a null weight.
-        Set<Path> paths = topologyService.getPaths(topology, srcVirtualDevice.id(), dstVirtualDevice.id(), null);
+        Set<Path> paths = topologyService.getPaths(topology, srcVirtualDevice.id(),
+                dstVirtualDevice.id(), (LinkWeigher) null);
     }
 
     /**
@@ -605,6 +616,8 @@ public class VirtualNetworkTopologyManagerTest extends TestDeviceParams {
      */
     private class TestCoreService extends CoreServiceAdapter {
 
+        ApplicationId appId;
+
         @Override
         public IdGenerator getIdGenerator(String topic) {
             return new IdGenerator() {
@@ -616,5 +629,17 @@ public class VirtualNetworkTopologyManagerTest extends TestDeviceParams {
                 }
             };
         }
+
+        @Override
+        public ApplicationId registerApplication(String name) {
+            appId = new DefaultApplicationId(1, name);
+            return appId;
+        }
+
+            @Override
+        public ApplicationId getAppId(String name) {
+            return appId;
+        }
     }
+
 }

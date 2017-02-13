@@ -702,15 +702,12 @@ public class PceWebTopovMessageHandler extends UiMessageHandler {
         }
     }
 
-    /**
-     * Handles the event of topology listeners.
-     */
     private void findTunnelAndHighlights() {
         Collection<Tunnel> tunnelSet = null;
         Highlights highlights = new Highlights();
-        paths.removeAll(paths);
+        paths.clear();
         tunnelSet = tunnelService.queryTunnel(MPLS);
-        if (tunnelSet.size() == 0) {
+        if (tunnelSet.isEmpty()) {
             log.warn("Tunnel does not exist");
             sendMessage(highlightsMessage(highlights));
             return;
@@ -747,12 +744,9 @@ public class PceWebTopovMessageHandler extends UiMessageHandler {
         hilightAndSendPaths(highlights);
     }
 
-    /**
-     * Handles the event of topology listeners.
-     */
     private void highlightsForTunnel(Tunnel tunnel) {
         Highlights highlights = new Highlights();
-        paths.removeAll(paths);
+        paths.clear();
         if (tunnel.path() == null) {
             log.error("path does not exist");
             sendMessage(highlightsMessage(highlights));

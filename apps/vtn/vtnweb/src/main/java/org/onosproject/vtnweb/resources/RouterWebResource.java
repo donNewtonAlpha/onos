@@ -106,7 +106,7 @@ public class RouterWebResource extends AbstractWebResource {
                 .getRouter(RouterId.valueOf(id)), NOT_EXIST);
 
         ObjectNode result = new ObjectMapper().createObjectNode();
-        if (fields.size() > 0) {
+        if (!fields.isEmpty()) {
             result.set("router",
                        new RouterCodec().extracFields(sub, this, fields));
         } else {
@@ -299,7 +299,7 @@ public class RouterWebResource extends AbstractWebResource {
         checkNotNull(routerNode, JSON_NOT_NULL);
         Map<RouterId, Router> subMap = new HashMap<RouterId, Router>();
         if (!routerNode.hasNonNull("id")) {
-            new IllegalArgumentException("id should not be null");
+            throw new IllegalArgumentException("id should not be null");
         } else if (routerNode.get("id").asText().isEmpty()) {
             throw new IllegalArgumentException("id should not be empty");
         }
