@@ -281,6 +281,7 @@ public class NoviBngComponent {
             arpRequestIntercept(gatewayIp, deviceId);
             icmpIntercept(gatewayIp, deviceId);
             processor.addRoutingInfo(deviceId, PortNumber.ANY, ipBlock, gatewayIp, gatewayMac);
+            log.info("New gateway added : " + gatewayIp + " for " + ipBlock);
             //TODO: there may be problem with processor.getMac()
 
         }

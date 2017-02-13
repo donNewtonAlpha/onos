@@ -556,7 +556,7 @@ public class NoviBngPacketProcessor implements PacketProcessor {
 
             boolean b = this.deviceId.equals(deviceId) && this.ip.equals(ip);
 
-            if (!port.equals(PortNumber.ANY)) {
+            if (!this.port.equals(PortNumber.ANY)) {
                 b = b && this.port.equals(port);
             }
 
@@ -576,6 +576,12 @@ public class NoviBngPacketProcessor implements PacketProcessor {
         public int hashCode() {
             return deviceId.hashCode() + 11 * port.hashCode() + 13 * subnet.hashCode() +
                     5 * ip.hashCode() + 3 * mac.hashCode();
+        }
+
+        public String toString() {
+
+            return "Routing info : " + ip + " (" + mac + ") for " + subnet  + " on port " + port + " for device " +
+                deviceId;
         }
     }
 
