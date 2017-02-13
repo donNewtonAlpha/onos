@@ -196,6 +196,8 @@ public class NoviBngPacketProcessor implements PacketProcessor {
 
             NoviBngComponent.getComponent().addSubscriberFlows(subIp, subInfo, subInfo.getTableInfo(), deviceId);
 
+        } else {
+            log.info("Subscriber " + subIp + " already activated");
         }
     }
 
@@ -209,10 +211,9 @@ public class NoviBngPacketProcessor implements PacketProcessor {
 
         log.info("ARP request for " + targetProtocolAddress + " received on port " + inPort.toString() + " from " + sourceIp);
 
-        //checkNewSub(deviceId, inPort, sourceIp, ethPkt);
         // Check if this is an ARP for the switch
         boolean matchingInfoFound = false;
-        log.info("Checking among the " + routingInfos.size() + " routing infos");
+        //log.info("Checking among the " + routingInfos.size() + " routing infos");
         for (RoutingInfo info : routingInfos) {
 
             log.info(info.toString());
