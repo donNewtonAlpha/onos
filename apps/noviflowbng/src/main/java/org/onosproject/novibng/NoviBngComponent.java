@@ -232,7 +232,7 @@ public class NoviBngComponent {
 
         Ip4Address subIp = Ip4Address.valueOf("10.20.1.2");
 
-        addSubscriber(subIp, Ip4Address.valueOf("10.20.1.254"), 1000, 1000, deviceId);
+        //addSubscriber(subIp, Ip4Address.valueOf("10.20.1.254"), 1000, 1000, deviceId);
 
         //log.info("Mac for " + nextHopIp + " : " + processor.getMac(nextHopIp, deviceId));
         log.info("hardcoded subscriber set up");

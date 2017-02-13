@@ -125,17 +125,22 @@ public class NoviBngPacketProcessor implements PacketProcessor {
 
                 if (arp.getOpCode() == ARP.OP_REQUEST) {
                     log.debug("It is an ARP request");
+                    MacAddress sourceMac = ethPkt.getSourceMAC();
+                    VlanId vlanId = VlanId.vlanId(ethPkt.getVlanID());
                     handleArpRequest(deviceId, inPort, ethPkt);
+                    checkNewSub(deviceId, inPort, Ip4Address.valueOf(arp.getSenderProtocolAddress()), sourceMac, vlanId);
                 } else {
                     log.debug("It is an ARP reply");
                     handleArpReply(deviceId, inPort, ethPkt);
                 }
+
+
             } else if (payload instanceof IPv4) {
 
                 log.debug("IP packet received");
                 IPv4 ipPkt = (IPv4) payload;
 
-                checkNewSub(deviceId, inPort, Ip4Address.valueOf(ipPkt.getSourceAddress()), ethPkt);
+
 
                 IPacket ipPayload = ipPkt.getPayload();
 
@@ -147,7 +152,7 @@ public class NoviBngPacketProcessor implements PacketProcessor {
 
 
                     if (ping.getIcmpType() == ICMP.TYPE_ECHO_REQUEST) {
-                        log.info("ICMP request received");
+                        log.debug("ICMP request received");
                         handlePingRequest(deviceId, inPort, ethPkt);
                     } else if (ping.getIcmpType() == ICMP.TYPE_ECHO_REPLY) {
                             log.info("ICMP reply received");
@@ -169,16 +174,19 @@ public class NoviBngPacketProcessor implements PacketProcessor {
         }
     }
 
-    private void checkNewSub(DeviceId deviceId, PortNumber inPort, Ip4Address subIp, Ethernet pkt) {
+    private void checkNewSub(DeviceId deviceId, PortNumber inPort, Ip4Address subIp, MacAddress subMac, VlanId subVlan) {
+
+        log.info("Checking for new subscriber : " + subIp);
 
         SubscriberInfo subInfo = NoviBngComponent.getComponent().subscribersInfo.get(deviceId).get(subIp);
         if (subInfo == null) {
+            log.info("This is not a provisionned subscriber");
             return;
         }
         if (subInfo.isStandby()) {
             subInfo.setPort(inPort);
-            subInfo.setCTag(VlanId.vlanId(pkt.getVlanID()));
-            subInfo.setMac(pkt.getSourceMAC());
+            subInfo.setCTag(subVlan);
+            subInfo.setMac(subMac);
 
             //Removing the intercept for this sub : the intercept is the gateway arp intecept
             // so we do not remove it (for now)
@@ -199,16 +207,23 @@ public class NoviBngPacketProcessor implements PacketProcessor {
                 arpRequest.getTargetProtocolAddress());
         Ip4Address sourceIp = Ip4Address.valueOf(arpRequest.getSenderProtocolAddress());
 
-        log.info("ARP request for " + targetProtocolAddress + " on port " + inPort.toString() + " from " + sourceIp);
+        log.info("ARP request for " + targetProtocolAddress + " received on port " + inPort.toString() + " from " + sourceIp);
 
-        checkNewSub(deviceId, inPort, sourceIp, ethPkt);
+        //checkNewSub(deviceId, inPort, sourceIp, ethPkt);
         // Check if this is an ARP for the switch
         boolean matchingInfoFound = false;
+        log.info("Checking among the " + routingInfos.size() + " routing infos");
         for (RoutingInfo info : routingInfos) {
+
+            log.info(info.toString());
 
             if (info.match(deviceId, inPort, targetProtocolAddress)) {
                 matchingInfoFound = true;
                 sendArpResponse(ethPkt, arpRequest, info.getMac(), info.getDeviceId(), inPort);
+            }
+
+            if (!matchingInfoFound) {
+                log.info("Did not match");
             }
 
         }
@@ -227,7 +242,7 @@ public class NoviBngPacketProcessor implements PacketProcessor {
         Ip4Address hostIpAddress = Ip4Address.valueOf(arpReply.getSenderProtocolAddress());
         MacAddress mac = MacAddress.valueOf(arpReply.getSenderHardwareAddress());
 
-        log.debug("ARP reply received from " + hostIpAddress + " : " + mac);
+        log.info("ARP reply received from " + hostIpAddress + " : " + mac);
 
 
         for (MacRequest request : macRequests) {
@@ -243,6 +258,9 @@ public class NoviBngPacketProcessor implements PacketProcessor {
         IPv4 ipPkt = (IPv4) ethPkt.getPayload();
 
         Ip4Address pingedIpAddress = Ip4Address.valueOf(ipPkt.getDestinationAddress());
+        Ip4Address sender = Ip4Address.valueOf(ipPkt.getSourceAddress());
+
+        log.info("ICMP request from " + sender + " to " + pingedIpAddress + " received on port " + inPort);
 
         for (RoutingInfo info : routingInfos) {
 
@@ -295,7 +313,7 @@ public class NoviBngPacketProcessor implements PacketProcessor {
                 treatment.build(), ByteBuffer.wrap(ethPkt.serialize()));
 
         packetService.emit(outPacket);
-        log.info("ICMP reply response from " + Ip4Address.valueOf(ipPkt.getDestinationAddress()) + " to "
+        log.info("ICMP response from " + Ip4Address.valueOf(ipPkt.getDestinationAddress()) + " to "
                 + Ip4Address.valueOf(ipPkt.getSourceAddress()) + " sent on port " + port.toString());
 
     }
@@ -369,8 +387,8 @@ public class NoviBngPacketProcessor implements PacketProcessor {
 
         //log.info("ARP integrated to Ethernet packet, ready to send");
 
-        arpReply.resetChecksum();
-        eth.resetChecksum();
+        //arpReply.resetChecksum();
+        //eth.resetChecksum();
 
         TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder();
         treatment.setOutput(dstPort);
