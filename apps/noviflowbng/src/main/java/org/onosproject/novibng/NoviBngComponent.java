@@ -32,6 +32,7 @@ import org.onlab.packet.Ethernet;
 import org.onlab.packet.IPv4;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
+import org.onosproject.incubator.net.meter.impl.MeterManager;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.flow.FlowRule;
@@ -90,6 +91,8 @@ public class NoviBngComponent {
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected PacketService packetService;
 
+
+    private MeterManager meterManager;
 
 
     static ApplicationId appId;
@@ -449,7 +452,7 @@ public class NoviBngComponent {
             downstreamBand.ofType(Band.Type.DROP);
             downstreamMeter.withBands(Collections.singleton(downstreamBand.build()));
 
-            //Meter finalDownstreamMeter = meterService.submit(downstreamMeter.add());
+            Meter finalDownstreamMeter = meterManager.submit(downstreamMeter.add());
 
 
             TrafficSelector.Builder selectorDownStream = DefaultTrafficSelector.builder();
@@ -459,7 +462,7 @@ public class NoviBngComponent {
 
 
             TrafficTreatment.Builder treatmentDownstream = DefaultTrafficTreatment.builder();
-            //treatmentDownstream.meter(finalDownstreamMeter.id());
+            treatmentDownstream.meter(finalDownstreamMeter.id());
             //routing
             treatmentDownstream.pushVlan();
             treatmentDownstream.setVlanId(subscriberInfo.getCTag());
@@ -492,7 +495,7 @@ public class NoviBngComponent {
                 selectorDownStream2.matchIPDst(subscriberIp.toIpPrefix());
 
                 TrafficTreatment.Builder treatmentDownstream2 = DefaultTrafficTreatment.builder();
-                //treatmentDownstream2.meter(finalDownstreamMeter.id());
+                treatmentDownstream2.meter(finalDownstreamMeter.id());
                 treatmentDownstream2.transition(tableInfo.getRootTable() + i + 1);
 
                 FlowRule.Builder ruleDownstream2 = DefaultFlowRule.builder();
@@ -521,7 +524,7 @@ public class NoviBngComponent {
             upstreamBand.ofType(Band.Type.DROP);
             uptreamMeter.withBands(Collections.singleton(upstreamBand.build()));
 
-            //Meter finalUpstreamMeter = meterService.submit(downstreamMeter.add());
+            Meter finalUpstreamMeter = meterManager.submit(downstreamMeter.add());
 
             TrafficSelector.Builder selectorUpstream = DefaultTrafficSelector.builder();
             selectorUpstream.matchEthType(Ethernet.TYPE_IPV4);
@@ -530,7 +533,7 @@ public class NoviBngComponent {
 
 
             TrafficTreatment.Builder treatmentUpstream = DefaultTrafficTreatment.builder();
-            //treatmentUpstream.meter(finalUpstreamMeter.id());
+            treatmentUpstream.meter(finalUpstreamMeter.id());
             treatmentUpstream.popVlan();
             treatmentUpstream.setEthSrc(matchingGatewayInfo.getGatewayMac());
             treatmentUpstream.setEthDst(processor.getMac(devicesConfig.get(deviceId).getPrimaryNextHopIp(), deviceId));
@@ -563,7 +566,7 @@ public class NoviBngComponent {
 
 
                 TrafficTreatment.Builder treatmentUpstream2 = DefaultTrafficTreatment.builder();
-                //treatmentUpstream2.meter(finalUpstreamMeter.id());
+                treatmentUpstream2.meter(finalUpstreamMeter.id());
                 treatmentUpstream2.transition(tableInfo.getRootTable() + i + 1);
 
                 FlowRule.Builder ruleUpstream2 = DefaultFlowRule.builder();

@@ -6,6 +6,7 @@ COMPILE_DEPS = [
   '//lib:javax.ws.rs-api',
   '//lib:jersey-server',
   '//utils/rest:onlab-rest',
+  '//incubator/net:onos-incubator-net',
 ]
 
 

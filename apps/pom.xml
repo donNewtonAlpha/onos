@@ -72,7 +72,7 @@
         <module>openstackinterface</module>
         <module>influxdbmetrics</module>
         <module>noviflowbng</module>
-        <!--<module>noviflowaggswitch</module>-->
+        <module>noviflowaggswitch</module>
         <module>gangliametrics</module>
         <module>graphitemetrics</module>
         <module>xosclient</module>

@@ -30,7 +30,7 @@ public class TablesInfo {
     public static final int MAX_SUBSCRIBERS = 2048;
     public static final int CONSECUTIVES_TABLES = 3;
 
-    public static final byte[] DSCP_LEVELS = {1, 2, 3};
+    public static final byte[] DSCP_LEVELS = {46, 10, 0};
 
 
     private List<Ip4Prefix> ipBlocks;

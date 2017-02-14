@@ -77,6 +77,12 @@
             <version>${onos.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.onosproject</groupId>
+            <artifactId>onos-incubator-net</artifactId>
+        </dependency>
+
+
 
     </dependencies>
 
