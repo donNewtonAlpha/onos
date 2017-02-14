@@ -33,7 +33,6 @@ import org.onlab.packet.IPv4;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.net.DeviceId;
-import org.onosproject.net.Port;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.flow.FlowRuleService;
@@ -226,7 +225,8 @@ public class NoviBngComponent {
 
         log.info("hardcoded config pushed");
 
-        allocateIpBlock(deviceId, Ip4Prefix.valueOf("10.20.1.0/24"), Ip4Address.valueOf("10.20.1.254"), MacAddress.valueOf("12:23:34:45:56:67"));
+        allocateIpBlock(deviceId, Ip4Prefix.valueOf("10.20.1.0/24"), Ip4Address.valueOf("10.20.1.254"),
+                MacAddress.valueOf("12:23:34:45:56:67"));
 
         log.info("hardcoded ip block allocated");
 
@@ -388,7 +388,8 @@ public class NoviBngComponent {
 
     }
 
-    public void modifySubscriber(Ip4Address subscriberIp, Ip4Address gatewayIp, int uploadSpeed, int downloadSpeed, DeviceId deviceId) {
+    public void modifySubscriber(Ip4Address subscriberIp, Ip4Address gatewayIp, int uploadSpeed, int downloadSpeed,
+                                 DeviceId deviceId) {
         //TODO:
         //verify if there is a difference with previous configuration
         //remove former config
@@ -410,8 +411,9 @@ public class NoviBngComponent {
                                    DeviceId deviceId) {
 
         if (subscriberInfo.getFlows().size() > 0) {
-            log.warn("subcriberInfo flows for subscriber " + subscriberIp + " contained " + subscriberInfo.getFlows().size() + " flow(s)");
-            for(FlowRule flow : subscriberInfo.getFlows()) {
+            log.warn("subcriberInfo flows for subscriber " + subscriberIp + " contained "
+                    + subscriberInfo.getFlows().size() + " flow(s)");
+            for (FlowRule flow : subscriberInfo.getFlows()) {
                 log.warn(flow.toString());
             }
 
@@ -835,7 +837,8 @@ public class NoviBngComponent {
             arpRequestIntercept(gwInfo.getGatewayIp(), deviceId);
             icmpIntercept(gwInfo.getGatewayIp(), deviceId);
             for (Ip4Prefix ipBlock : gwInfo.getIpBlocks()) {
-                processor.addRoutingInfo(deviceId, PortNumber.ANY, ipBlock, gwInfo.getGatewayIp(), gwInfo.getGatewayMac());
+                processor.addRoutingInfo(deviceId, PortNumber.ANY, ipBlock, gwInfo.getGatewayIp(),
+                        gwInfo.getGatewayMac());
             }
 
         }

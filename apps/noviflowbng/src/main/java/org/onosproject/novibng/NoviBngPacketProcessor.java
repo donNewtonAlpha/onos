@@ -128,7 +128,8 @@ public class NoviBngPacketProcessor implements PacketProcessor {
                     MacAddress sourceMac = ethPkt.getSourceMAC();
                     VlanId vlanId = VlanId.vlanId(ethPkt.getVlanID());
                     handleArpRequest(deviceId, inPort, ethPkt);
-                    checkNewSub(deviceId, inPort, Ip4Address.valueOf(arp.getSenderProtocolAddress()), sourceMac, vlanId);
+                    checkNewSub(deviceId, inPort, Ip4Address.valueOf(arp.getSenderProtocolAddress()),
+                            sourceMac, vlanId);
                 } else {
                     log.debug("It is an ARP reply");
                     handleArpReply(deviceId, inPort, ethPkt);
@@ -174,7 +175,8 @@ public class NoviBngPacketProcessor implements PacketProcessor {
         }
     }
 
-    private void checkNewSub(DeviceId deviceId, PortNumber inPort, Ip4Address subIp, MacAddress subMac, VlanId subVlan) {
+    private void checkNewSub(DeviceId deviceId, PortNumber inPort, Ip4Address subIp,
+                             MacAddress subMac, VlanId subVlan) {
 
         log.info("Checking for new subscriber : " + subIp);
 
@@ -209,7 +211,8 @@ public class NoviBngPacketProcessor implements PacketProcessor {
                 arpRequest.getTargetProtocolAddress());
         Ip4Address sourceIp = Ip4Address.valueOf(arpRequest.getSenderProtocolAddress());
 
-        log.info("ARP request for " + targetProtocolAddress + " received on port " + inPort.toString() + " from " + sourceIp);
+        log.info("ARP request for " + targetProtocolAddress + " received on port " + inPort.toString()
+                + " from " + sourceIp);
 
         // Check if this is an ARP for the switch
         boolean matchingInfoFound = false;

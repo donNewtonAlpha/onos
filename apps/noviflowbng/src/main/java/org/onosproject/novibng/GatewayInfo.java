@@ -19,7 +19,6 @@ package org.onosproject.novibng;
 import org.onlab.packet.Ip4Address;
 import org.onlab.packet.Ip4Prefix;
 import org.onlab.packet.MacAddress;
-import org.onosproject.net.Link;
 
 import java.util.LinkedList;
 import java.util.List;
