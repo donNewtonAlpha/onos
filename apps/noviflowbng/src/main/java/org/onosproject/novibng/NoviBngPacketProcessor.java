@@ -219,16 +219,16 @@ public class NoviBngPacketProcessor implements PacketProcessor {
         //log.info("Checking among the " + routingInfos.size() + " routing infos");
         for (RoutingInfo info : routingInfos) {
 
-            log.info(info.toString());
+            //log.info(info.toString());
 
             if (info.match(deviceId, inPort, targetProtocolAddress)) {
                 matchingInfoFound = true;
                 sendArpResponse(ethPkt, arpRequest, info.getMac(), info.getDeviceId(), inPort);
             }
 
-            if (!matchingInfoFound) {
+            /*if (!matchingInfoFound) {
                 log.info("Did not match");
-            }
+            }*/
 
         }
 
