@@ -92,7 +92,7 @@ public class NoviBngComponent {
     protected PacketService packetService;
 
 
-    private MeterManager meterManager;
+    //private MeterManager meterService;
 
 
     static ApplicationId appId;
@@ -138,8 +138,8 @@ public class NoviBngComponent {
         instance = this;
         appId = coreService.registerApplication("org.onosproject.novibng");
 
-        meterManager = new MeterManager();
-        meterManager.activate();
+        //meterService = new MeterManager();
+        //meterService.activate();
 
         //Multicast
         //multicastHandlers = new HashMap<>();
@@ -453,7 +453,7 @@ public class NoviBngComponent {
             downstreamBand.ofType(Band.Type.DROP);
             downstreamMeter.withBands(Collections.singleton(downstreamBand.build()));
 
-            Meter finalDownstreamMeter = meterManager.submit(downstreamMeter.add());
+            Meter finalDownstreamMeter = meterService.submit(downstreamMeter.add());
 
 
             TrafficSelector.Builder selectorDownStream = DefaultTrafficSelector.builder();
@@ -525,7 +525,7 @@ public class NoviBngComponent {
             upstreamBand.ofType(Band.Type.DROP);
             uptreamMeter.withBands(Collections.singleton(upstreamBand.build()));
 
-            Meter finalUpstreamMeter = meterManager.submit(downstreamMeter.add());
+            Meter finalUpstreamMeter = meterService.submit(downstreamMeter.add());
 
             TrafficSelector.Builder selectorUpstream = DefaultTrafficSelector.builder();
             selectorUpstream.matchEthType(Ethernet.TYPE_IPV4);
