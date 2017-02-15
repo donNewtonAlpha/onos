@@ -32,7 +32,6 @@ import org.onlab.packet.Ethernet;
 import org.onlab.packet.IPv4;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
-import org.onosproject.incubator.net.meter.impl.MeterManager;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.flow.FlowRule;
@@ -629,6 +628,7 @@ public class NoviBngComponent {
             //Upstream flow
 
             TrafficSelector.Builder selectorUpstream = DefaultTrafficSelector.builder();
+            selectorUpstream.matchEthType(Ethernet.TYPE_IPV4);
             selectorUpstream.matchIPDscp(TablesInfo.DSCP_LEVELS[i]);
             selectorUpstream.matchIPSrc(ipBlock);
 
