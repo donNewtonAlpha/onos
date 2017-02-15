@@ -645,7 +645,7 @@ public class NoviBngComponent {
             ruleUpstream.forDevice(deviceId);
             ruleUpstream.makePermanent();
 
-            flowRuleService.applyFlowRules(ruleDownstream.build());
+            flowRuleService.applyFlowRules(ruleUpstream.build());
 
         }
     }
