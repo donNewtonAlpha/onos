@@ -139,6 +139,7 @@ public class NoviBngComponent {
         appId = coreService.registerApplication("org.onosproject.novibng");
 
         meterManager = new MeterManager();
+        meterManager.activate();
 
         //Multicast
         //multicastHandlers = new HashMap<>();
