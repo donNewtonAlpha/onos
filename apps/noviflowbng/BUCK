@@ -21,7 +21,7 @@ osgi_jar_with_tests (
 
 onos_app (
   title = 'NoviFlow vBNG',
-  category = 'Traffic Steering',
+  category = 'Network Function',
   url = 'http://onosproject.org',
   description = 'app to implement a vBNG on a NoviFlow.',
 )
