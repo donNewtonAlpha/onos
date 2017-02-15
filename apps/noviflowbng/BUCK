@@ -12,6 +12,7 @@ COMPILE_DEPS = [
 
 osgi_jar_with_tests (
   deps = COMPILE_DEPS,
+  web_context = '/onos/novibng',
   api_title = 'ONOS NoviBng REST API',
   api_version = '1.0',
   api_description = 'APIs for interacting with the Noviflow BNG application.',

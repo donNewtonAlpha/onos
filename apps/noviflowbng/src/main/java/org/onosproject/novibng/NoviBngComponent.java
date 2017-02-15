@@ -239,7 +239,7 @@ public class NoviBngComponent {
 
         log.info("Mac for " + nextHopIp + " : " + processor.getMac(nextHopIp, deviceId));
 
-        addSubscriber(subIp, Ip4Address.valueOf("10.20.1.254"), 1000, 1000, deviceId);
+        addSubscriber(subIp, Ip4Address.valueOf("10.20.1.254"), 1000, 2000, deviceId);
 
         log.info("hardcoded subscriber set up");
 
