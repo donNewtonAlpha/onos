@@ -220,7 +220,7 @@ public class NoviBngComponent {
                         24,
                         MacAddress.valueOf("54:32:10:54:32:10"),
                         MacAddress.valueOf("98:76:54:98:76:54"),
-                        PortNumber.portNumber(12),
+                        PortNumber.portNumber(2),
                         PortNumber.portNumber(8),
                         nextHopIp,
                         Ip4Address.valueOf("20.20.1.3"));
