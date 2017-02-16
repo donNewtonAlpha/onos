@@ -520,7 +520,7 @@ public class NoviBngComponent {
             uptreamMeter.fromApp(appId);
             uptreamMeter.withUnit(Meter.Unit.KB_PER_SEC);
             Band.Builder upstreamBand = DefaultBand.builder();
-            upstreamBand.withRate(subscriberInfo.getDownloadSpeed());
+            upstreamBand.withRate(subscriberInfo.getUploadSpeed());
             upstreamBand.ofType(Band.Type.DROP);
             uptreamMeter.withBands(Collections.singleton(upstreamBand.build()));
 

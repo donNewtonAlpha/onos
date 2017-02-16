@@ -4,7 +4,6 @@ COMPILE_DEPS = [
   '//lib:org.apache.karaf.shell.console',
   '//core/api:onos-api',
   '//lib:javax.ws.rs-api',
-  '//lib:jersey-server',
   '//utils/rest:onlab-rest',
   '//incubator/net:onos-incubator-net',
 ]
