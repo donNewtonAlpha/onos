@@ -73,7 +73,7 @@ public class RestNoviBng extends AbstractWebResource {
     /**
      * Allocate a new Ip block.
      *
-     * @param stream JSON encoded description of ip block to be allocated
+     *
      * @return 200 ok
      */
     public Response allocateIpBlock(InputStream stream) {
@@ -122,7 +122,7 @@ public class RestNoviBng extends AbstractWebResource {
     /**
      * Provision a subscriber.
      *
-     * @param stream JSON desciption of the subscriber to be provisionned
+     *
      * @return 200 ok
      */
     public Response provisionSubscriber(InputStream stream) {
@@ -176,7 +176,7 @@ public class RestNoviBng extends AbstractWebResource {
      *
      *
      * @return 200 ok
-     * @param stream JSON config for the BNG
+     *
      */
     public Response config(InputStream stream) {
 
