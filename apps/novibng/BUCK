@@ -2,10 +2,11 @@ COMPILE_DEPS = [
   '//lib:CORE_DEPS',
   '//core/store/serializers:onos-core-serializers',
   '//lib:org.apache.karaf.shell.console',
+  '//cli:onos-cli',
   '//core/api:onos-api',
   '//lib:javax.ws.rs-api',
+  '//lib:jersey-server',
   '//utils/rest:onlab-rest',
-  '//incubator/net:onos-incubator-net',
 ]
 
 
