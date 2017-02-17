@@ -27,7 +27,7 @@
         <init-param>
             <param-name>com.sun.jersey.config.property.classnames</param-name>
             <param-value>
-                org.onosproject.novibng.web.RestNoviAggSwitch
+                org.onosproject.novibng.web.RestNoviBng
             </param-value>
         </init-param>
         <load-on-startup>1</load-on-startup>
