@@ -28,10 +28,7 @@ import org.slf4j.Logger;
 import org.onosproject.novibng.NoviBngComponent;
 import org.onosproject.novibng.config.BngDeviceConfig;
 
-import javax.ws.rs.Path;
-import javax.ws.rs.POST;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.Produces;
+import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
@@ -65,6 +62,23 @@ public class RestNoviBng extends AbstractWebResource {
     private static final String UPLOAD_SPEED = "uploadSpeed";
     private static final String DOWNLOAD_SPEED = "downstreamSpeed";
 
+
+
+    @GET
+    @Path("test")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    /**
+     * test REST interface
+     *
+     *
+     * @return 200 ok
+     */
+    public Response test(InputStream stream) {
+
+        return Response.ok().build();
+
+    }
 
     @POST
     @Path("allocateIpBlock")
