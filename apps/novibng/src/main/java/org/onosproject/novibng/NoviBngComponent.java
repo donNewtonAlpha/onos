@@ -455,40 +455,8 @@ public class NoviBngComponent {
             Meter finalDownstreamMeter = meterService.submit(downstreamMeter.add());
 
 
-            TrafficSelector.Builder selectorDownStream = DefaultTrafficSelector.builder();
-            selectorDownStream.matchEthType(Ethernet.TYPE_IPV4);
-            selectorDownStream.matchIPDscp(TablesInfo.DSCP_LEVELS[i]);
-            selectorDownStream.matchIPDst(subscriberIp.toIpPrefix());
-
-
-            TrafficTreatment.Builder treatmentDownstream = DefaultTrafficTreatment.builder();
-            treatmentDownstream.meter(finalDownstreamMeter.id());
-            //routing
-            treatmentDownstream.pushVlan();
-            treatmentDownstream.setVlanId(subscriberInfo.getCTag());
-            treatmentDownstream.setEthSrc(matchingGatewayInfo.getGatewayMac());
-            treatmentDownstream.setEthDst(subscriberInfo.getMac());
-            treatmentDownstream.setQueue(i);
-            treatmentDownstream.setOutput(subscriberInfo.getPort());
             if (i < TablesInfo.CONSECUTIVES_TABLES - 1) {
-                treatmentDownstream.transition(tableInfo.getRootTable() + i + 1);
-            }
-
-            FlowRule.Builder ruleDownstream = DefaultFlowRule.builder();
-            ruleDownstream.withSelector(selectorDownStream.build());
-            ruleDownstream.withTreatment(treatmentDownstream.build());
-            ruleDownstream.withPriority(SUBSCRIBER_DOWNSTREAM_EXIT_PRIORITY);
-            ruleDownstream.forTable(tableInfo.getRootTable() + i);
-            ruleDownstream.fromApp(appId);
-            ruleDownstream.forDevice(deviceId);
-            ruleDownstream.makePermanent();
-
-            FlowRule flowDownstream = ruleDownstream.build();
-
-            //flowRuleService.applyFlowRules(flowDownstream);
-            subscriberInfo.addFlow(flowDownstream);
-
-            if (i > 0 && i < (TablesInfo.CONSECUTIVES_TABLES - 1)) {
+                //Transition to next table flow
 
                 TrafficSelector.Builder selectorDownStream2 = DefaultTrafficSelector.builder();
                 selectorDownStream2.matchEthType(Ethernet.TYPE_IPV4);
@@ -511,7 +479,45 @@ public class NoviBngComponent {
 
                 //flowRuleService.applyFlowRules(flowDownstream2);
                 subscriberInfo.addFlow(flowDownstream2);
+
+            } else {
+
+                for (int j = 0; j < TablesInfo.CONSECUTIVES_TABLES; j++) {
+
+
+                    TrafficSelector.Builder selectorDownStream = DefaultTrafficSelector.builder();
+                    selectorDownStream.matchEthType(Ethernet.TYPE_IPV4);
+                    selectorDownStream.matchIPDscp(TablesInfo.DSCP_LEVELS[i]);
+                    selectorDownStream.matchIPDst(subscriberIp.toIpPrefix());
+
+
+                    TrafficTreatment.Builder treatmentDownstream = DefaultTrafficTreatment.builder();
+                    treatmentDownstream.meter(finalDownstreamMeter.id());
+                    //routing
+                    treatmentDownstream.pushVlan();
+                    treatmentDownstream.setVlanId(subscriberInfo.getCTag());
+                    treatmentDownstream.setEthSrc(matchingGatewayInfo.getGatewayMac());
+                    treatmentDownstream.setEthDst(subscriberInfo.getMac());
+                    treatmentDownstream.setQueue(i);
+                    treatmentDownstream.setOutput(subscriberInfo.getPort());
+
+
+                    FlowRule.Builder ruleDownstream = DefaultFlowRule.builder();
+                    ruleDownstream.withSelector(selectorDownStream.build());
+                    ruleDownstream.withTreatment(treatmentDownstream.build());
+                    ruleDownstream.withPriority(SUBSCRIBER_DOWNSTREAM_EXIT_PRIORITY);
+                    ruleDownstream.forTable(tableInfo.getRootTable() + i);
+                    ruleDownstream.fromApp(appId);
+                    ruleDownstream.forDevice(deviceId);
+                    ruleDownstream.makePermanent();
+
+                    FlowRule flowDownstream = ruleDownstream.build();
+
+                    //flowRuleService.applyFlowRules(flowDownstream);
+                    subscriberInfo.addFlow(flowDownstream);
+                }
             }
+
 
             //Upstream flow
 
@@ -526,39 +532,7 @@ public class NoviBngComponent {
 
             Meter finalUpstreamMeter = meterService.submit(downstreamMeter.add());
 
-            TrafficSelector.Builder selectorUpstream = DefaultTrafficSelector.builder();
-            selectorUpstream.matchEthType(Ethernet.TYPE_IPV4);
-            selectorUpstream.matchIPDscp(TablesInfo.DSCP_LEVELS[i]);
-            selectorUpstream.matchIPSrc(subscriberIp.toIpPrefix());
-
-
-            TrafficTreatment.Builder treatmentUpstream = DefaultTrafficTreatment.builder();
-            treatmentUpstream.meter(finalUpstreamMeter.id());
-            treatmentUpstream.popVlan();
-            treatmentUpstream.setEthSrc(matchingGatewayInfo.getGatewayMac());
-            treatmentUpstream.setEthDst(processor.getMac(devicesConfig.get(deviceId).getPrimaryNextHopIp(), deviceId));
-            treatmentUpstream.setQueue(i);
-            treatmentUpstream.setOutput(devicesConfig.get(deviceId).getPrimaryLinkPort());
             if (i < TablesInfo.CONSECUTIVES_TABLES - 1) {
-                treatmentUpstream.transition(tableInfo.getRootTable() + i + 1);
-            }
-
-            FlowRule.Builder ruleUpstream = DefaultFlowRule.builder();
-            ruleUpstream.withSelector(selectorUpstream.build());
-            ruleUpstream.withTreatment(treatmentUpstream.build());
-            ruleUpstream.withPriority(SUBSCRIBER_UPSTREAM_EXIT_PRIORITY);
-            ruleUpstream.forTable(tableInfo.getRootTable() + i);
-            ruleUpstream.fromApp(appId);
-            ruleUpstream.forDevice(deviceId);
-            ruleUpstream.makePermanent();
-
-
-            FlowRule flowUpstream = ruleUpstream.build();
-
-            //flowRuleService.applyFlowRules(flowUpstream);
-            subscriberInfo.addFlow(flowUpstream);
-
-            if (i > 0 && i < (TablesInfo.CONSECUTIVES_TABLES - 1)) {
 
                 TrafficSelector.Builder selectorUpstream2 = DefaultTrafficSelector.builder();
                 selectorUpstream2.matchEthType(Ethernet.TYPE_IPV4);
@@ -583,7 +557,41 @@ public class NoviBngComponent {
                 //flowRuleService.applyFlowRules(flowUpstream2);
                 subscriberInfo.addFlow(flowUpstream2);
 
+            } else {
+
+                TrafficSelector.Builder selectorUpstream = DefaultTrafficSelector.builder();
+                selectorUpstream.matchEthType(Ethernet.TYPE_IPV4);
+                selectorUpstream.matchIPDscp(TablesInfo.DSCP_LEVELS[i]);
+                selectorUpstream.matchIPSrc(subscriberIp.toIpPrefix());
+
+
+                TrafficTreatment.Builder treatmentUpstream = DefaultTrafficTreatment.builder();
+                treatmentUpstream.meter(finalUpstreamMeter.id());
+                treatmentUpstream.popVlan();
+                treatmentUpstream.setEthSrc(matchingGatewayInfo.getGatewayMac());
+                treatmentUpstream.setEthDst(processor.getMac(devicesConfig.get(deviceId).getPrimaryNextHopIp(), deviceId));
+                treatmentUpstream.setQueue(i);
+                treatmentUpstream.setOutput(devicesConfig.get(deviceId).getPrimaryLinkPort());
+
+
+                FlowRule.Builder ruleUpstream = DefaultFlowRule.builder();
+                ruleUpstream.withSelector(selectorUpstream.build());
+                ruleUpstream.withTreatment(treatmentUpstream.build());
+                ruleUpstream.withPriority(SUBSCRIBER_UPSTREAM_EXIT_PRIORITY);
+                ruleUpstream.forTable(tableInfo.getRootTable() + i);
+                ruleUpstream.fromApp(appId);
+                ruleUpstream.forDevice(deviceId);
+                ruleUpstream.makePermanent();
+
+
+                FlowRule flowUpstream = ruleUpstream.build();
+
+                //flowRuleService.applyFlowRules(flowUpstream);
+                subscriberInfo.addFlow(flowUpstream);
+
             }
+
+
         }
 
         log.info("All flows for subscriber " + subscriberIp + " are ready to be added");
