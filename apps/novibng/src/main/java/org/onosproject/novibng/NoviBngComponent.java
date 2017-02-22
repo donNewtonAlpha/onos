@@ -234,11 +234,13 @@ public class NoviBngComponent {
         log.info("hardcoded ip block allocated");
 
         Ip4Address subIp = Ip4Address.valueOf("10.20.1.2");
+        Ip4Address subIp2 = Ip4Address.valueOf("10.20.1.3");
 
 
         log.info("Mac for " + nextHopIp + " : " + processor.getMac(nextHopIp, deviceId));
 
         addSubscriber(subIp, Ip4Address.valueOf("10.20.1.254"), 1000, 2000, deviceId);
+        addSubscriber(subIp2, Ip4Address.valueOf("10.20.1.254"), 10000, 20000, deviceId);
 
         log.info("hardcoded subscriber set up");
 
