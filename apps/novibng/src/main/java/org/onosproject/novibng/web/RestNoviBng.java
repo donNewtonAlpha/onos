@@ -84,16 +84,16 @@ public class RestNoviBng extends AbstractWebResource {
 
     }
 
-    @POST
+    /*@POST
     @Path("allocateIpBlock")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    /**
+    *//**
      * Allocate a new Ip block.
      *
      *
      * @return 200 ok
-     */
+     *//*
     public Response allocateIpBlock(InputStream stream) {
 
         try {
@@ -137,12 +137,12 @@ public class RestNoviBng extends AbstractWebResource {
     @Path("addSubscriber")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    /**
+    *//**
      * Provision a subscriber.
      *
      *
      * @return 200 ok
-     */
+     *//*
     public Response provisionSubscriber(InputStream stream) {
 
         try {
@@ -189,13 +189,13 @@ public class RestNoviBng extends AbstractWebResource {
     @Path("config")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    /**
+    *//**
      * Add/modify the config for one device.
      *
      *
      * @return 200 ok
      *
-     */
+     *//*
     public Response config(InputStream stream) {
 
         try {
@@ -256,6 +256,6 @@ public class RestNoviBng extends AbstractWebResource {
         }
 
         return Response.status(406).build();
-    }
+    }*/
 
 }
