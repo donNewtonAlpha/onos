@@ -45,6 +45,17 @@
                     instance = this;
                     this.model = null;
                 },
+                addLayout: function (data) {
+
+                    // TODO: Dynamically change the Geo Map from the layout data
+
+                    if (data.bgType === 'grid') {
+                        t2sls.loadLayout(data.bgId);
+                        t2sls.show();
+                    } else {
+                        t2sls.hide();
+                    }
+                },
                 addRegion: function (data) {
 
                     var RegionModel = Model.extend({
@@ -73,13 +84,6 @@
                         t2bcs.hide();
                     }
 
-                    // TODO: This should load the sprite layer from the region data
-                    if (this.model.get('id') === 'c01') {
-                        t2sls.loadLayout('segmentRouting');
-                        t2sls.show();
-                    } else {
-                        t2sls.hide();
-                    }
                 },
                 isRootRegion: function () {
                     return this.model.get('id') === ROOT;
@@ -183,7 +187,7 @@
 
                     if (event.memo === 'added') {
                         device = this.model.get('devices').add(event.data);
-                        $log('Added device', device)
+                        $log.debug('Added device', device);
                     } else if (event.memo === 'updated') {
                         device = this.getDevice(event.subject);
                         device.set(event.data);

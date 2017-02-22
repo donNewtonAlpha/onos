@@ -52,6 +52,7 @@ import org.onosproject.net.link.LinkStoreDelegate;
 import org.onosproject.net.provider.AbstractProviderService;
 import org.slf4j.Logger;
 
+import java.util.Optional;
 import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -260,7 +261,7 @@ public class LinkManager
             if (isAllowed(cfg) && isAllowed(cfgTwo)) {
                 return BasicLinkOperator.combine(cfg, linkDescription);
             } else {
-                log.trace("Link " + linkDescription.toString() + " is not allowed");
+                log.trace("Link {} is not allowed", linkDescription);
                 return null;
             }
         }
@@ -357,9 +358,12 @@ public class LinkManager
                 rldesc = BasicLinkOperator.combine(cfg,
                             BasicLinkOperator.descriptionOf(lk.dst(), lk.src(), link));
             }
-            // XXX think of sane way to fetch the LinkProvider
-            store.createOrUpdateLink(ProviderId.NONE, fldesc);
-            store.createOrUpdateLink(ProviderId.NONE, rldesc);
+
+            ProviderId pid = Optional.ofNullable(link)
+                                .map(Link::providerId)
+                                .orElse(ProviderId.NONE);
+            store.createOrUpdateLink(pid, fldesc);
+            store.createOrUpdateLink(pid, rldesc);
         }
 
     }

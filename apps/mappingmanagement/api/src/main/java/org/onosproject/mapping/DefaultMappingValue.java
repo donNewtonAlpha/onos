@@ -15,8 +15,23 @@
  */
 package org.onosproject.mapping;
 
+import org.onosproject.mapping.addresses.MappingAddress;
+import org.onosproject.mapping.instructions.MappingInstruction;
+
+import java.util.List;
+
 /**
  * Default mapping value implementation.
  */
 public class DefaultMappingValue implements MappingValue {
+
+    @Override
+    public MappingAddress address() {
+        return null;
+    }
+
+    @Override
+    public List<MappingInstruction> instructions() {
+        return null;
+    }
 }

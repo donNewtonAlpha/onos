@@ -21,7 +21,9 @@ import java.util.Set;
 
 /**
  * Means to alter a device's dataplane queues.
+ * @deprecated in Junco (1.9.1), use QueueConfigBehaviour instead
  */
+@Deprecated
 public interface QueueConfig {
 
     /**

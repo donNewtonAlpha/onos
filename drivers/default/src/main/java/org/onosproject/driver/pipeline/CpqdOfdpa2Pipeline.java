@@ -19,7 +19,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import org.onlab.packet.Ethernet;
 import org.onlab.packet.IpPrefix;
-import org.onlab.packet.MacAddress;
 import org.onlab.packet.VlanId;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.net.Port;
@@ -64,6 +63,8 @@ import java.util.Deque;
 import java.util.List;
 
 import static org.onlab.packet.IPv6.PROTOCOL_ICMP6;
+import static org.onlab.packet.MacAddress.BROADCAST;
+import static org.onlab.packet.MacAddress.NONE;
 import static org.slf4j.LoggerFactory.getLogger;
 
 
@@ -168,7 +169,7 @@ public class CpqdOfdpa2Pipeline extends Ofdpa2Pipeline {
             }
         }
 
-        if (ethCriterion == null || ethCriterion.mac().equals(MacAddress.NONE)) {
+        if (ethCriterion == null || ethCriterion.mac().equals(NONE)) {
             log.debug("filtering objective missing dstMac, cannot program TMAC table");
         } else {
             for (FlowRule tmacRule : processEthDstFilter(portCriterion, ethCriterion,
@@ -639,7 +640,7 @@ public class CpqdOfdpa2Pipeline extends Ofdpa2Pipeline {
         TrafficSelector.Builder filteredSelectorBuilder =
                 DefaultTrafficSelector.builder();
         // Do not match MacAddress for subnet broadcast entry
-        if (!ethCriterion.mac().equals(MacAddress.NONE)) {
+        if (!ethCriterion.mac().equals(NONE) && !ethCriterion.mac().equals(BROADCAST)) {
             filteredSelectorBuilder.matchEthDst(ethCriterion.mac());
             log.debug("processing L2 forwarding objective:{} -> next:{} in dev:{}",
                     fwd.id(), fwd.nextId(), deviceId);
@@ -790,8 +791,7 @@ public class CpqdOfdpa2Pipeline extends Ofdpa2Pipeline {
     @Override
     protected void initializePipeline() {
         processPortTable();
-        // vlan table processing not required, as default is to drop packets
-        // which can be accomplished without a table-miss-entry.
+        processVlanTable();
         processTmacTable();
         processIpTable();
         processMulticastIpTable();
@@ -818,12 +818,40 @@ public class CpqdOfdpa2Pipeline extends Ofdpa2Pipeline {
         flowRuleService.apply(ops.build(new FlowRuleOperationsContext() {
             @Override
             public void onSuccess(FlowRuleOperations ops) {
-                log.info("Initialized port table");
+                log.info("Initialized port table on {}", deviceId);
             }
 
             @Override
             public void onError(FlowRuleOperations ops) {
-                log.info("Failed to initialize port table");
+                log.warn("Failed to initialize port table on {}", deviceId);
+            }
+        }));
+    }
+
+    protected void processVlanTable() {
+        //table miss entry
+        FlowRuleOperations.Builder ops = FlowRuleOperations.builder();
+        TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
+        TrafficTreatment.Builder treatment = DefaultTrafficTreatment.builder().wipeDeferred();
+        treatment.transition(ACL_TABLE);
+        FlowRule rule = DefaultFlowRule.builder()
+                .forDevice(deviceId)
+                .withSelector(selector.build())
+                .withTreatment(treatment.build())
+                .withPriority(LOWEST_PRIORITY)
+                .fromApp(driverId)
+                .makePermanent()
+                .forTable(VLAN_TABLE).build();
+        ops =  ops.add(rule);
+        flowRuleService.apply(ops.build(new FlowRuleOperationsContext() {
+            @Override
+            public void onSuccess(FlowRuleOperations ops) {
+                log.info("Initialized vlan table on {}", deviceId);
+            }
+
+            @Override
+            public void onError(FlowRuleOperations ops) {
+                log.warn("Failed to initialize vlan table on {}", deviceId);
             }
         }));
     }
@@ -846,12 +874,12 @@ public class CpqdOfdpa2Pipeline extends Ofdpa2Pipeline {
         flowRuleService.apply(ops.build(new FlowRuleOperationsContext() {
             @Override
             public void onSuccess(FlowRuleOperations ops) {
-                log.info("Initialized tmac table");
+                log.info("Initialized tmac table on {}", deviceId);
             }
 
             @Override
             public void onError(FlowRuleOperations ops) {
-                log.info("Failed to initialize tmac table");
+                log.warn("Failed to initialize tmac table on {}", deviceId);
             }
         }));
     }
@@ -874,12 +902,12 @@ public class CpqdOfdpa2Pipeline extends Ofdpa2Pipeline {
         flowRuleService.apply(ops.build(new FlowRuleOperationsContext() {
             @Override
             public void onSuccess(FlowRuleOperations ops) {
-                log.info("Initialized IP table");
+                log.info("Initialized IP table on {}", deviceId);
             }
 
             @Override
             public void onError(FlowRuleOperations ops) {
-                log.info("Failed to initialize unicast IP table");
+                log.warn("Failed to initialize unicast IP table on {}", deviceId);
             }
         }));
     }
@@ -902,12 +930,12 @@ public class CpqdOfdpa2Pipeline extends Ofdpa2Pipeline {
         flowRuleService.apply(ops.build(new FlowRuleOperationsContext() {
             @Override
             public void onSuccess(FlowRuleOperations ops) {
-                log.info("Initialized multicast IP table");
+                log.info("Initialized multicast IP table on {}", deviceId);
             }
 
             @Override
             public void onError(FlowRuleOperations ops) {
-                log.info("Failed to initialize multicast IP table");
+                log.warn("Failed to initialize multicast IP table on {}", deviceId);
             }
         }));
     }
@@ -944,12 +972,12 @@ public class CpqdOfdpa2Pipeline extends Ofdpa2Pipeline {
         flowRuleService.apply(ops.build(new FlowRuleOperationsContext() {
             @Override
             public void onSuccess(FlowRuleOperations ops) {
-                log.info("Initialized MPLS tables");
+                log.info("Initialized MPLS tables on {}", deviceId);
             }
 
             @Override
             public void onError(FlowRuleOperations ops) {
-                log.info("Failed to initialize MPLS tables");
+                log.warn("Failed to initialize MPLS tables on {}", deviceId);
             }
         }));
     }
@@ -972,12 +1000,12 @@ public class CpqdOfdpa2Pipeline extends Ofdpa2Pipeline {
         flowRuleService.apply(ops.build(new FlowRuleOperationsContext() {
             @Override
             public void onSuccess(FlowRuleOperations ops) {
-                log.info("Initialized Bridging table");
+                log.info("Initialized Bridging table on {}", deviceId);
             }
 
             @Override
             public void onError(FlowRuleOperations ops) {
-                log.info("Failed to initialize Bridging table");
+                log.warn("Failed to initialize Bridging table on {}", deviceId);
             }
         }));
     }
@@ -999,12 +1027,12 @@ public class CpqdOfdpa2Pipeline extends Ofdpa2Pipeline {
         flowRuleService.apply(ops.build(new FlowRuleOperationsContext() {
             @Override
             public void onSuccess(FlowRuleOperations ops) {
-                log.info("Initialized Acl table");
+                log.info("Initialized Acl table on {}", deviceId);
             }
 
             @Override
             public void onError(FlowRuleOperations ops) {
-                log.info("Failed to initialize Acl table");
+                log.warn("Failed to initialize Acl table on {}", deviceId);
             }
         }));
     }

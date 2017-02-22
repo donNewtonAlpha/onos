@@ -15,8 +15,35 @@
  */
 package org.onosproject.mapping;
 
+import org.onosproject.mapping.addresses.MappingAddress;
+
 /**
- * Abstraction of key of mapping information.
+ * Abstraction of network mapping key.
  */
 public interface MappingKey {
+
+    /**
+     * Returns a mapping address.
+     *
+     * @return a mapping address
+     */
+    MappingAddress address();
+
+    interface Builder {
+
+        /**
+         * Specifies a mapping address.
+         *
+         * @param address mapping address
+         * @return a mapping key builder
+         */
+        Builder withAddress(MappingAddress address);
+
+        /**
+         * Builds an immutable mapping key.
+         *
+         * @return a mapping key
+         */
+        MappingKey build();
+    }
 }

@@ -129,10 +129,10 @@ public class DeviceKey extends AbstractAnnotated {
     /**
      * Method to create a device key of type USERNAME_PASSWORD.
      *
-     * @param id    device key identifier
-     * @param label optional label for this device key
-     * @param username username for this device key
-     * @param password password for this device key
+     * @param id       device key identifier
+     * @param label    optional label for this device key
+     * @param username username for accessing this device
+     * @param password password for accessing this device
      * @return device key
      */
     public static DeviceKey createDeviceKeyUsingUsernamePassword(DeviceKeyId id, String label,
@@ -141,6 +141,25 @@ public class DeviceKey extends AbstractAnnotated {
                 .set(AnnotationKeys.PASSWORD, password).build();
 
         return new DeviceKey(id, label, Type.USERNAME_PASSWORD, annotations);
+    }
+
+    /**
+     * Method to create a device key of type SSL_KEY.
+     *
+     * @param id       device key identifier
+     * @param label    optional label for this device key
+     * @param username username for accessing this device
+     * @param password password for accessing this device SSH key
+     * @param sshkey   SSH key for accessing this device
+     * @return device key
+     */
+    public static DeviceKey createDeviceKeyUsingSshKey(DeviceKeyId id, String label,
+                                                       String username, String password, String sshkey) {
+        DefaultAnnotations annotations = builder().set(AnnotationKeys.USERNAME, username)
+                .set(AnnotationKeys.PASSWORD, password)
+                .set(AnnotationKeys.SSHKEY, sshkey).build();
+
+        return new DeviceKey(id, label, Type.SSL_KEY, annotations);
     }
 
     /**

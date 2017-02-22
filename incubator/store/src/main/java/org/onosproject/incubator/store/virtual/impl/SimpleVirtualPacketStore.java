@@ -33,6 +33,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Simple single instance implementation of the virtual packet store.
+ */
 public class SimpleVirtualPacketStore
         extends AbstractVirtualStore<PacketEvent, PacketStoreDelegate>
         implements VirtualNetworkPacketStore {
@@ -51,6 +54,9 @@ public class SimpleVirtualPacketStore
 
         requests.get(networkId).compute(request.selector(), (s, existingRequests) -> {
             if (existingRequests == null) {
+                if (hasDelegate(networkId)) {
+                    delegateMap.get(networkId).requestPackets(request);
+                }
                 return ImmutableSet.of(request);
             } else if (!existingRequests.contains(request)) {
                 if (hasDelegate(networkId)) {
@@ -72,12 +78,12 @@ public class SimpleVirtualPacketStore
             if (existingRequests.contains(request)) {
                 HashSet<PacketRequest> newRequests = Sets.newHashSet(existingRequests);
                 newRequests.remove(request);
+                if (hasDelegate(networkId)) {
+                    delegateMap.get(networkId).cancelPackets(request);
+                }
                 if (newRequests.size() > 0) {
                     return ImmutableSet.copyOf(newRequests);
                 } else {
-                    if (hasDelegate(networkId)) {
-                        delegateMap.get(networkId).cancelPackets(request);
-                    }
                     return null;
                 }
             } else {

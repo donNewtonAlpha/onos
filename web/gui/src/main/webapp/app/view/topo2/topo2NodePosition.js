@@ -23,7 +23,7 @@
     'use strict';
 
     // Injected vars
-    var rs, t2mcs;
+    var rs, t2mcs, t2sls;
 
     // Internal state;
     var nearDist = 15;
@@ -93,13 +93,27 @@
         var loc = el.get('location'),
             coord;
 
-        if (loc && loc.type === 'lnglat') {
+        if (loc && loc.type === 'geo') {
 
             if (loc.lat === 0 && loc.lng === 0) {
                 return false;
             }
 
             coord = coordFromLngLat(loc);
+            el.fixed = true;
+            el.x = el.px = coord[0];
+            el.y = el.py = coord[1];
+
+            return true;
+        }
+
+        if (loc && loc.type === 'grid') {
+
+            if (loc.gridX === 0 && loc.gridY === 0) {
+                return false;
+            }
+
+            coord = coordFromXY(loc);
             el.fixed = true;
             el.x = el.px = coord[0];
             el.y = el.py = coord[1];
@@ -113,13 +127,22 @@
         return p ? p([loc.lng, loc.lat]) : [0, 0];
     }
 
+    function coordFromXY(loc) {
+        // 1000 is a hardcoded HTML value of the SVG element (topo2.html)
+        var x = (1000 / t2sls.getWidth()) * loc.gridX,
+            y = (1000 / t2sls.getHeight()) * loc.gridY;
+
+        return [x, y];
+    }
+
     angular.module('ovTopo2')
     .factory('Topo2NodePositionService',
-        ['RandomService', 'Topo2MapConfigService',
-            function (_rs_, _t2mcs_) {
+        ['RandomService', 'Topo2MapConfigService', 'Topo2SpriteLayerService',
+            function (_rs_, _t2mcs_, _t2sls_) {
 
                 rs = _rs_;
                 t2mcs = _t2mcs_;
+                t2sls = _t2sls_;
 
                 return {
                     positionNode: positionNode,

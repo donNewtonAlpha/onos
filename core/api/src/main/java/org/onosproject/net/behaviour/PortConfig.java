@@ -21,7 +21,9 @@ import org.onosproject.net.driver.HandlerBehaviour;
 
 /**
  * Means to configure a logical port at the device.
+ * @deprecated in Junco (1.9.1), use PortConfigBehaviour instead
  */
+@Deprecated
 public interface PortConfig extends HandlerBehaviour {
 
     /**
